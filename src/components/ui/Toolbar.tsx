@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
+import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useViewportStore } from '../../stores/viewportStore';
-import { loadFromFile } from '../../io/jsonIO';
-import { ZOOM_STEP } from '../../utils/constants';
+import { useEditorActions } from '../../commands/useEditorActions';
 import { DocumentDetails } from './DocumentDetails';
 import styles from './Toolbar.module.css';
 import clsx from 'clsx';
@@ -35,26 +34,18 @@ function formatRelativeSave(timestamp: number | null, now: number): string {
  * status. Renders the one-time local-only-data notice within its own subtree.
  */
 export function Toolbar() {
-  const resetDocument = usePedigreeStore((s) => s.resetDocument);
-  const setDocument = usePedigreeStore((s) => s.setDocument);
-  const addIndividual = usePedigreeStore((s) => s.addIndividual);
-  const removeIndividual = usePedigreeStore((s) => s.removeIndividual);
   const updateMetadata = usePedigreeStore((s) => s.updateMetadata);
   const doc = usePedigreeStore((s) => s.document);
   const metadata = doc.metadata;
   const title = metadata.title;
 
   const selectedIds = useUIStore((s) => s.selectedIds);
-  const clearSelection = useUIStore((s) => s.clearSelection);
-  const select = useUIStore((s) => s.select);
-  const openModal = useUIStore((s) => s.openModal);
   const activeTool = useUIStore((s) => s.activeTool);
-  const setActiveTool = useUIStore((s) => s.setActiveTool);
   const lastSavedAt = useUIStore((s) => s.lastSavedAt);
 
   const scale = useViewportStore((s) => s.scale);
-  const zoomToPoint = useViewportStore((s) => s.zoomToPoint);
-  const resetView = useViewportStore((s) => s.resetView);
+
+  const actions = useEditorActions();
 
   // --- Title click-to-edit ---
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -123,80 +114,6 @@ export function Toolbar() {
     } catch {
       // localStorage unavailable — state still updated for this session.
     }
-  };
-
-  const handleNew = () => {
-    if (
-      window.confirm(
-        'Create a new pedigree? Unsaved changes will be lost.'
-      )
-    ) {
-      resetDocument();
-      clearSelection();
-      resetView();
-    }
-  };
-
-  const handleOpen = async () => {
-    try {
-      const loaded = await loadFromFile();
-      setDocument(loaded);
-      clearSelection();
-      resetView();
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      // Silently ignore cancelled file pickers
-      if (err instanceof Error && err.message.includes('cancelled')) return;
-      alert(`Failed to open file: ${err instanceof Error ? err.message : 'Unknown error'}`);
-    }
-  };
-
-  const handleAddIndividual = () => {
-    // Place new individual at center of visible canvas area
-    const { screenToCanvas } = useViewportStore.getState();
-    const canvasEl = document.querySelector('.konvajs-content');
-    // screenToCanvas expects stage-local coords (0,0 = top-left of stage)
-    let stageCenter = { x: 300, y: 300 };
-    if (canvasEl) {
-      const rect = canvasEl.getBoundingClientRect();
-      stageCenter = { x: rect.width / 2, y: rect.height / 2 };
-    }
-    const canvasCenter = screenToCanvas(stageCenter);
-
-    const individual = createDefaultIndividual({
-      position: {
-        x: Math.round(canvasCenter.x),
-        y: Math.round(canvasCenter.y),
-      },
-    });
-    addIndividual(individual);
-    select(individual.id);
-  };
-
-  const handleDelete = () => {
-    for (const id of selectedIds) {
-      removeIndividual(id);
-    }
-    clearSelection();
-  };
-
-  const handleUndo = () => {
-    usePedigreeStore.temporal.getState().undo();
-  };
-
-  const handleRedo = () => {
-    usePedigreeStore.temporal.getState().redo();
-  };
-
-  const handleZoomIn = () => {
-    // Zoom toward center of viewport
-    const center = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    zoomToPoint(center, scale * ZOOM_STEP);
-  };
-
-  const handleZoomOut = () => {
-    const center = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
-    zoomToPoint(center, scale / ZOOM_STEP);
   };
 
   return (
@@ -278,35 +195,35 @@ export function Toolbar() {
       <div className={styles.group}>
         <button
           className={clsx(styles.button, styles.textButton)}
-          onClick={handleNew}
+          onClick={actions.newDocument}
           title="New Pedigree"
         >
           New
         </button>
         <button
           className={clsx(styles.button, styles.textButton)}
-          onClick={handleOpen}
+          onClick={actions.openDocument}
           title="Open JSON (Cmd+O)"
         >
           Open
         </button>
         <button
           className={clsx(styles.button, styles.textButton)}
-          onClick={() => openModal('import')}
+          onClick={actions.importPed}
           title="Import PED format"
         >
           Import
         </button>
         <button
           className={clsx(styles.button, styles.textButton)}
-          onClick={() => openModal('export')}
+          onClick={actions.exportDocument}
           title="Export"
         >
           Export
         </button>
         <button
           className={clsx(styles.button, styles.textButton)}
-          onClick={() => openModal('legendEditor')}
+          onClick={actions.openLegend}
           title="Configure legend / key"
         >
           Legend
@@ -318,14 +235,14 @@ export function Toolbar() {
       <div className={styles.group}>
         <button
           className={styles.button}
-          onClick={handleUndo}
+          onClick={actions.undo}
           title="Undo (Cmd+Z)"
         >
           &#x21A9;
         </button>
         <button
           className={styles.button}
-          onClick={handleRedo}
+          onClick={actions.redo}
           title="Redo (Cmd+Shift+Z)"
         >
           &#x21AA;
@@ -341,14 +258,14 @@ export function Toolbar() {
             styles.textButton,
             activeTool === 'select' && styles.buttonActive
           )}
-          onClick={() => setActiveTool('select')}
+          onClick={actions.selectTool}
           title="Select tool"
         >
           Select
         </button>
         <button
           className={clsx(styles.button, styles.textButton)}
-          onClick={handleAddIndividual}
+          onClick={actions.addPerson}
           title="Add Individual"
         >
           + Person
@@ -359,7 +276,7 @@ export function Toolbar() {
 
       <button
         className={clsx(styles.button, styles.textButton)}
-        onClick={handleDelete}
+        onClick={actions.deleteSelected}
         disabled={selectedIds.size === 0}
         title="Delete Selected"
         style={{ opacity: selectedIds.size === 0 ? 0.4 : 1 }}
@@ -372,7 +289,7 @@ export function Toolbar() {
       <div className={styles.group}>
         <button
           className={styles.button}
-          onClick={handleZoomOut}
+          onClick={actions.zoomOut}
           title="Zoom Out"
         >
           &minus;
@@ -382,14 +299,14 @@ export function Toolbar() {
         </span>
         <button
           className={styles.button}
-          onClick={handleZoomIn}
+          onClick={actions.zoomIn}
           title="Zoom In"
         >
           +
         </button>
         <button
           className={clsx(styles.button, styles.textButton)}
-          onClick={resetView}
+          onClick={actions.resetView}
           title="Reset View"
         >
           Fit
