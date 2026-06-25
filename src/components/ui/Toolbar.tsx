@@ -68,14 +68,6 @@ export function Toolbar() {
     }
   }, [isEditingTitle]);
 
-  // Keep the draft in sync when the title changes externally (e.g. Open/New)
-  // while not actively editing.
-  useEffect(() => {
-    if (!isEditingTitle) {
-      setTitleDraft(title);
-    }
-  }, [title, isEditingTitle]);
-
   const startEditingTitle = (): void => {
     setTitleDraft(title);
     setIsEditingTitle(true);
@@ -87,6 +79,7 @@ export function Toolbar() {
   };
 
   const cancelTitle = (): void => {
+    setTitleDraft(title);
     setIsEditingTitle(false);
   };
 
