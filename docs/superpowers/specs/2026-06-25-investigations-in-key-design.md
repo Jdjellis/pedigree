@@ -115,9 +115,15 @@ export function collectInvestigations(individuals: Individual[]): string[]
   saved before this change.
 - **Store factory** (`src/stores/pedigreeStore.ts`): `createDefaultIndividual` sets
   `investigations: []`; remove the `geneticTests: []` line.
-- **Canvas export** (SVG/PNG): symbol lines flow through `SymbolLabel` and key rows
-  through `LegendLayer`, so exports pick them up with no export-specific changes.
-  Verify during implementation.
+- **SVG/PNG export** (`src/io/svgExport.ts`): the export is a **separate
+  model-driven vector renderer** that manually mirrors the Konva components, not a
+  capture of them. So investigations must be added in two more places here:
+  `buildLabelLines` (mirrors `SymbolLabel`) appends investigation lines, and
+  `renderLegend` (mirrors `LegendLayer`) grows the key box with the "Investigations"
+  subheading and rows. These functions are pure and string-producing, so they are the
+  primary automated-test surface (the live Konva components are verified via the dev
+  preview, matching the repo's existing testing approach — `svgExport.test.ts` is the
+  only component-level test because react-konva does not render under jsdom).
 - **PED IO** (`src/io/pedIO.ts`): remove the two `geneticTests: []` initializers. PED
   has no field for free-text investigations, so they are not exported — the existing
   "PED import is lossy" notice already covers annotations/conditions and now covers
@@ -133,18 +139,21 @@ export function collectInvestigations(individuals: Individual[]): string[]
 
 ## Testing (TDD)
 
-Write tests before implementation:
+Write tests before implementation. react-konva does not render under jsdom, so the
+Konva components (`SymbolLabel`, `LegendLayer`, `PropertiesPanel`) are **not** unit
+tested — they are verified via the dev preview. Automated coverage runs through pure
+functions and the SVG export, matching the repo's existing `svgExport.test.ts`:
 
 - `collectInvestigations`: dedup, alphabetical order, trims/drops empties, empty input
   → `[]`, single vs multiple individuals.
-- `SymbolLabel`: renders one line per investigation, after conditions; renders nothing
-  extra when `investigations` is empty.
-- `PropertiesPanel` investigations section: add appends, remove deletes, empty input
-  ignored, duplicate on same individual not re-added, datalist options reflect the
-  chart-wide set.
-- `LegendLayer`: shows the "Investigations" subheading with the derived set; hidden
-  when empty.
-- `jsonIO`: a document without `investigations` loads with `investigations: []`.
+- `buildPedigreeSvg` (exercises `buildLabelLines` + `renderLegend`): an individual's
+  investigation text appears in the exported SVG; the key contains an "Investigations"
+  subheading with the distinct sorted set; no subheading when there are none.
+- `deserializeDocument`: a document whose individuals lack `investigations` loads with
+  `investigations: []`.
+- **Manual/preview verification** (documented in the plan, not automated): symbol
+  shows investigation lines, editor add/remove + datalist autocomplete, key subheading
+  on the live canvas.
 
 ## Scope guard (YAGNI — explicitly out of scope for v1)
 
