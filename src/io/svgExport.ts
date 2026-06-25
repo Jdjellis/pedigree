@@ -9,7 +9,7 @@ import type {
   FillPatternType,
 } from '../types/pedigree';
 import { GenderIdentity, RelationshipType, TwinType, VitalStatus } from '../types/enums';
-import { computeBounds, toRomanNumeral } from '../utils/boundsCalculation';
+import { computeBounds, computeGenerationNumerals } from '../utils/boundsCalculation';
 import {
   SYMBOL_SIZE,
   SYMBOL_STROKE_WIDTH,
@@ -264,29 +264,6 @@ function computeIndividualNumbers(individuals: Individual[]): Map<string, number
     });
   }
   return numbers;
-}
-
-/**
- * Compute generation numeral labels, matching `BoundsLayer.tsx`: one Roman
- * numeral per generation, vertically positioned at the average y of that
- * generation's individuals.
- */
-function computeGenerationLabels(
-  individuals: Individual[],
-): { roman: string; y: number }[] {
-  const genYMap = new Map<number, number[]>();
-  for (const ind of individuals) {
-    const gen = ind.generation ?? 0;
-    if (!genYMap.has(gen)) genYMap.set(gen, []);
-    genYMap.get(gen)!.push(ind.position.y);
-  }
-  const labels: { gen: number; y: number }[] = [];
-  for (const [gen, ys] of genYMap) {
-    const avgY = ys.reduce((a, b) => a + b, 0) / ys.length;
-    labels.push({ gen, y: avgY });
-  }
-  labels.sort((a, b) => a.gen - b.gen);
-  return labels.map(({ gen, y }) => ({ roman: toRomanNumeral(gen), y }));
 }
 
 // ---------------------------------------------------------------------------
@@ -781,7 +758,7 @@ export function buildPedigreeSvg(doc: PedigreeDocument, title: string): string {
   const entries = doc.legendConfig.entries;
 
   const individualNumbers = computeIndividualNumbers(individuals);
-  const generationLabels = computeGenerationLabels(individuals);
+  const generationLabels = computeGenerationNumerals(individuals);
 
   // ---- Collect pattern + clip defs --------------------------------------
   const patternDefs = new Map<string, string>();

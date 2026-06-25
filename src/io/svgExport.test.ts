@@ -153,6 +153,44 @@ describe('buildPedigreeSvg', () => {
     expect(svg).toContain('>II</text>');
   });
 
+  it('ranks the topmost generation as I even when its raw value is negative', () => {
+    // Simulate adding a parent generation above founders: founders stay at
+    // generation 0 and the new parents get generation -1 (see RadialMenu). The
+    // topmost (minimum) generation must still render as "I".
+    const doc = makeFixture();
+    const grandfather: Individual = {
+      ...doc.individuals.father,
+      id: 'grandfather',
+      displayName: 'George',
+      isProband: false,
+      position: { x: 100, y: -50 },
+      generation: -1,
+    };
+    doc.individuals = { ...doc.individuals, grandfather };
+
+    const svg = buildPedigreeSvg(doc, 'Test Pedigree');
+
+    // Three generations (-1, 0, 1) read I, II, III top-to-bottom.
+    expect(svg).toContain('>I</text>');
+    expect(svg).toContain('>II</text>');
+    expect(svg).toContain('>III</text>');
+  });
+
+  it('ranks the topmost generation as I even when raw generations are all > 0', () => {
+    const doc = makeFixture();
+    doc.individuals.father.generation = 2;
+    doc.individuals.mother.generation = 2;
+    doc.individuals.child.generation = 3;
+
+    const svg = buildPedigreeSvg(doc, 'Test Pedigree');
+
+    // Min-relative: generation 2 -> I, generation 3 -> II.
+    expect(svg).toContain('>I</text>');
+    expect(svg).toContain('>II</text>');
+    // Absolute numbering would have produced III for generation 2; it must not.
+    expect(svg).not.toContain('>III</text>');
+  });
+
   it('escapes XML-special characters in the title and labels', () => {
     const doc = makeFixture();
     doc.individuals.father.displayName = 'A & B <test>';
