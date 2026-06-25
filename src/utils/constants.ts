@@ -27,6 +27,13 @@ export const MIN_ZOOM = 0.1;
 export const MAX_ZOOM = 5;
 export const ZOOM_STEP = 1.1;
 export const DEFAULT_ZOOM = 1;
+// Wheel/trackpad navigation. Ctrl/Cmd+wheel and trackpad pinch zoom toward the
+// cursor; a plain wheel/two-finger scroll pans. Sensitivity converts (delta-mode
+// normalized) wheel deltaY into an exponential zoom factor.
+export const ZOOM_WHEEL_SENSITIVITY = 0.0015;
+// Pixels-per-line used to normalize line-mode (DOM_DELTA_LINE) wheel events,
+// which classic mouse wheels emit, into pixel-equivalent deltas.
+export const WHEEL_LINE_HEIGHT = 16;
 
 // Radial menu
 export const RADIAL_MENU_RADIUS = 60;

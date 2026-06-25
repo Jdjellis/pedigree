@@ -7,6 +7,8 @@ interface ViewportState {
 
   setScale: (scale: number) => void;
   setPosition: (pos: { x: number; y: number }) => void;
+  /** Pans the viewport by a screen-space delta, reading the latest position. */
+  panBy: (delta: { x: number; y: number }) => void;
   zoomToPoint: (
     point: { x: number; y: number },
     newScale: number
@@ -39,6 +41,12 @@ export const useViewportStore = create<ViewportState>()((set, get) => ({
 
   setPosition: (position) => {
     set({ position });
+  },
+
+  panBy: (delta) => {
+    set((state) => ({
+      position: { x: state.position.x + delta.x, y: state.position.y + delta.y },
+    }));
   },
 
   zoomToPoint: (point, newScale) => {

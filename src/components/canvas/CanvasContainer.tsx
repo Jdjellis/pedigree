@@ -22,7 +22,12 @@ import { BoundsLayer } from './BoundsLayer';
 import { computeBounds } from '../../utils/boundsCalculation';
 import type { ActiveQuarter } from './symbols/ConditionOverlay';
 import type { Individual } from '../../types/pedigree';
-import { ZOOM_STEP, MIN_ZOOM, MAX_ZOOM } from '../../utils/constants';
+import {
+  MIN_ZOOM,
+  MAX_ZOOM,
+  ZOOM_WHEEL_SENSITIVITY,
+  WHEEL_LINE_HEIGHT,
+} from '../../utils/constants';
 import styles from './CanvasContainer.module.css';
 
 export interface CanvasContainerHandle {
@@ -36,11 +41,15 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
 
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [isDragging, setIsDragging] = useState(false);
+    // True while the spacebar is held — turns the canvas into a "pan anywhere"
+    // mode (symbol dragging is suspended so a left-drag pans over symbols too).
+    const [isSpaceHeld, setIsSpaceHeld] = useState(false);
+    // True while a middle-mouse pan gesture is in progress.
+    const [isMiddlePanning, setIsMiddlePanning] = useState(false);
 
     const scale = useViewportStore((s) => s.scale);
     const position = useViewportStore((s) => s.position);
     const setPosition = useViewportStore((s) => s.setPosition);
-    const zoomToPoint = useViewportStore((s) => s.zoomToPoint);
 
     const activeTool = useUIStore((s) => s.activeTool);
     const clearSelection = useUIStore((s) => s.clearSelection);
@@ -84,27 +93,126 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
       };
     }, []);
 
-    // --------------- Wheel / Zoom ---------------
-    const handleWheel = useCallback(
-      (e: KonvaEventObject<WheelEvent>) => {
-        e.evt.preventDefault();
+    // --------------- Spacebar: hold to pan from anywhere ---------------
+    useEffect(() => {
+      const isTypingTarget = (t: EventTarget | null): boolean => {
+        const el = t as HTMLElement | null;
+        return (
+          !!el &&
+          (el.tagName === 'INPUT' ||
+            el.tagName === 'TEXTAREA' ||
+            el.tagName === 'SELECT' ||
+            el.isContentEditable)
+        );
+      };
+      const onKeyDown = (e: KeyboardEvent) => {
+        if (e.code !== 'Space' || e.repeat || isTypingTarget(e.target)) return;
+        e.preventDefault(); // avoid page scroll / focused-button activation
+        setIsSpaceHeld(true);
+      };
+      const onKeyUp = (e: KeyboardEvent) => {
+        if (e.code === 'Space') setIsSpaceHeld(false);
+      };
+      window.addEventListener('keydown', onKeyDown);
+      window.addEventListener('keyup', onKeyUp);
+      return () => {
+        window.removeEventListener('keydown', onKeyDown);
+        window.removeEventListener('keyup', onKeyUp);
+      };
+    }, []);
 
-        const stage = stageRef.current;
-        if (!stage) return;
+    // --------------- Middle-mouse drag: pan from anywhere ---------------
+    useEffect(() => {
+      const container = containerRef.current;
+      if (!container) return;
+      let last: { x: number; y: number } | null = null;
 
+      // Intercept the middle button in the capture phase, before Konva's
+      // listeners (bound on the descendant content element) can start a drag —
+      // so middle-drag always pans rather than moving a symbol. A physical
+      // middle press fires both pointerdown and mousedown; we stop both.
+      const onDown = (e: MouseEvent) => {
+        if (e.button !== 1) return;
+        e.preventDefault(); // suppress middle-click autoscroll
+        e.stopPropagation();
+        if (last) return; // already started by the paired pointer/mouse event
+        last = { x: e.clientX, y: e.clientY };
+        setIsMiddlePanning(true);
+      };
+      const onMove = (e: MouseEvent) => {
+        if (!last) return;
+        useViewportStore
+          .getState()
+          .panBy({ x: e.clientX - last.x, y: e.clientY - last.y });
+        last = { x: e.clientX, y: e.clientY };
+      };
+      const onUp = () => {
+        if (!last) return;
+        last = null;
+        setIsMiddlePanning(false);
+      };
+
+      container.addEventListener('mousedown', onDown, true);
+      container.addEventListener('pointerdown', onDown as EventListener, true);
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+      return () => {
+        container.removeEventListener('mousedown', onDown, true);
+        container.removeEventListener('pointerdown', onDown as EventListener, true);
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+      };
+    }, []);
+
+    // --------------- Cursor feedback for pan modes ---------------
+    useEffect(() => {
+      const el = stageRef.current?.container();
+      if (!el) return;
+      const panning = isDragging || isMiddlePanning;
+      el.style.cursor = panning ? 'grabbing' : isSpaceHeld ? 'grab' : '';
+      // While panning, clear any inline cursor the symbols set on the canvases
+      // so the container's grab/grabbing cursor is what shows.
+      if (panning || isSpaceHeld) {
+        el.querySelectorAll('canvas').forEach((c) => {
+          (c as HTMLElement).style.cursor = '';
+        });
+      }
+    }, [isDragging, isMiddlePanning, isSpaceHeld]);
+
+    // --------------- Wheel: pan, or zoom with Ctrl/Cmd (and trackpad pinch) ---------------
+    const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      if (!stage) return;
+      const evt = e.evt;
+
+      // Normalize line-mode wheels (classic mouse wheels) to pixel-equivalents.
+      const lineFactor = evt.deltaMode === 1 ? WHEEL_LINE_HEIGHT : 1;
+      let dx = evt.deltaX * lineFactor;
+      let dy = evt.deltaY * lineFactor;
+
+      // Ctrl/Cmd + wheel — and trackpad pinch, which browsers deliver as a wheel
+      // event with ctrlKey set — zoom toward the cursor.
+      if (evt.ctrlKey || evt.metaKey) {
         const pointer = stage.getPointerPosition();
         if (!pointer) return;
+        const { scale, zoomToPoint } = useViewportStore.getState();
+        const newScale = Math.max(
+          MIN_ZOOM,
+          Math.min(MAX_ZOOM, scale * Math.exp(-dy * ZOOM_WHEEL_SENSITIVITY))
+        );
+        zoomToPoint(pointer, newScale);
+        return;
+      }
 
-        const direction = e.evt.deltaY < 0 ? 1 : -1;
-        const newScale =
-          direction > 0 ? scale * ZOOM_STEP : scale / ZOOM_STEP;
-
-        const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newScale));
-
-        zoomToPoint(pointer, clamped);
-      },
-      [scale, zoomToPoint]
-    );
+      // Plain wheel / two-finger scroll pans. Shift maps a vertical-only mouse
+      // wheel to horizontal panning.
+      if (evt.shiftKey && dx === 0) {
+        dx = dy;
+        dy = 0;
+      }
+      useViewportStore.getState().panBy({ x: -dx, y: -dy });
+    }, []);
 
     // --------------- Stage Drag (Pan) ---------------
     const handleDragStart = useCallback(() => {
@@ -161,7 +269,10 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
       }
     }, [dragLink.active, endDragLink]);
 
-    const isDraggable = activeTool === 'pan';
+    // The stage is always draggable so a left-drag on empty canvas pans. When
+    // space is held, symbol dragging is suspended (see panMode below) so a
+    // left-drag over a symbol falls through to panning the stage instead.
+    const isDraggable = true;
 
     const individualsList = Object.values(individuals);
 
@@ -251,6 +362,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
                   isHovered={hoveredId === individual.id}
                   activeQuarters={getActiveQuarters(individual)}
                   individualNumber={individualNumbers.get(individual.id)}
+                  panMode={isSpaceHeld}
                 />
               ))}
             </Layer>

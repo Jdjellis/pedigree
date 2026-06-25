@@ -30,6 +30,12 @@ export interface PedigreeSymbolProps {
   isHovered: boolean;
   activeQuarters: ActiveQuarter[];
   individualNumber?: number;
+  /**
+   * When true the canvas is in "pan anywhere" mode (spacebar held): dragging
+   * this symbol is suspended so a left-drag pans the stage, and hover affordances
+   * (pointer cursor, radial menu) are skipped.
+   */
+  panMode?: boolean;
 }
 
 const SELECTION_COLOR = '#6965db';
@@ -214,7 +220,14 @@ function HoverHighlight({ isHovered }: { isHovered: boolean }) {
  * inside event handlers (imperative, not reactive).
  */
 export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
-  ({ individual, isSelected, isHovered, activeQuarters, individualNumber }) => {
+  ({
+    individual,
+    isSelected,
+    isHovered,
+    activeQuarters,
+    individualNumber,
+    panMode = false,
+  }) => {
     const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const isDeceased =
@@ -239,6 +252,8 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
     );
 
     const handleMouseEnter = useCallback(() => {
+      // In pan mode, suppress hover affordances so panning feels uninterrupted.
+      if (panMode) return;
       const uiState = useUIStore.getState();
       uiState.setHovered(individual.id);
       if (uiState.dragLink.active) {
@@ -257,7 +272,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         const screenPos = canvasToScreen(individual.position);
         useUIStore.getState().showRadialMenu(individual.id, screenPos);
       }, RADIAL_MENU_HOVER_DELAY);
-    }, [individual.id, individual.position]);
+    }, [individual.id, individual.position, panMode]);
 
     const handleMouseLeave = useCallback(() => {
       const uiState = useUIStore.getState();
@@ -315,7 +330,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
       <Group
         x={individual.position.x}
         y={individual.position.y}
-        draggable
+        draggable={!panMode}
         onClick={handleClick}
         onTap={handleClick}
         onMouseEnter={handleMouseEnter}
