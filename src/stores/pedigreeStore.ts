@@ -72,6 +72,10 @@ interface PedigreeState {
     partnershipId: string,
     childId: string
   ) => void;
+  updatePartnership: (
+    id: string,
+    patch: Partial<PartnershipRelationship>
+  ) => void;
 
   // Parent-child link actions
   addParentChildLink: (link: ParentChildRelationship) => void;
@@ -319,6 +323,25 @@ export const usePedigreeStore = create<PedigreeState>()(
                     (id) => id !== childId
                   ),
                 },
+              },
+            },
+          };
+        }),
+
+      updatePartnership: (id, patch) =>
+        set((state) => {
+          const partnership = state.document.partnerships[id];
+          if (!partnership) return state;
+          return {
+            document: {
+              ...state.document,
+              metadata: {
+                ...state.document.metadata,
+                updatedAt: new Date().toISOString(),
+              },
+              partnerships: {
+                ...state.document.partnerships,
+                [id]: { ...partnership, ...patch },
               },
             },
           };
