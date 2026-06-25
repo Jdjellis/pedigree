@@ -2,7 +2,8 @@
    Does NOT reflow the canvas; the canvas always fills the full viewport. */
 .panel {
   position: absolute;
-  top: 14px;
+  /* Start below the top-right Actions island so the two don't overlap. */
+  top: 70px;
   right: 14px;
   bottom: 14px;
   width: 280px;
@@ -15,7 +16,7 @@
   z-index: 10;
   pointer-events: auto;
   /* Prevent panel from growing taller than the viewport minus its insets */
-  max-height: calc(100vh - 28px);
+  max-height: calc(100vh - 84px);
 }
 
 .empty {
