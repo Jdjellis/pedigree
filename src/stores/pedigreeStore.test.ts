@@ -1,6 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { usePedigreeStore } from './pedigreeStore';
-import type { TextAnnotation } from '../types/pedigree';
+import { usePedigreeStore, createDefaultIndividual } from './pedigreeStore';
+import { generateId } from '../utils/idGenerator';
+import { RelationshipType } from '../types/enums';
+import { MIN_GENERATION_NODE_SPACING } from '../utils/constants';
+import type {
+  TextAnnotation,
+  PartnershipRelationship,
+} from '../types/pedigree';
 
 /**
  * Reset the store to a fresh empty document (and clear undo/redo history)
@@ -106,5 +112,96 @@ describe('pedigreeStore text annotation actions', () => {
     expect(
       usePedigreeStore.getState().document.textAnnotations['anno-1'].position,
     ).toEqual({ x: 10, y: 20 });
+  });
+});
+
+describe('pedigreeStore bounded respacing on add', () => {
+  it('addPartnerToIndividual nudges an overlapping same-generation neighbour right', () => {
+    // An existing target at x=0 and a neighbour sitting where the new partner
+    // will land (x = PARTNER_SPACING is well within MIN_GENERATION_NODE_SPACING
+    // of the partner). All three share generation 0.
+    const target = createDefaultIndividual({
+      id: 'target',
+      generation: 0,
+      position: { x: 0, y: 0 },
+    });
+    const neighbour = createDefaultIndividual({
+      id: 'neighbour',
+      generation: 0,
+      // Just to the right of where the new partner will land (x=120), so it
+      // overlaps the partner and must be pushed right; order is unambiguous.
+      position: { x: 130, y: 0 },
+    });
+    usePedigreeStore.getState().addIndividual(target);
+    usePedigreeStore.getState().addIndividual(neighbour);
+
+    const partner = createDefaultIndividual({
+      id: 'partner',
+      generation: 0,
+      position: { x: 120, y: 0 }, // target.x + PARTNER_SPACING
+    });
+    const partnership: PartnershipRelationship = {
+      id: generateId(),
+      type: RelationshipType.Partnership,
+      partner1Id: target.id,
+      partner2Id: partner.id,
+      childrenIds: [],
+    };
+
+    usePedigreeStore.getState().addPartnerToIndividual(partner, partnership);
+
+    const individuals = usePedigreeStore.getState().document.individuals;
+    // The partner stays put; the overlapping neighbour is pushed right to keep
+    // at least MIN_GENERATION_NODE_SPACING, and left-to-right order is preserved.
+    expect(individuals.target.position.x).toBe(0);
+    expect(individuals.partner.position.x).toBe(120);
+    expect(individuals.neighbour.position.x).toBe(
+      120 + MIN_GENERATION_NODE_SPACING,
+    );
+    expect(individuals.partner.position.x).toBeLessThan(
+      individuals.neighbour.position.x,
+    );
+  });
+
+  it('a single undo reverts both the partner add and the respacing nudge', () => {
+    const target = createDefaultIndividual({
+      id: 'target',
+      generation: 0,
+      position: { x: 0, y: 0 },
+    });
+    const neighbour = createDefaultIndividual({
+      id: 'neighbour',
+      generation: 0,
+      // Just to the right of where the new partner will land (x=120), so it
+      // overlaps the partner and must be pushed right; order is unambiguous.
+      position: { x: 130, y: 0 },
+    });
+    usePedigreeStore.getState().addIndividual(target);
+    usePedigreeStore.getState().addIndividual(neighbour);
+
+    const partner = createDefaultIndividual({
+      id: 'partner',
+      generation: 0,
+      position: { x: 120, y: 0 },
+    });
+    const partnership: PartnershipRelationship = {
+      id: generateId(),
+      type: RelationshipType.Partnership,
+      partner1Id: target.id,
+      partner2Id: partner.id,
+      childrenIds: [],
+    };
+
+    usePedigreeStore.getState().addPartnerToIndividual(partner, partnership);
+    expect(
+      usePedigreeStore.getState().document.individuals.neighbour.position.x,
+    ).toBe(120 + MIN_GENERATION_NODE_SPACING);
+
+    usePedigreeStore.temporal.getState().undo();
+
+    const individuals = usePedigreeStore.getState().document.individuals;
+    // One undo removes the partner AND restores the nudged neighbour's x.
+    expect(individuals.partner).toBeUndefined();
+    expect(individuals.neighbour.position.x).toBe(130);
   });
 });

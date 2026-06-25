@@ -11,6 +11,12 @@ export const GENERATION_SPACING = 150;
 export const SIBLING_SPACING = 80;
 export const PARTNER_SPACING = 120;
 export const PARENT_CHILD_OFFSET = 50;
+/**
+ * Minimum horizontal gap between two nodes in the same generation, used by the
+ * bounded auto-respacing on add. Sized to twice the symbol width (SYMBOL_SIZE)
+ * so symbols never visually overlap; matches SIBLING_SPACING as a reference.
+ */
+export const MIN_GENERATION_NODE_SPACING = SYMBOL_SIZE * 2;
 
 // Connection lines
 export const LINE_COLOR = '#1a1a1a';
