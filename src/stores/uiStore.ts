@@ -31,6 +31,13 @@ interface UIState {
   activeModal: ActiveModal;
   activeTool: ActiveTool;
 
+  /**
+   * Timestamp (ms since epoch) of the most recent successful autosave to
+   * localStorage, or `null` if nothing has been saved yet this session.
+   * Drives the "Saved locally" indicator in the toolbar.
+   */
+  lastSavedAt: number | null;
+
   select: (id: string) => void;
   selectMultiple: (ids: string[]) => void;
   clearSelection: () => void;
@@ -51,6 +58,7 @@ interface UIState {
   openModal: (modal: ActiveModal) => void;
   closeModal: () => void;
   setPropertiesPanelOpen: (open: boolean) => void;
+  setLastSavedAt: (timestamp: number) => void;
 }
 
 export const useUIStore = create<UIState>()((set) => ({
@@ -80,6 +88,7 @@ export const useUIStore = create<UIState>()((set) => ({
   propertiesPanelOpen: false,
   activeModal: null,
   activeTool: 'select',
+  lastSavedAt: null,
 
   select: (id) =>
     set({
@@ -167,4 +176,6 @@ export const useUIStore = create<UIState>()((set) => ({
   closeModal: () => set({ activeModal: null }),
 
   setPropertiesPanelOpen: (open) => set({ propertiesPanelOpen: open }),
+
+  setLastSavedAt: (timestamp) => set({ lastSavedAt: timestamp }),
 }));

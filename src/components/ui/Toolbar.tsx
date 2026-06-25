@@ -1,18 +1,48 @@
+import { useEffect, useRef, useState } from 'react';
 import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
 import { useViewportStore } from '../../stores/viewportStore';
 import { loadFromFile } from '../../io/jsonIO';
 import { ZOOM_STEP } from '../../utils/constants';
+import { DocumentDetails } from './DocumentDetails';
 import styles from './Toolbar.module.css';
 import clsx from 'clsx';
 
+const PLACEHOLDER_TITLE = 'Untitled Pedigree';
+/** localStorage flag marking the one-time local-only notice as dismissed. */
+const LOCAL_NOTICE_DISMISSED_KEY = 'pedigree-editor-local-notice-dismissed';
+
+/**
+ * Formats a "Saved locally" suffix as a coarse relative time. Kept intentionally
+ * simple — the indicator is reassurance, not a precise clock.
+ */
+function formatRelativeSave(timestamp: number | null, now: number): string {
+  // No autosave has fired yet this session — the document is trivially in its
+  // saved (empty/restored) state, so reassure rather than imply pending work.
+  if (timestamp === null) return 'Saved locally';
+  const seconds = Math.max(0, Math.round((now - timestamp) / 1000));
+  if (seconds < 5) return 'Saved locally';
+  if (seconds < 60) return `Saved locally · ${seconds}s ago`;
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `Saved locally · ${minutes}m ago`;
+  const hours = Math.round(minutes / 60);
+  return `Saved locally · ${hours}h ago`;
+}
+
+/**
+ * The top application toolbar: document title (click-to-edit), document-details
+ * popover, document/edit/view actions, and the local-first "Saved locally"
+ * status. Renders the one-time local-only-data notice within its own subtree.
+ */
 export function Toolbar() {
   const resetDocument = usePedigreeStore((s) => s.resetDocument);
   const setDocument = usePedigreeStore((s) => s.setDocument);
   const addIndividual = usePedigreeStore((s) => s.addIndividual);
   const removeIndividual = usePedigreeStore((s) => s.removeIndividual);
+  const updateMetadata = usePedigreeStore((s) => s.updateMetadata);
   const doc = usePedigreeStore((s) => s.document);
-  const title = doc.metadata.title;
+  const metadata = doc.metadata;
+  const title = metadata.title;
 
   const selectedIds = useUIStore((s) => s.selectedIds);
   const clearSelection = useUIStore((s) => s.clearSelection);
@@ -20,10 +50,87 @@ export function Toolbar() {
   const openModal = useUIStore((s) => s.openModal);
   const activeTool = useUIStore((s) => s.activeTool);
   const setActiveTool = useUIStore((s) => s.setActiveTool);
+  const lastSavedAt = useUIStore((s) => s.lastSavedAt);
 
   const scale = useViewportStore((s) => s.scale);
   const zoomToPoint = useViewportStore((s) => s.zoomToPoint);
   const resetView = useViewportStore((s) => s.resetView);
+
+  // --- Title click-to-edit ---
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(title);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditingTitle) {
+      titleInputRef.current?.focus();
+      titleInputRef.current?.select();
+    }
+  }, [isEditingTitle]);
+
+  // Keep the draft in sync when the title changes externally (e.g. Open/New)
+  // while not actively editing.
+  useEffect(() => {
+    if (!isEditingTitle) {
+      setTitleDraft(title);
+    }
+  }, [title, isEditingTitle]);
+
+  const startEditingTitle = (): void => {
+    setTitleDraft(title);
+    setIsEditingTitle(true);
+  };
+
+  const commitTitle = (): void => {
+    updateMetadata({ title: titleDraft.trim() });
+    setIsEditingTitle(false);
+  };
+
+  const cancelTitle = (): void => {
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleKeyDown = (
+    event: React.KeyboardEvent<HTMLInputElement>
+  ): void => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      commitTitle();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      cancelTitle();
+    }
+  };
+
+  // --- Document details popover ---
+  const [detailsOpen, setDetailsOpen] = useState(false);
+
+  // --- "Saved locally" relative-time tick ---
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const intervalId = setInterval(() => setNow(Date.now()), 15000);
+    return () => clearInterval(intervalId);
+  }, []);
+  const saveStatus = formatRelativeSave(lastSavedAt, now);
+
+  // --- One-time local-only-data notice ---
+  const [noticeDismissed, setNoticeDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(LOCAL_NOTICE_DISMISSED_KEY) === 'true';
+    } catch {
+      // localStorage unavailable — treat as already dismissed to avoid nagging.
+      return true;
+    }
+  });
+
+  const dismissNotice = (): void => {
+    setNoticeDismissed(true);
+    try {
+      localStorage.setItem(LOCAL_NOTICE_DISMISSED_KEY, 'true');
+    } catch {
+      // localStorage unavailable — state still updated for this session.
+    }
+  };
 
   const handleNew = () => {
     if (
@@ -101,7 +208,77 @@ export function Toolbar() {
 
   return (
     <div className={styles.toolbar}>
-      <span className={styles.title}>{title}</span>
+      <div className={styles.documentInfo}>
+        <div className={styles.titleRow}>
+          {isEditingTitle ? (
+            <input
+              ref={titleInputRef}
+              className={styles.titleInput}
+              type="text"
+              value={titleDraft}
+              placeholder={PLACEHOLDER_TITLE}
+              onChange={(e) => setTitleDraft(e.target.value)}
+              onBlur={commitTitle}
+              onKeyDown={handleTitleKeyDown}
+              aria-label="Document title"
+            />
+          ) : (
+            <button
+              type="button"
+              className={clsx(styles.title, !title && styles.titlePlaceholder)}
+              onClick={startEditingTitle}
+              title="Click to rename this pedigree"
+            >
+              {title || PLACEHOLDER_TITLE}
+            </button>
+          )}
+
+          <div className={styles.detailsAnchor}>
+            <button
+              type="button"
+              className={clsx(styles.button, styles.detailsButton)}
+              onClick={() => setDetailsOpen((open) => !open)}
+              aria-expanded={detailsOpen}
+              aria-haspopup="dialog"
+              title="Document details (author, institution, reference condition)"
+            >
+              &#9432;
+            </button>
+            {detailsOpen && (
+              <DocumentDetails
+                metadata={metadata}
+                onChange={updateMetadata}
+                onClose={() => setDetailsOpen(false)}
+              />
+            )}
+          </div>
+        </div>
+
+        <span
+          className={styles.saveStatus}
+          title="Your work lives only in this browser. Export → JSON to keep a permanent copy."
+        >
+          {saveStatus}
+        </span>
+      </div>
+
+      {!noticeDismissed && (
+        <div className={styles.localNotice} role="status">
+          <span className={styles.localNoticeText}>
+            Your work is saved only in this browser. Export → JSON to keep a
+            permanent copy.
+          </span>
+          <button
+            type="button"
+            className={styles.localNoticeDismiss}
+            onClick={dismissNotice}
+            title="Dismiss"
+            aria-label="Dismiss local-storage notice"
+          >
+            &times;
+          </button>
+        </div>
+      )}
 
       <div className={styles.separator} />
 

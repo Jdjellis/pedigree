@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { usePedigreeStore } from '../stores/pedigreeStore';
+import { useUIStore } from '../stores/uiStore';
 
 const STORAGE_KEY = 'pedigree-editor-autosave';
 const DEBOUNCE_MS = 2000;
@@ -53,6 +54,8 @@ export function useAutoSave() {
       timeoutId = setTimeout(() => {
         try {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(state.document));
+          // Surface a last-saved signal so the toolbar can show "Saved locally".
+          useUIStore.getState().setLastSavedAt(Date.now());
         } catch {
           // localStorage full or unavailable — ignore
         }

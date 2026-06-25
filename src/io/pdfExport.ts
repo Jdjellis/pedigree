@@ -60,6 +60,14 @@ export async function exportToPdf(
     doc.text(`Institution: ${metadata.institution}`, MARGIN, cursorY);
     cursorY += 5;
   }
+  if (metadata.referenceCondition) {
+    doc.text(
+      `Reference condition: ${metadata.referenceCondition}`,
+      MARGIN,
+      cursorY
+    );
+    cursorY += 5;
+  }
 
   // Horizontal rule
   cursorY += 2;
