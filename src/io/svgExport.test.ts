@@ -146,6 +146,8 @@ describe('buildPedigreeSvg', () => {
     expect(svg).toContain('Condition A (dx 25)');
     // Legend "Key" box.
     expect(svg).toContain('>Key</text>');
+    // Legend rows read "icon = description" (issue #18).
+    expect(svg).toContain('>= Condition A</text>');
     // Generation numerals (Roman).
     expect(svg).toContain('>I</text>');
     expect(svg).toContain('>II</text>');

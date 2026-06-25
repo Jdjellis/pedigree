@@ -651,12 +651,13 @@ function renderLegend(
       parts.push(renderLegendSwatch(sx, rowY, GenderIdentity.Woman, entry));
     }
 
+    // Read as "icon = description" to match the on-canvas legend.
     parts.push(
       `<text x="${LEGEND_PADDING + swatchWidth + 8}" y="${num(
         rowY + 4 + 12,
       )}" font-size="12" font-family="${escapeXml(
         LABEL_FONT_FAMILY,
-      )}" fill="${SYMBOL_COLOR}">${escapeXml(entry.name)}</text>`,
+      )}" fill="${SYMBOL_COLOR}">${escapeXml(`= ${entry.name}`)}</text>`,
     );
   });
 
