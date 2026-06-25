@@ -128,7 +128,6 @@ function CommandPaletteInner({ onClose }: CommandPaletteInnerProps) {
   return (
     <Dialog.Content
       className={styles.panel}
-      aria-label="Command palette"
       onOpenAutoFocus={(e) => {
         // Prevent Radix from focusing the panel itself; focus the input instead.
         e.preventDefault();
@@ -146,7 +145,7 @@ function CommandPaletteInner({ onClose }: CommandPaletteInnerProps) {
       <input
         ref={inputRef}
         role="combobox"
-        aria-expanded={visibleCommands.length > 0}
+        aria-expanded={true}
         aria-autocomplete="list"
         aria-controls="command-palette-list"
         aria-activedescendant={
@@ -169,31 +168,32 @@ function CommandPaletteInner({ onClose }: CommandPaletteInnerProps) {
         className={styles.list}
         aria-label="Commands"
       >
-        {visibleCommands.length === 0 ? (
-          <li className={styles.empty}>No matching commands</li>
-        ) : (
-          visibleCommands.map((cmd, index) => (
-            <li
-              key={cmd.id}
-              id={`cmd-item-${index}`}
-              role="option"
-              aria-selected={index === safeIndex}
-              className={
-                index === safeIndex
-                  ? `${styles.item} ${styles.itemHighlighted}`
-                  : styles.item
-              }
-              onMouseEnter={() => setHighlightIndex(index)}
-              onClick={() => runCommand(index)}
-            >
-              <span className={styles.itemTitle}>{cmd.title}</span>
-              {cmd.shortcut && (
-                <kbd className={styles.shortcut}>{cmd.shortcut}</kbd>
-              )}
-            </li>
-          ))
-        )}
+        {visibleCommands.map((cmd, index) => (
+          <li
+            key={cmd.id}
+            id={`cmd-item-${index}`}
+            role="option"
+            aria-selected={index === safeIndex}
+            className={
+              index === safeIndex
+                ? `${styles.item} ${styles.itemHighlighted}`
+                : styles.item
+            }
+            onMouseEnter={() => setHighlightIndex(index)}
+            onClick={() => runCommand(index)}
+          >
+            <span className={styles.itemTitle}>{cmd.title}</span>
+            {cmd.shortcut && (
+              <kbd className={styles.shortcut}>{cmd.shortcut}</kbd>
+            )}
+          </li>
+        ))}
       </ul>
+      {/* Empty state lives outside the listbox so it isn't an invalid
+          non-option child of role="listbox". */}
+      {visibleCommands.length === 0 && (
+        <div className={styles.empty}>No matching commands</div>
+      )}
     </Dialog.Content>
   );
 }
