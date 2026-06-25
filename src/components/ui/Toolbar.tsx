@@ -4,6 +4,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { useViewportStore } from '../../stores/viewportStore';
 import { loadFromFile } from '../../io/jsonIO';
 import { generateId } from '../../utils/idGenerator';
+import { computeAnnotationDropPosition } from '../../utils/annotationPlacement';
 import {
   ZOOM_STEP,
   ANNOTATION_DEFAULT_FONT_SIZE,
@@ -189,8 +190,10 @@ export function Toolbar() {
   };
 
   const handleAddText = () => {
-    // Place the new annotation at the centre of the visible canvas area, using
-    // the same stage-local → canvas conversion as adding an individual.
+    // Drop the annotation in clear space below the existing pedigree so it does
+    // not land on top of a symbol. When the document is empty, fall back to the
+    // centre of the visible canvas area (same stage-local → canvas conversion
+    // as adding an individual).
     const { screenToCanvas } = useViewportStore.getState();
     const canvasEl = document.querySelector('.konvajs-content');
     let stageCenter = { x: 300, y: 300 };
@@ -198,15 +201,17 @@ export function Toolbar() {
       const rect = canvasEl.getBoundingClientRect();
       stageCenter = { x: rect.width / 2, y: rect.height / 2 };
     }
-    const canvasCenter = screenToCanvas(stageCenter);
+    const fallback = screenToCanvas(stageCenter);
+    const position = computeAnnotationDropPosition(
+      Object.values(doc.individuals),
+      Object.values(doc.textAnnotations),
+      fallback,
+    );
 
     const annotation = {
       id: generateId(),
       text: ANNOTATION_PLACEHOLDER_TEXT,
-      position: {
-        x: Math.round(canvasCenter.x),
-        y: Math.round(canvasCenter.y),
-      },
+      position,
       fontSize: ANNOTATION_DEFAULT_FONT_SIZE,
     };
     addTextAnnotation(annotation);

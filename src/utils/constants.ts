@@ -57,6 +57,12 @@ export const LABEL_OFFSET_Y = 8;
 export const ANNOTATION_DEFAULT_FONT_SIZE = 18;
 /** Placeholder text a new annotation opens with before the user types. */
 export const ANNOTATION_PLACEHOLDER_TEXT = 'Text';
+/**
+ * Vertical gap (canvas units) left between the lowest existing content and a
+ * newly dropped annotation, so it lands in clear space rather than on top of a
+ * symbol. See {@link computeAnnotationDropPosition}.
+ */
+export const ANNOTATION_DROP_GAP = SYMBOL_SIZE;
 
 // Proband arrow
 export const PROBAND_ARROW_SIZE = 10;
