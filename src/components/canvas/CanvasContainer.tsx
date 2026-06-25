@@ -12,7 +12,7 @@ import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore } from '../../stores/uiStore';
-import { usePedigreeStore } from '../../stores/pedigreeStore';
+import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
 import { GridLayer } from './GridLayer';
 import { ConnectionsLayer } from '../connections/ConnectionsLayer';
 import { PedigreeSymbol } from './symbols/PedigreeSymbol';
@@ -246,7 +246,30 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     const handleStageClick = useCallback(
       (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
         const clickedOnEmpty = e.target === e.target.getStage();
-        if (clickedOnEmpty) {
+        if (!clickedOnEmpty) return;
+
+        // Read activeTool via getState() to avoid stale-closure issues —
+        // consistent with the existing pattern in this file (no Zustand hook
+        // subscriptions inside react-konva handlers).
+        const currentTool = useUIStore.getState().activeTool;
+
+        if (currentTool === 'addIndividual') {
+          // Place a new individual at the click point in canvas space.
+          const stage = stageRef.current;
+          if (!stage) return;
+          const pointer = stage.getPointerPosition();
+          if (!pointer) return;
+          const canvasPos = useViewportStore.getState().screenToCanvas(pointer);
+          const individual = createDefaultIndividual({
+            position: {
+              x: Math.round(canvasPos.x),
+              y: Math.round(canvasPos.y),
+            },
+          });
+          usePedigreeStore.getState().addIndividual(individual);
+          useUIStore.getState().select(individual.id);
+          useUIStore.getState().setActiveTool('select');
+        } else {
           clearSelection();
         }
       },
