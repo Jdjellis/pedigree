@@ -4,13 +4,18 @@ import {
   type CanvasContainerHandle,
 } from './components/canvas/CanvasContainer';
 import { EmptyStateHint } from './components/canvas/EmptyStateHint';
-import { Toolbar } from './components/ui/Toolbar';
 import { PropertiesPanel } from './components/ui/PropertiesPanel';
 import { RadialMenu } from './components/ui/RadialMenu';
 import { ImportExportModal } from './components/ui/ImportExportModal';
 import { LegendEditor } from './components/ui/LegendEditor';
 import { LinkTypePopup } from './components/ui/LinkTypePopup';
 import { LegendOverlay } from './components/ui/LegendOverlay';
+import { MenuIsland } from './components/ui/islands/MenuIsland';
+import { ToolIsland } from './components/ui/islands/ToolIsland';
+import { ActionsIsland } from './components/ui/islands/ActionsIsland';
+import { ZoomIsland } from './components/ui/islands/ZoomIsland';
+import { HistoryIsland } from './components/ui/islands/HistoryIsland';
+import { HelpIsland } from './components/ui/islands/HelpIsland';
 import { useUIStore } from './stores/uiStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -29,16 +34,40 @@ function App() {
 
   return (
     <div className={styles.app}>
-      <Toolbar />
-      <div className={styles.main}>
-        <div className={styles.canvasArea}>
-          <CanvasContainer ref={canvasRef} />
-          <EmptyStateHint />
-          <RadialMenu />
-          <LegendOverlay />
-        </div>
-        {propertiesPanelOpen && <PropertiesPanel />}
+      {/* Full-bleed canvas layer */}
+      <div className={styles.canvasArea}>
+        <CanvasContainer ref={canvasRef} />
+        <EmptyStateHint />
+        <RadialMenu />
+        <LegendOverlay />
       </div>
+
+      {/* Floating island slots */}
+      <div className={styles.slotTopLeft}>
+        <MenuIsland />
+      </div>
+
+      <div className={styles.slotTopCenter}>
+        <ToolIsland />
+      </div>
+
+      <div className={styles.slotTopRight}>
+        <ActionsIsland />
+      </div>
+
+      <div className={styles.slotBottomLeft}>
+        <ZoomIsland />
+        <HistoryIsland />
+      </div>
+
+      <div className={styles.slotBottomRight}>
+        <HelpIsland />
+      </div>
+
+      {/* Floating properties panel — overlays the canvas, does not reflow it */}
+      {propertiesPanelOpen && <PropertiesPanel />}
+
+      {/* Modal/overlay components */}
       <ImportExportModal getStage={getStage} />
       <LegendEditor />
       <LinkTypePopup />
