@@ -1,0 +1,47 @@
+/**
+ * Shared button styles for all floating-island controls.
+ *
+ * Import these classes in any island component instead of reaching back into
+ * Toolbar.module.css. Later island tasks (Zoom, History, etc.) should import
+ * from here so button styling stays consistent across the UI chrome.
+ */
+
+/** Square icon button (32×32). */
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--color-text);
+  transition: background-color 0.1s;
+  font-size: 14px;
+  position: relative;
+}
+
+.button:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.button:active {
+  background: rgba(0, 0, 0, 0.1);
+}
+
+/** Applied when the button's tool/action is currently active. */
+.buttonActive {
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
+}
+
+.buttonActive:hover {
+  background: var(--color-primary-soft-strong);
+}
+
+/** Width-auto variant for text-labelled buttons (e.g. "＋ Person"). */
+.textButton {
+  width: auto;
+  padding: 0 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
