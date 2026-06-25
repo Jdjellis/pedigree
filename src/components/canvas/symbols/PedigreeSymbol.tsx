@@ -124,6 +124,7 @@ function SelectionHighlight({
         dash={[4, 3]}
         cornerRadius={2}
         listening={false}
+        name="export-exclude"
       />
     );
   }
@@ -141,6 +142,7 @@ function SelectionHighlight({
           dash={[4, 3]}
           cornerRadius={2}
           listening={false}
+          name="export-exclude"
         />
       );
 
@@ -154,6 +156,7 @@ function SelectionHighlight({
           strokeWidth={SELECTION_STROKE_WIDTH}
           dash={[4, 3]}
           listening={false}
+          name="export-exclude"
         />
       );
 
@@ -171,6 +174,7 @@ function SelectionHighlight({
           dash={[4, 3]}
           cornerRadius={2}
           listening={false}
+          name="export-exclude"
         />
       );
   }
@@ -195,6 +199,7 @@ function HoverHighlight({ isHovered }: { isHovered: boolean }) {
       opacity={HOVER_OPACITY}
       cornerRadius={4}
       listening={false}
+      name="export-exclude"
     />
   );
 }

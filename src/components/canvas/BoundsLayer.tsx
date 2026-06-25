@@ -39,6 +39,7 @@ export const BoundsLayer: React.FC<BoundsLayerProps> = React.memo(
           strokeWidth={1}
           dash={[6, 4]}
           listening={false}
+          name="export-exclude"
         />
         {genLabels.map(({ gen, y }) => (
           <Text
@@ -51,6 +52,7 @@ export const BoundsLayer: React.FC<BoundsLayerProps> = React.memo(
             fontStyle="bold"
             fill={LABEL_COLOR}
             listening={false}
+            name="export-exclude"
           />
         ))}
       </>

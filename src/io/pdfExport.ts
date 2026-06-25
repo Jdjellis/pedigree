@@ -1,6 +1,25 @@
 import { jsPDF } from 'jspdf';
 import type Konva from 'konva';
 import type { PedigreeMetadata } from '../types/pedigree';
+import { captureCleanDataUrl } from './captureClean';
+
+/**
+ * Loads a data URL into an Image to read its natural pixel dimensions.
+ * Used so the PDF can preserve the captured pedigree's aspect ratio rather
+ * than the (unrelated) on-screen stage aspect ratio.
+ */
+function loadImageDimensions(
+  dataUrl: string
+): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = (): void =>
+      resolve({ width: img.naturalWidth, height: img.naturalHeight });
+    img.onerror = (): void =>
+      reject(new Error('Failed to load exported pedigree image'));
+    img.src = dataUrl;
+  });
+}
 
 const MARGIN = 20;
 const HEADER_FONT_SIZE = 16;
@@ -50,21 +69,26 @@ export async function exportToPdf(
   cursorY += 5;
 
   // --- Stage image ---
-  const dataUrl = stage.toDataURL({ pixelRatio: 3, mimeType: 'image/png' });
+  // Capture the whole pedigree cleanly (no grid / bounds / selection chrome),
+  // independent of the current pan/zoom.
+  const dataUrl = captureCleanDataUrl(stage, {
+    pixelRatio: 3,
+    mimeType: 'image/png',
+  });
 
   const availableWidth = pageWidth - MARGIN * 2;
   const footerHeight = 15;
   const availableHeight = pageHeight - cursorY - footerHeight;
 
-  // Calculate dimensions preserving aspect ratio
-  const stageWidth = stage.width();
-  const stageHeight = stage.height();
+  // Calculate dimensions preserving the captured image's aspect ratio.
+  const { width: imageWidth, height: imageHeight } =
+    await loadImageDimensions(dataUrl);
   const scale = Math.min(
-    availableWidth / stageWidth,
-    availableHeight / stageHeight
+    availableWidth / imageWidth,
+    availableHeight / imageHeight
   );
-  const imgWidth = stageWidth * scale;
-  const imgHeight = stageHeight * scale;
+  const imgWidth = imageWidth * scale;
+  const imgHeight = imageHeight * scale;
 
   // Center horizontally
   const imgX = MARGIN + (availableWidth - imgWidth) / 2;

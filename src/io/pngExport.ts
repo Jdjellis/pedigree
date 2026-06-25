@@ -1,10 +1,14 @@
 import type Konva from 'konva';
+import { captureCleanDataUrl } from './captureClean';
 
 export async function exportToPng(
   stage: Konva.Stage,
   title: string
 ): Promise<void> {
-  const dataUrl = stage.toDataURL({ pixelRatio: 3, mimeType: 'image/png' });
+  const dataUrl = captureCleanDataUrl(stage, {
+    pixelRatio: 3,
+    mimeType: 'image/png',
+  });
 
   // Convert data URL to Blob
   const response = await fetch(dataUrl);

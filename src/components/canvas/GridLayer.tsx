@@ -64,7 +64,7 @@ export const GridLayer: React.FC<GridLayerProps> = React.memo(
     }, [width, height, scale, position.x, position.y]);
 
     return (
-      <Layer listening={false}>
+      <Layer listening={false} name="export-exclude">
         {generationLines.map((line, i) => (
           <Line
             key={`gen-${i}`}
