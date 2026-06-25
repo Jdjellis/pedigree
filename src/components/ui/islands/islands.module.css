@@ -1,9 +1,9 @@
 /**
  * Shared button styles for all floating-island controls.
  *
- * Import these classes in any island component instead of reaching back into
- * Toolbar.module.css. Later island tasks (Zoom, History, etc.) should import
- * from here so button styling stays consistent across the UI chrome.
+ * Import these classes in any island component to keep button styling
+ * consistent across the UI chrome (ActionsIsland, ToolIsland, ZoomIsland,
+ * HistoryIsland, HelpIsland, etc.).
  */
 
 /** Square icon button (32×32). */

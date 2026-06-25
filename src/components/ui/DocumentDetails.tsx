@@ -22,8 +22,8 @@ export interface DocumentDetailsProps {
  * institution, and reference condition. The document date is derived
  * automatically from `metadata.updatedAt` and shown read-only.
  *
- * Rendered anchored within the toolbar subtree (see {@link Toolbar}). Closes
- * on outside click or the Escape key. Each field commits on change via
+ * Rendered anchored within the document-identity island. Closes on outside
+ * click or the Escape key. Each field commits on change via
  * {@link DocumentDetailsProps.onChange} so edits are picked up by autosave.
  */
 export function DocumentDetails({

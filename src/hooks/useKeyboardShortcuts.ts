@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import { usePedigreeStore } from '../stores/pedigreeStore';
 import { useUIStore } from '../stores/uiStore';
-import { loadFromFile, saveToFile } from '../io/jsonIO';
+import { saveToFile } from '../io/jsonIO';
+import { openDocumentAction, deleteSelectedAction } from '../commands/editorActions';
 
 /**
  * Global keyboard shortcuts for the pedigree editor.
@@ -70,14 +71,7 @@ export function useKeyboardShortcuts() {
           }
           case 'o': {
             e.preventDefault();
-            loadFromFile()
-              .then((doc) => {
-                usePedigreeStore.getState().setDocument(doc);
-                useUIStore.getState().clearSelection();
-              })
-              .catch(() => {
-                // User cancelled open picker — ignore
-              });
+            void openDocumentAction();
             return;
           }
           case 'e': {
@@ -123,14 +117,9 @@ export function useKeyboardShortcuts() {
         }
         case 'Delete':
         case 'Backspace': {
-          const ui = useUIStore.getState();
-          if (ui.selectedIds.size > 0) {
+          if (useUIStore.getState().selectedIds.size > 0) {
             e.preventDefault();
-            const { removeIndividual } = usePedigreeStore.getState();
-            for (const id of ui.selectedIds) {
-              removeIndividual(id);
-            }
-            ui.clearSelection();
+            deleteSelectedAction();
           }
           return;
         }

@@ -2,8 +2,8 @@ import { useMemo } from 'react';
 import { usePedigreeStore, createDefaultIndividual } from '../stores/pedigreeStore';
 import { useUIStore } from '../stores/uiStore';
 import { useViewportStore } from '../stores/viewportStore';
-import { loadFromFile } from '../io/jsonIO';
 import { ZOOM_STEP } from '../utils/constants';
+import { openDocumentAction, deleteSelectedAction } from './editorActions';
 
 /**
  * All imperative editor actions available to any surface (islands, ⌘K palette,
@@ -60,10 +60,13 @@ export interface EditorActions {
 }
 
 /**
- * Returns the full set of imperative editor actions, ported verbatim from the
- * inline handlers in `Toolbar.tsx`. Consume in floating islands, the ⌘K
- * command palette, or any other surface that needs to trigger document or
- * viewport mutations.
+ * Returns the full set of imperative editor actions for use in floating
+ * islands, the ⌘K command palette, or any other React surface that needs to
+ * trigger document or viewport mutations.
+ *
+ * The `openDocument` and `deleteSelected` actions delegate to module-level
+ * functions in `editorActions.ts` so that `useKeyboardShortcuts` can share
+ * the same bodies without duplicating logic.
  *
  * All store reads inside callbacks use `getState()` to avoid stale closures.
  */
@@ -78,21 +81,7 @@ export function useEditorActions(): EditorActions {
     }
   };
 
-  const openDocument = async (): Promise<void> => {
-    try {
-      const loaded = await loadFromFile();
-      usePedigreeStore.getState().setDocument(loaded);
-      useUIStore.getState().clearSelection();
-      useViewportStore.getState().resetView();
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      // Silently ignore cancelled file pickers
-      if (err instanceof Error && err.message.includes('cancelled')) return;
-      alert(
-        `Failed to open file: ${err instanceof Error ? err.message : 'Unknown error'}`
-      );
-    }
-  };
+  const openDocument = (): Promise<void> => openDocumentAction();
 
   const importPed = (): void => {
     useUIStore.getState().openModal('import');
@@ -132,13 +121,7 @@ export function useEditorActions(): EditorActions {
     addPersonAt(canvasCenter);
   };
 
-  const deleteSelected = (): void => {
-    const { selectedIds } = useUIStore.getState();
-    for (const id of selectedIds) {
-      usePedigreeStore.getState().removeIndividual(id);
-    }
-    useUIStore.getState().clearSelection();
-  };
+  const deleteSelected = (): void => deleteSelectedAction();
 
   const undo = (): void => {
     usePedigreeStore.temporal.getState().undo();

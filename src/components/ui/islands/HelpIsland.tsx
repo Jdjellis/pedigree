@@ -15,10 +15,8 @@ import styles from './islands.module.css';
  * ```
  */
 export function HelpIsland(): React.JSX.Element {
-  const openModal = useUIStore.getState().openModal;
-
   const handleHelpClick = (): void => {
-    openModal('shortcuts');
+    useUIStore.getState().openModal('shortcuts');
   };
 
   return (

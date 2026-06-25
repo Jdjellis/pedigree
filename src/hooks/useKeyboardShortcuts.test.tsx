@@ -9,6 +9,7 @@
 import { render, act, fireEvent } from '@testing-library/react';
 import { beforeEach, describe, test, expect } from 'vitest';
 import { useUIStore } from '../stores/uiStore';
+import { usePedigreeStore, createDefaultIndividual } from '../stores/pedigreeStore';
 import { useKeyboardShortcuts } from './useKeyboardShortcuts';
 
 // ---------------------------------------------------------------------------
@@ -20,13 +21,15 @@ function TestHarness(): null {
   return null;
 }
 
-/** Reset UI store to defaults before each test. */
+/** Reset stores to defaults before each test. */
 beforeEach(() => {
   act(() => {
+    usePedigreeStore.getState().resetDocument();
     useUIStore.setState({
       activeTool: 'select',
       activeModal: null,
       commandPaletteOpen: false,
+      selectedIds: new Set<string>(),
     });
   });
 });
@@ -125,5 +128,65 @@ describe('input-guard (hotkeys silenced when typing)', () => {
     expect(useUIStore.getState().activeTool).toBe('select');
 
     document.body.removeChild(select);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Delete / Backspace — removes selected individuals via deleteSelectedAction
+// ---------------------------------------------------------------------------
+
+describe('Delete / Backspace key removes selected individuals', () => {
+  function addAndSelectIndividual(): string {
+    const individual = createDefaultIndividual({ position: { x: 0, y: 0 } });
+    usePedigreeStore.getState().addIndividual(individual);
+    useUIStore.getState().select(individual.id);
+    return individual.id;
+  }
+
+  test('pressing Delete removes selected individuals from the document', () => {
+    render(<TestHarness />);
+    addAndSelectIndividual();
+
+    fireEvent.keyDown(document.body, { key: 'Delete' });
+
+    const individuals = Object.values(
+      usePedigreeStore.getState().document.individuals
+    );
+    expect(individuals).toHaveLength(0);
+  });
+
+  test('pressing Delete clears the selection', () => {
+    render(<TestHarness />);
+    addAndSelectIndividual();
+
+    fireEvent.keyDown(document.body, { key: 'Delete' });
+
+    expect(useUIStore.getState().selectedIds.size).toBe(0);
+  });
+
+  test('pressing Backspace removes selected individuals', () => {
+    render(<TestHarness />);
+    addAndSelectIndividual();
+
+    fireEvent.keyDown(document.body, { key: 'Backspace' });
+
+    const individuals = Object.values(
+      usePedigreeStore.getState().document.individuals
+    );
+    expect(individuals).toHaveLength(0);
+  });
+
+  test('pressing Delete with no selection does not remove anything', () => {
+    render(<TestHarness />);
+    const individual = createDefaultIndividual({ position: { x: 0, y: 0 } });
+    usePedigreeStore.getState().addIndividual(individual);
+    // Do NOT select the individual
+
+    fireEvent.keyDown(document.body, { key: 'Delete' });
+
+    const individuals = Object.values(
+      usePedigreeStore.getState().document.individuals
+    );
+    expect(individuals).toHaveLength(1);
   });
 });
