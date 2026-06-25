@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
 import {
@@ -27,6 +27,35 @@ export function PropertiesPanel() {
     },
     [selectedId, updateIndividual]
   );
+
+  const [addingNote, setAddingNote] = useState(false);
+  const [noteName, setNoteName] = useState('');
+  const [noteAge, setNoteAge] = useState('');
+
+  const resetNoteForm = useCallback(() => {
+    setAddingNote(false);
+    setNoteName('');
+    setNoteAge('');
+  }, []);
+
+  const submitNote = useCallback(() => {
+    if (!individual) return;
+    const name = noteName.trim();
+    if (!name) return;
+    const parsedAge = noteAge.trim() ? parseInt(noteAge, 10) : NaN;
+    const ageOfOnset = !isNaN(parsedAge) ? parsedAge : undefined;
+    update({
+      conditions: [
+        ...individual.conditions,
+        {
+          id: generateId(),
+          name,
+          ageOfOnset,
+        },
+      ],
+    });
+    resetNoteForm();
+  }, [individual, noteName, noteAge, update, resetNoteForm]);
 
   if (!propertiesPanelOpen || !individual) {
     return (
@@ -170,30 +199,55 @@ export function PropertiesPanel() {
               </button>
             </div>
           ))}
-          <button
-            className={styles.addButton}
-            onClick={() => {
-              const name = prompt('Clinical note / condition:');
-              if (!name) return;
-              const ageStr = prompt('Age of onset (optional):');
-              const ageOfOnset = ageStr ? parseInt(ageStr, 10) : undefined;
-              update({
-                conditions: [
-                  ...individual.conditions,
-                  {
-                    id: generateId(),
-                    name,
-                    ageOfOnset:
-                      ageOfOnset != null && !isNaN(ageOfOnset)
-                        ? ageOfOnset
-                        : undefined,
-                  },
-                ],
-              });
-            }}
-          >
-            + Add Note
-          </button>
+          {addingNote ? (
+            <div className={styles.noteForm}>
+              <input
+                className={styles.input}
+                value={noteName}
+                onChange={(e) => setNoteName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submitNote();
+                  if (e.key === 'Escape') resetNoteForm();
+                }}
+                placeholder="Clinical note / condition"
+                autoFocus
+              />
+              <input
+                className={styles.input}
+                type="number"
+                value={noteAge}
+                onChange={(e) => setNoteAge(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') submitNote();
+                  if (e.key === 'Escape') resetNoteForm();
+                }}
+                placeholder="Age of onset (optional)"
+                min={0}
+              />
+              <div className={styles.noteFormActions}>
+                <button
+                  className={styles.noteAddButton}
+                  onClick={submitNote}
+                  disabled={!noteName.trim()}
+                >
+                  Add
+                </button>
+                <button
+                  className={styles.noteCancelButton}
+                  onClick={resetNoteForm}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              className={styles.addButton}
+              onClick={() => setAddingNote(true)}
+            >
+              + Add Note
+            </button>
+          )}
         </div>
       </div>
 

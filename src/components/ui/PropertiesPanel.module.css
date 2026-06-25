@@ -143,3 +143,42 @@
   background: var(--color-border);
   margin: 12px 0;
 }
+
+.noteForm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.noteFormActions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.noteAddButton {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-primary);
+  padding: 4px 0;
+}
+
+.noteAddButton:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.noteAddButton:disabled {
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+  cursor: default;
+}
+
+.noteCancelButton {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  padding: 4px 0;
+}
+
+.noteCancelButton:hover {
+  text-decoration: underline;
+}
