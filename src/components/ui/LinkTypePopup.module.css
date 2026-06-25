@@ -39,8 +39,8 @@
 }
 
 .option:hover {
-  background: #f0f4ff;
-  color: #2563eb;
+  background: var(--color-primary-soft);
+  color: var(--color-primary);
 }
 
 .cancelButton {

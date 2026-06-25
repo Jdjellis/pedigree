@@ -16,7 +16,7 @@ export const EXPORT_EXCLUDE_NAME = 'export-exclude';
  * temporarily recoloured to {@link SYMBOL_COLOR} during a clean capture so the
  * exported document never shows the editing selection colour.
  */
-const SELECTION_STROKE_COLOR = '#2563eb';
+const SELECTION_STROKE_COLOR = '#6965db';
 
 /** Padding (in content-space px) added around the pedigree content in exports. */
 const EXPORT_PADDING = 40;

@@ -32,7 +32,7 @@ export interface PedigreeSymbolProps {
   individualNumber?: number;
 }
 
-const SELECTION_COLOR = '#2563eb';
+const SELECTION_COLOR = '#6965db';
 const SELECTION_STROKE_WIDTH = 2;
 const HOVER_OPACITY = 0.08;
 
