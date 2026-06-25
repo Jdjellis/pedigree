@@ -3,6 +3,7 @@ import {
   CanvasContainer,
   type CanvasContainerHandle,
 } from './components/canvas/CanvasContainer';
+import { EmptyStateHint } from './components/canvas/EmptyStateHint';
 import { Toolbar } from './components/ui/Toolbar';
 import { PropertiesPanel } from './components/ui/PropertiesPanel';
 import { RadialMenu } from './components/ui/RadialMenu';
@@ -32,6 +33,7 @@ function App() {
       <div className={styles.main}>
         <div className={styles.canvasArea}>
           <CanvasContainer ref={canvasRef} />
+          <EmptyStateHint />
           <RadialMenu />
           <LegendOverlay />
         </div>
