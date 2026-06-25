@@ -1,0 +1,130 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  width: 480px;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 0;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 0;
+  line-height: 1;
+}
+
+.closeButton:hover {
+  color: var(--color-text);
+}
+
+.body {
+  padding: 16px 24px 24px;
+}
+
+.description {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin: 0 0 16px;
+}
+
+.optionGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 16px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.option:hover {
+  border-color: var(--color-primary);
+  background: var(--color-surface-hover);
+}
+
+.optionIcon {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-primary);
+  font-family: var(--font-mono, monospace);
+}
+
+.optionLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.optionDesc {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.warning {
+  margin: 14px 0 0;
+  padding: 10px 12px;
+  background: #fffbe6;
+  border: 1px solid #f5e6a3;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+  color: #8a6d0b;
+}
+
+.status {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  background: #e6f9ed;
+  border: 1px solid #a3e4b8;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: #1a7a3a;
+}
+
+.error {
+  margin: 12px 0 0;
+  padding: 8px 12px;
+  background: #fce8e8;
+  border: 1px solid #e4a3a3;
+  border-radius: var(--radius-md);
+  font-size: 13px;
+  color: #c53030;
+}

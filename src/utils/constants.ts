@@ -1,0 +1,46 @@
+// Symbol dimensions (at 1x zoom)
+export const SYMBOL_SIZE = 40;
+export const SYMBOL_STROKE_WIDTH = 2;
+export const SYMBOL_COLOR = '#1a1a1a';
+export const SYMBOL_FILL = '#ffffff';
+// Default legend condition colors
+export const DEFAULT_CONDITION_COLORS = ['#1a1a1a', '#e63946', '#457b9d', '#2a9d8f'];
+
+// Layout spacing
+export const GENERATION_SPACING = 150;
+export const SIBLING_SPACING = 80;
+export const PARTNER_SPACING = 120;
+export const PARENT_CHILD_OFFSET = 50;
+
+// Connection lines
+export const LINE_COLOR = '#1a1a1a';
+export const LINE_WIDTH = 2;
+export const CONSANGUINITY_GAP = 4;
+export const DASH_PATTERN = [8, 4];
+
+// Grid
+export const GRID_SIZE = 20;
+export const GRID_COLOR = '#e5e5e5';
+
+// Viewport
+export const MIN_ZOOM = 0.1;
+export const MAX_ZOOM = 5;
+export const ZOOM_STEP = 1.1;
+export const DEFAULT_ZOOM = 1;
+
+// Radial menu
+export const RADIAL_MENU_RADIUS = 60;
+export const RADIAL_MENU_HOVER_DELAY = 300;
+export const RADIAL_MENU_DISMISS_DISTANCE = 120;
+
+// Label
+export const LABEL_FONT_SIZE = 12;
+export const LABEL_FONT_FAMILY = 'Inter, system-ui, -apple-system, sans-serif';
+export const LABEL_COLOR = '#333333';
+export const LABEL_OFFSET_Y = 8;
+
+// Proband arrow
+export const PROBAND_ARROW_SIZE = 10;
+
+// Deceased slash
+export const DECEASED_SLASH_OVERSHOOT = 5;

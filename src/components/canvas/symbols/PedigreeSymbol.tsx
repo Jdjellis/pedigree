@@ -1,0 +1,365 @@
+import React, { useCallback, useRef } from 'react';
+import { Group, Rect, Circle } from 'react-konva';
+import type { KonvaEventObject } from 'konva/lib/Node';
+import type { Individual } from '../../../types/pedigree';
+import { GenderIdentity, VitalStatus } from '../../../types/enums';
+import { useUIStore } from '../../../stores/uiStore';
+import { usePedigreeStore } from '../../../stores/pedigreeStore';
+import { useViewportStore } from '../../../stores/viewportStore';
+import {
+  SYMBOL_SIZE,
+  SYMBOL_STROKE_WIDTH,
+  SYMBOL_COLOR,
+  SYMBOL_FILL,
+  RADIAL_MENU_HOVER_DELAY,
+} from '../../../utils/constants';
+
+import { SquareShape } from './SquareShape';
+import { CircleShape } from './CircleShape';
+import { DiamondShape } from './DiamondShape';
+import { TriangleShape } from './TriangleShape';
+import { ConditionOverlay } from './ConditionOverlay';
+import type { ActiveQuarter } from './ConditionOverlay';
+import { DeceasedSlash } from './DeceasedSlash';
+import { ProbandArrow } from './ProbandArrow';
+import { SymbolLabel } from './SymbolLabel';
+
+export interface PedigreeSymbolProps {
+  individual: Individual;
+  isSelected: boolean;
+  isHovered: boolean;
+  activeQuarters: ActiveQuarter[];
+  individualNumber?: number;
+}
+
+const SELECTION_COLOR = '#2563eb';
+const SELECTION_STROKE_WIDTH = 2;
+const HOVER_OPACITY = 0.08;
+
+/**
+ * Renders the base shape determined by genderIdentity.
+ * For pregnancies not carried to term, renders a triangle instead.
+ */
+function BaseShape({
+  individual,
+  fill,
+  strokeColor,
+}: {
+  individual: Individual;
+  fill: string;
+  strokeColor: string;
+}) {
+  // Pregnancy not carried to term -> triangle
+  if (individual.isPregnancy && individual.pregnancyOutcome) {
+    return (
+      <TriangleShape
+        size={SYMBOL_SIZE}
+        strokeColor={strokeColor}
+        strokeWidth={SYMBOL_STROKE_WIDTH}
+        fill={fill}
+      />
+    );
+  }
+
+  switch (individual.genderIdentity) {
+    case GenderIdentity.Man:
+      return (
+        <SquareShape
+          size={SYMBOL_SIZE}
+          strokeColor={strokeColor}
+          strokeWidth={SYMBOL_STROKE_WIDTH}
+          fill={fill}
+        />
+      );
+
+    case GenderIdentity.Woman:
+      return (
+        <CircleShape
+          size={SYMBOL_SIZE}
+          strokeColor={strokeColor}
+          strokeWidth={SYMBOL_STROKE_WIDTH}
+          fill={fill}
+        />
+      );
+
+    case GenderIdentity.NonBinary:
+    case GenderIdentity.Unknown:
+    default:
+      return (
+        <DiamondShape
+          size={SYMBOL_SIZE}
+          strokeColor={strokeColor}
+          strokeWidth={SYMBOL_STROKE_WIDTH}
+          fill={fill}
+        />
+      );
+  }
+}
+
+/**
+ * Renders a highlight shape behind the base symbol when selected.
+ */
+function SelectionHighlight({
+  individual,
+  isSelected,
+}: {
+  individual: Individual;
+  isSelected: boolean;
+}) {
+  if (!isSelected) return null;
+
+  const pad = 4;
+  const size = SYMBOL_SIZE + pad * 2;
+  const half = size / 2;
+
+  if (individual.isPregnancy && individual.pregnancyOutcome) {
+    return (
+      <Rect
+        x={-half}
+        y={-half}
+        width={size}
+        height={size}
+        stroke={SELECTION_COLOR}
+        strokeWidth={SELECTION_STROKE_WIDTH}
+        dash={[4, 3]}
+        cornerRadius={2}
+        listening={false}
+      />
+    );
+  }
+
+  switch (individual.genderIdentity) {
+    case GenderIdentity.Man:
+      return (
+        <Rect
+          x={-half}
+          y={-half}
+          width={size}
+          height={size}
+          stroke={SELECTION_COLOR}
+          strokeWidth={SELECTION_STROKE_WIDTH}
+          dash={[4, 3]}
+          cornerRadius={2}
+          listening={false}
+        />
+      );
+
+    case GenderIdentity.Woman:
+      return (
+        <Circle
+          x={0}
+          y={0}
+          radius={half}
+          stroke={SELECTION_COLOR}
+          strokeWidth={SELECTION_STROKE_WIDTH}
+          dash={[4, 3]}
+          listening={false}
+        />
+      );
+
+    case GenderIdentity.NonBinary:
+    case GenderIdentity.Unknown:
+    default:
+      return (
+        <Rect
+          x={-half}
+          y={-half}
+          width={size}
+          height={size}
+          stroke={SELECTION_COLOR}
+          strokeWidth={SELECTION_STROKE_WIDTH}
+          dash={[4, 3]}
+          cornerRadius={2}
+          listening={false}
+        />
+      );
+  }
+}
+
+/**
+ * Renders a subtle hover highlight behind the symbol.
+ */
+function HoverHighlight({ isHovered }: { isHovered: boolean }) {
+  if (!isHovered) return null;
+
+  const pad = 6;
+  const size = SYMBOL_SIZE + pad * 2;
+
+  return (
+    <Rect
+      x={-size / 2}
+      y={-size / 2}
+      width={size}
+      height={size}
+      fill={SELECTION_COLOR}
+      opacity={HOVER_OPACITY}
+      cornerRadius={4}
+      listening={false}
+    />
+  );
+}
+
+/**
+ * Main pedigree symbol component.
+ *
+ * IMPORTANT: This component renders inside react-konva's custom reconciler,
+ * NOT react-dom. Zustand hook subscriptions do not trigger re-renders here.
+ * All reactive data (isSelected, isHovered, individual) must be passed as
+ * props from a react-dom ancestor. Store actions are accessed via getState()
+ * inside event handlers (imperative, not reactive).
+ */
+export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
+  ({ individual, isSelected, isHovered, activeQuarters, individualNumber }) => {
+    const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const isDeceased =
+      individual.vitalStatus === VitalStatus.Deceased ||
+      individual.vitalStatus === VitalStatus.Stillborn;
+
+    const strokeColor = isSelected ? SELECTION_COLOR : SYMBOL_COLOR;
+
+    const handleClick = useCallback(
+      (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+        e.cancelBubble = true;
+        const { select, toggleSelection, hideRadialMenu } = useUIStore.getState();
+        hideRadialMenu();
+        const evt = e.evt;
+        if ('shiftKey' in evt && (evt.shiftKey || evt.metaKey || evt.ctrlKey)) {
+          toggleSelection(individual.id);
+        } else {
+          select(individual.id);
+        }
+      },
+      [individual.id]
+    );
+
+    const handleMouseEnter = useCallback(() => {
+      const uiState = useUIStore.getState();
+      uiState.setHovered(individual.id);
+      if (uiState.dragLink.active) {
+        uiState.setDragLinkTarget(individual.id);
+      }
+      const stage = document.querySelector('canvas');
+      if (stage) stage.style.cursor = 'pointer';
+
+      // Start hover timer for radial menu
+      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
+      hoverTimerRef.current = setTimeout(() => {
+        const { canvasToScreen } = useViewportStore.getState();
+        // canvasToScreen gives stage-local coordinates; the RadialMenu overlay
+        // is position:absolute inside .canvasArea which wraps the stage,
+        // so stage-local coords position it correctly.
+        const screenPos = canvasToScreen(individual.position);
+        useUIStore.getState().showRadialMenu(individual.id, screenPos);
+      }, RADIAL_MENU_HOVER_DELAY);
+    }, [individual.id, individual.position]);
+
+    const handleMouseLeave = useCallback(() => {
+      const uiState = useUIStore.getState();
+      uiState.setHovered(null);
+      if (uiState.dragLink.active) {
+        uiState.setDragLinkTarget(null);
+      }
+      if (hoverTimerRef.current) {
+        clearTimeout(hoverTimerRef.current);
+        hoverTimerRef.current = null;
+      }
+      const stage = document.querySelector('canvas');
+      if (stage) stage.style.cursor = 'default';
+    }, []);
+
+    const handleDragStart = useCallback(
+      (e: KonvaEventObject<DragEvent>) => {
+        if (e.evt.altKey) {
+          // Cancel the Konva drag (don't move the symbol)
+          e.target.stopDrag();
+          // Start link mode
+          useUIStore.getState().startDragLink(individual.id);
+        }
+      },
+      [individual.id],
+    );
+
+    const handleDragEnd = useCallback(
+      (e: KonvaEventObject<DragEvent>) => {
+        const node = e.target;
+        usePedigreeStore.getState().moveIndividual(individual.id, {
+          x: node.x(),
+          y: node.y(),
+        });
+      },
+      [individual.id]
+    );
+
+    const handleMouseUp = useCallback(() => {
+      const { dragLink, showLinkPopup } = useUIStore.getState();
+      if (dragLink.active && dragLink.sourceId && dragLink.sourceId !== individual.id) {
+        const { canvasToScreen } = useViewportStore.getState();
+        const canvasEl = document.querySelector('.konvajs-content');
+        const screenPos = canvasToScreen(individual.position);
+        if (canvasEl) {
+          const rect = canvasEl.getBoundingClientRect();
+          screenPos.x += rect.left;
+          screenPos.y += rect.top;
+        }
+        showLinkPopup(dragLink.sourceId, individual.id, screenPos);
+      }
+    }, [individual.id, individual.position]);
+
+    return (
+      <Group
+        x={individual.position.x}
+        y={individual.position.y}
+        draggable
+        onClick={handleClick}
+        onTap={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onMouseUp={handleMouseUp}
+      >
+        {/* Hover highlight (behind everything) */}
+        <HoverHighlight isHovered={isHovered} />
+
+        {/* Selection highlight */}
+        <SelectionHighlight individual={individual} isSelected={isSelected} />
+
+        {/* Base shape */}
+        <BaseShape
+          individual={individual}
+          fill={SYMBOL_FILL}
+          strokeColor={strokeColor}
+        />
+
+        {/* Condition quarter overlay */}
+        <ConditionOverlay
+          size={SYMBOL_SIZE}
+          genderIdentity={individual.genderIdentity}
+          activeQuarters={activeQuarters}
+        />
+
+        {/* Deceased slash */}
+        {isDeceased && (
+          <DeceasedSlash
+            size={SYMBOL_SIZE}
+            strokeColor={SYMBOL_COLOR}
+            strokeWidth={SYMBOL_STROKE_WIDTH}
+          />
+        )}
+
+        {/* Proband / Consultand arrow */}
+        <ProbandArrow
+          size={SYMBOL_SIZE}
+          isProband={individual.isProband}
+          isConsultand={individual.isConsultand ?? false}
+        />
+
+        {/* Text label */}
+        <SymbolLabel individual={individual} individualNumber={individualNumber} />
+      </Group>
+    );
+  }
+);
+
+PedigreeSymbol.displayName = 'PedigreeSymbol';

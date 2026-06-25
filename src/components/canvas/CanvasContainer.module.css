@@ -1,0 +1,22 @@
+.container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.container[data-tool='select'] {
+  cursor: default;
+}
+
+.container[data-tool='pan'] {
+  cursor: grab;
+}
+
+.container[data-tool='pan'][data-dragging='true'] {
+  cursor: grabbing;
+}
+
+.container[data-tool='addIndividual'] {
+  cursor: crosshair;
+}
