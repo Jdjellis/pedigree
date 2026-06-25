@@ -1,19 +1,69 @@
+/* Full-viewport root container. All islands and the canvas are absolutely
+   positioned children so the canvas is never reflowed by panel toggles. */
 .app {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  position: relative;
   width: 100%;
-}
-
-.main {
-  display: flex;
-  flex: 1;
+  height: 100%;
   overflow: hidden;
-  position: relative;
 }
 
+/* Canvas fills the entire viewport behind every island. */
 .canvasArea {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
+  position: absolute;
+  inset: 0;
+}
+
+/* ── Island slots ─────────────────────────────────────────────────────────── */
+/*
+ * Slots are click-through containers: pointer-events: none lets canvas
+ * drag/pan events reach the Konva stage through the empty gaps between
+ * islands. Each Island itself sets pointer-events: auto (via Island.module.css)
+ * so buttons inside remain fully clickable.
+ *
+ * z-index: 10 ensures islands float above the canvas layer.
+ */
+.slotTopLeft {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.slotTopCenter {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.slotTopRight {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Bottom-left hosts ZoomIsland + HistoryIsland side by side. */
+.slotBottomLeft {
+  position: absolute;
+  bottom: 14px;
+  left: 14px;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.slotBottomRight {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 10;
+  pointer-events: none;
 }

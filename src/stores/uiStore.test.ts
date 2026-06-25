@@ -1,5 +1,17 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, test, expect, beforeEach } from 'vitest';
 import { useUIStore } from './uiStore';
+
+test('togglePropertiesPanel flips the flag', () => {
+  useUIStore.setState({ propertiesPanelOpen: false });
+  useUIStore.getState().togglePropertiesPanel();
+  expect(useUIStore.getState().propertiesPanelOpen).toBe(true);
+});
+
+test('toggleCommandPalette flips palette state', () => {
+  useUIStore.setState({ commandPaletteOpen: false });
+  useUIStore.getState().toggleCommandPalette();
+  expect(useUIStore.getState().commandPaletteOpen).toBe(true);
+});
 
 describe('relationshipPopup slice', () => {
   beforeEach(() => {

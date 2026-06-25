@@ -3,8 +3,7 @@ import {
   CanvasContainer,
   type CanvasContainerHandle,
 } from './components/canvas/CanvasContainer';
-import { EmptyStateHint } from './components/canvas/EmptyStateHint';
-import { Toolbar } from './components/ui/Toolbar';
+import { OnboardingHints } from './components/canvas/OnboardingHints';
 import { PropertiesPanel } from './components/ui/PropertiesPanel';
 import { RadialMenu } from './components/ui/RadialMenu';
 import { ImportExportModal } from './components/ui/ImportExportModal';
@@ -13,6 +12,14 @@ import { LinkTypePopup } from './components/ui/LinkTypePopup';
 import { RelationshipPopup } from './components/ui/RelationshipPopup';
 import { LegendOverlay } from './components/ui/LegendOverlay';
 import { AnnotationEditor } from './components/ui/AnnotationEditor';
+import { CommandPalette } from './components/ui/CommandPalette';
+import { ShortcutsOverlay } from './components/ui/ShortcutsOverlay';
+import { MenuIsland } from './components/ui/islands/MenuIsland';
+import { ToolIsland } from './components/ui/islands/ToolIsland';
+import { ActionsIsland } from './components/ui/islands/ActionsIsland';
+import { ZoomIsland } from './components/ui/islands/ZoomIsland';
+import { HistoryIsland } from './components/ui/islands/HistoryIsland';
+import { HelpIsland } from './components/ui/islands/HelpIsland';
 import { useUIStore } from './stores/uiStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useAutoSave } from './hooks/useAutoSave';
@@ -31,21 +38,47 @@ function App() {
 
   return (
     <div className={styles.app}>
-      <Toolbar />
-      <div className={styles.main}>
-        <div className={styles.canvasArea}>
-          <CanvasContainer ref={canvasRef} />
-          <EmptyStateHint />
-          <RadialMenu />
-          <LegendOverlay />
-          <AnnotationEditor />
-        </div>
-        {propertiesPanelOpen && <PropertiesPanel />}
+      {/* Full-bleed canvas layer */}
+      <div className={styles.canvasArea}>
+        <CanvasContainer ref={canvasRef} />
+        <OnboardingHints />
+        <RadialMenu />
+        <LegendOverlay />
+        <AnnotationEditor />
       </div>
+
+      {/* Floating island slots */}
+      <div className={styles.slotTopLeft}>
+        <MenuIsland />
+      </div>
+
+      <div className={styles.slotTopCenter}>
+        <ToolIsland />
+      </div>
+
+      <div className={styles.slotTopRight}>
+        <ActionsIsland />
+      </div>
+
+      <div className={styles.slotBottomLeft}>
+        <ZoomIsland />
+        <HistoryIsland />
+      </div>
+
+      <div className={styles.slotBottomRight}>
+        <HelpIsland />
+      </div>
+
+      {/* Floating properties panel — overlays the canvas, does not reflow it */}
+      {propertiesPanelOpen && <PropertiesPanel />}
+
+      {/* Modal/overlay components */}
       <ImportExportModal getStage={getStage} />
       <LegendEditor />
       <LinkTypePopup />
       <RelationshipPopup />
+      <CommandPalette />
+      <ShortcutsOverlay />
     </div>
   );
 }

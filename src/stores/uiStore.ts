@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 export type ActiveTool = 'select' | 'pan' | 'addIndividual';
-export type ActiveModal = 'import' | 'export' | 'settings' | 'legendEditor' | null;
+export type ActiveModal = 'import' | 'export' | 'settings' | 'legendEditor' | 'shortcuts' | null;
 
 interface UIState {
   selectedIds: Set<string>;
@@ -36,6 +36,9 @@ interface UIState {
   propertiesPanelOpen: boolean;
   activeModal: ActiveModal;
   activeTool: ActiveTool;
+
+  /** Whether the ⌘K command palette is open. */
+  commandPaletteOpen: boolean;
 
   /**
    * Id of the text annotation currently being edited in the inline overlay,
@@ -76,6 +79,12 @@ interface UIState {
   openModal: (modal: ActiveModal) => void;
   closeModal: () => void;
   setPropertiesPanelOpen: (open: boolean) => void;
+  /** Toggles `propertiesPanelOpen` between true and false. */
+  togglePropertiesPanel: () => void;
+  /** Opens or closes the ⌘K command palette. */
+  setCommandPaletteOpen: (open: boolean) => void;
+  /** Toggles `commandPaletteOpen` between true and false. */
+  toggleCommandPalette: () => void;
   setLastSavedAt: (timestamp: number) => void;
   /** Enter inline edit mode for the given annotation id. */
   startEditingAnnotation: (id: string) => void;
@@ -116,6 +125,7 @@ export const useUIStore = create<UIState>()((set) => ({
   propertiesPanelOpen: false,
   activeModal: null,
   activeTool: 'select',
+  commandPaletteOpen: false,
   editingAnnotationId: null,
   lastSavedAt: null,
 
@@ -224,6 +234,14 @@ export const useUIStore = create<UIState>()((set) => ({
   closeModal: () => set({ activeModal: null }),
 
   setPropertiesPanelOpen: (open) => set({ propertiesPanelOpen: open }),
+
+  togglePropertiesPanel: () =>
+    set((state) => ({ propertiesPanelOpen: !state.propertiesPanelOpen })),
+
+  setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
+
+  toggleCommandPalette: () =>
+    set((state) => ({ commandPaletteOpen: !state.commandPaletteOpen })),
 
   setLastSavedAt: (timestamp) => set({ lastSavedAt: timestamp }),
 
