@@ -100,7 +100,7 @@
   text-align: center;
 }
 
-/* Visually hidden element for accessible Dialog.Title */
+/* Visually hidden element for accessible Dialog.Title / Dialog.Description */
 .srOnly {
   position: absolute;
   width: 1px;

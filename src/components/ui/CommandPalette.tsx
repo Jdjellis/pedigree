@@ -135,8 +135,12 @@ function CommandPaletteInner({ onClose }: CommandPaletteInnerProps) {
         inputRef.current?.focus();
       }}
     >
-      {/* Visually hidden title satisfies Radix's accessibility requirement. */}
+      {/* Visually hidden title + description satisfy Radix's a11y requirements
+          and silence the missing-description dev warning. */}
       <Dialog.Title className={styles.srOnly}>Command palette</Dialog.Title>
+      <Dialog.Description className={styles.srOnly}>
+        Search for a command and press Enter to run it.
+      </Dialog.Description>
 
       {/* Search input */}
       <input

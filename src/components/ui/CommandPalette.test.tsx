@@ -7,17 +7,30 @@
  * Store reset is done via `useUIStore.setState` in `beforeEach` to guarantee
  * a clean slate regardless of test ordering.
  */
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { beforeEach, vi } from 'vitest';
 import { useUIStore } from '../../stores/uiStore';
 import { CommandPalette } from './CommandPalette';
 
+/**
+ * Open or close the palette via the store, wrapped in `act` so any resulting
+ * React re-render is flushed inside the test's act() scope. This keeps test
+ * output free of "not wrapped in act(...)" warnings.
+ */
+function setPaletteOpen(open: boolean): void {
+  act(() => {
+    useUIStore.setState({ commandPaletteOpen: open });
+  });
+}
+
 /** Reset all UI store state before each test. */
 beforeEach(() => {
-  useUIStore.setState({
-    commandPaletteOpen: false,
-    activeModal: null,
-    selectedIds: new Set<string>(),
+  act(() => {
+    useUIStore.setState({
+      commandPaletteOpen: false,
+      activeModal: null,
+      selectedIds: new Set<string>(),
+    });
   });
   vi.restoreAllMocks();
 });
@@ -27,19 +40,19 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 test('renders nothing when commandPaletteOpen is false', () => {
-  useUIStore.setState({ commandPaletteOpen: false });
+  setPaletteOpen(false);
   render(<CommandPalette />);
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 });
 
 test('renders the dialog when commandPaletteOpen is true', () => {
-  useUIStore.setState({ commandPaletteOpen: true });
+  setPaletteOpen(true);
   render(<CommandPalette />);
   expect(screen.getByRole('dialog')).toBeInTheDocument();
 });
 
 test('renders a search input when open', () => {
-  useUIStore.setState({ commandPaletteOpen: true });
+  setPaletteOpen(true);
   render(<CommandPalette />);
   expect(screen.getByRole('combobox')).toBeInTheDocument();
 });
@@ -49,7 +62,7 @@ test('renders a search input when open', () => {
 // ---------------------------------------------------------------------------
 
 test('typing "export" filters the list to commands matching that query', () => {
-  useUIStore.setState({ commandPaletteOpen: true });
+  setPaletteOpen(true);
   render(<CommandPalette />);
 
   const input = screen.getByRole('combobox');
@@ -66,7 +79,7 @@ test('typing "export" filters the list to commands matching that query', () => {
 // ---------------------------------------------------------------------------
 
 test('pressing Enter on the highlighted export command opens the export modal and closes the palette', () => {
-  useUIStore.setState({ commandPaletteOpen: true });
+  setPaletteOpen(true);
   render(<CommandPalette />);
 
   const input = screen.getByRole('combobox');
@@ -84,7 +97,7 @@ test('pressing Enter on the highlighted export command opens the export modal an
 // ---------------------------------------------------------------------------
 
 test('ArrowDown moves highlight to the second item', () => {
-  useUIStore.setState({ commandPaletteOpen: true });
+  setPaletteOpen(true);
   render(<CommandPalette />);
 
   const input = screen.getByRole('combobox');
@@ -105,7 +118,7 @@ test('ArrowDown moves highlight to the second item', () => {
 // ---------------------------------------------------------------------------
 
 test('pressing Escape closes the palette via store', () => {
-  useUIStore.setState({ commandPaletteOpen: true });
+  setPaletteOpen(true);
   render(<CommandPalette />);
 
   // Radix Dialog fires onOpenChange(false) when Escape is pressed, but we
@@ -122,11 +135,11 @@ test('pressing Escape closes the palette via store', () => {
 
 test('query is empty when the palette opens', () => {
   // First render with open=false, then flip to true
-  useUIStore.setState({ commandPaletteOpen: false });
+  setPaletteOpen(false);
   const { rerender } = render(<CommandPalette />);
 
   // Set some query state by rendering open, typing, closing, reopening
-  useUIStore.setState({ commandPaletteOpen: true });
+  setPaletteOpen(true);
   rerender(<CommandPalette />);
 
   const input = screen.getByRole('combobox');
@@ -134,9 +147,9 @@ test('query is empty when the palette opens', () => {
   expect((input as HTMLInputElement).value).toBe('zoom');
 
   // Close and reopen
-  useUIStore.setState({ commandPaletteOpen: false });
+  setPaletteOpen(false);
   rerender(<CommandPalette />);
-  useUIStore.setState({ commandPaletteOpen: true });
+  setPaletteOpen(true);
   rerender(<CommandPalette />);
 
   const freshInput = screen.getByRole('combobox');
@@ -148,7 +161,7 @@ test('query is empty when the palette opens', () => {
 // ---------------------------------------------------------------------------
 
 test('ArrowUp from index 0 wraps to the last item', () => {
-  useUIStore.setState({ commandPaletteOpen: true });
+  setPaletteOpen(true);
   render(<CommandPalette />);
 
   const input = screen.getByRole('combobox');
