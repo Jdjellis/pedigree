@@ -45,7 +45,19 @@
   transform: scale(0.95);
 }
 
-/* Positions: centered at 56px radius from menu center — outside the 40px symbol */
+/*
+ * Positions are measured from the menu center (which sits on the symbol center).
+ * The symbol is 40px, so 56px clears it on every side.
+ *
+ * The symbol's name / age / number label is rendered as a center-aligned column
+ * of text directly below the symbol, starting ~28px down and growing downward by
+ * one line per detail. A "Child" item placed straight down (0, 56) lands on top
+ * of that label. To keep "Child" reachable yet clear of the centered label
+ * column, it is pushed onto the lower-right diagonal (down and to the side, out
+ * of the text). "Sibling" is given a matching slight downward nudge on the left
+ * so the two lower items sit symmetrically about the label and the menu stays
+ * balanced. Parent and Partner remain on their cardinal axes.
+ */
 .top {
   left: 50%;
   top: 50%;
@@ -64,22 +76,24 @@
   transform: translate(-50%, -50%) translate(56px, 0px) scale(1.1);
 }
 
+/* Lower-right diagonal: clears the centered label column below the symbol. */
 .bottom {
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) translate(0px, 56px);
+  transform: translate(-50%, -50%) translate(50px, 50px);
 }
 .bottom:hover {
-  transform: translate(-50%, -50%) translate(0px, 56px) scale(1.1);
+  transform: translate(-50%, -50%) translate(50px, 50px) scale(1.1);
 }
 
+/* Lower-left diagonal: mirrors "Child" so the lower pair stays symmetric. */
 .left {
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) translate(-56px, 0px);
+  transform: translate(-50%, -50%) translate(-50px, 50px);
 }
 .left:hover {
-  transform: translate(-50%, -50%) translate(-56px, 0px) scale(1.1);
+  transform: translate(-50%, -50%) translate(-50px, 50px) scale(1.1);
 }
 
 .disabled {
