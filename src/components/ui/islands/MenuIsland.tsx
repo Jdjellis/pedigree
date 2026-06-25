@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import clsx from 'clsx';
 import { usePedigreeStore } from '../../../stores/pedigreeStore';
 import { useUIStore } from '../../../stores/uiStore';
@@ -39,10 +39,12 @@ function formatRelativeSave(timestamp: number | null, now: number): string {
  *
  * Renders:
  * - A ☰ hamburger button that opens a dropdown of document actions (New, Open,
- *   Import, Export, Legend, Document details).
+ *   Import, Export, Legend, Document details, Command palette).
  * - An editable document title (click-to-edit inline input).
  * - A "Saved locally" save-status indicator, updated on a 15-second tick.
- * - A one-time dismissible notice reminding users that data is browser-local.
+ * - A one-time dismissible notice reminding users that data is browser-local;
+ *   suppressed while the onboarding overlay is visible (individual count === 0)
+ *   because OnboardingHints already carries the same message.
  *
  * Lives in the react-dom tree, so Zustand subscriptions are safe here.
  *
@@ -55,6 +57,11 @@ export function MenuIsland(): React.JSX.Element {
   const updateMetadata = usePedigreeStore((s) => s.updateMetadata);
   const metadata = usePedigreeStore((s) => s.document.metadata);
   const title = metadata.title;
+
+  /** Individual count — used to suppress the local-notice during onboarding. */
+  const individualCount = usePedigreeStore(
+    (s) => Object.keys(s.document.individuals).length
+  );
 
   const lastSavedAt = useUIStore((s) => s.lastSavedAt);
 
@@ -119,19 +126,40 @@ export function MenuIsland(): React.JSX.Element {
   // ── Document menu (☰ dropdown) ───────────────────────────────────────────
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Close menu on outside click or Escape.
+  /**
+   * Index of the currently keyboard-focused menu item (-1 = none).
+   * Drives roving focus: we imperatively call `.focus()` on the matched
+   * element from `handleMenuKeyDown`.
+   */
+  const focusedItemIndexRef = useRef(-1);
+
+  /**
+   * Closes the dropdown and resets keyboard-focus tracking.
+   *
+   * @param returnFocus - When `true`, return focus to the ☰ button.
+   */
+  const closeMenu = useCallback((returnFocus = false): void => {
+    setMenuOpen(false);
+    focusedItemIndexRef.current = -1;
+    if (returnFocus) {
+      menuButtonRef.current?.focus();
+    }
+  }, []);
+
+  // Close menu on outside click or Escape; restore focus to the ☰ button.
   useEffect(() => {
     if (!menuOpen) return;
 
     const handlePointerDown = (event: MouseEvent): void => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setMenuOpen(false);
+        closeMenu(false);
       }
     };
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.key === 'Escape') {
-        setMenuOpen(false);
+        closeMenu(true);
       }
     };
 
@@ -141,13 +169,51 @@ export function MenuIsland(): React.JSX.Element {
       document.removeEventListener('mousedown', handlePointerDown);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [menuOpen]);
+  }, [menuOpen, closeMenu]);
+
+  /**
+   * Handles keyboard navigation (ArrowDown / ArrowUp / Enter / Space) inside
+   * the dropdown `role="menu"` container. Uses roving focus — `.focus()` is
+   * called directly on the target DOM element (imperative, not via state).
+   */
+  const handleMenuKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>): void => {
+      if (!menuRef.current) return;
+
+      const items = Array.from(
+        menuRef.current.querySelectorAll<HTMLElement>('[role="menuitem"]')
+      );
+      if (items.length === 0) return;
+
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        const next = (focusedItemIndexRef.current + 1) % items.length;
+        focusedItemIndexRef.current = next;
+        items[next]?.focus();
+      } else if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        const prev =
+          focusedItemIndexRef.current <= 0
+            ? items.length - 1
+            : focusedItemIndexRef.current - 1;
+        focusedItemIndexRef.current = prev;
+        items[prev]?.focus();
+      } else if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        const idx = focusedItemIndexRef.current;
+        if (idx >= 0 && idx < items.length) {
+          items[idx].click();
+        }
+      }
+    },
+    []
+  );
 
   // ── Document-details popover ─────────────────────────────────────────────
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   const openDetails = (): void => {
-    setMenuOpen(false);
+    closeMenu(false);
     setDetailsOpen(true);
   };
 
@@ -178,30 +244,44 @@ export function MenuIsland(): React.JSX.Element {
     }
   };
 
+  /**
+   * Whether to show the one-time notice. Suppressed while the onboarding
+   * overlay is visible (i.e. no individuals have been added yet) because
+   * `OnboardingHints` already carries the "saved only in this browser" message.
+   * Once the user adds at least one person, the notice may appear until dismissed.
+   */
+  const showNotice = !noticeDismissed && individualCount > 0;
+
   // ── Menu-item handlers ───────────────────────────────────────────────────
   const handleMenuNew = (): void => {
-    setMenuOpen(false);
+    closeMenu(false);
     actions.newDocument();
   };
 
   const handleMenuOpen = (): void => {
-    setMenuOpen(false);
+    closeMenu(false);
     void actions.openDocument();
   };
 
   const handleMenuImport = (): void => {
-    setMenuOpen(false);
+    closeMenu(false);
     actions.importPed();
   };
 
   const handleMenuExport = (): void => {
-    setMenuOpen(false);
+    closeMenu(false);
     actions.exportDocument();
   };
 
   const handleMenuLegend = (): void => {
-    setMenuOpen(false);
+    closeMenu(false);
     actions.openLegend();
+  };
+
+  /** Opens the ⌘K command palette and closes the dropdown. */
+  const handleMenuCommandPalette = (): void => {
+    closeMenu(false);
+    useUIStore.getState().toggleCommandPalette();
   };
 
   return (
@@ -209,6 +289,7 @@ export function MenuIsland(): React.JSX.Element {
       {/* ☰ Menu button */}
       <div ref={menuRef} style={{ position: 'relative' }}>
         <button
+          ref={menuButtonRef}
           type="button"
           className={clsx(styles.menuButton, menuOpen && styles.menuButtonOpen)}
           onClick={() => setMenuOpen((open) => !open)}
@@ -221,12 +302,18 @@ export function MenuIsland(): React.JSX.Element {
         </button>
 
         {menuOpen && (
-          <div role="menu" className={styles.dropdown} aria-label="Document actions">
+          <div
+            role="menu"
+            className={styles.dropdown}
+            aria-label="Document actions"
+            onKeyDown={handleMenuKeyDown}
+          >
             <button
               type="button"
               role="menuitem"
               className={styles.menuItem}
               onClick={handleMenuNew}
+              tabIndex={-1}
             >
               New
             </button>
@@ -235,6 +322,7 @@ export function MenuIsland(): React.JSX.Element {
               role="menuitem"
               className={styles.menuItem}
               onClick={handleMenuOpen}
+              tabIndex={-1}
             >
               Open
             </button>
@@ -243,6 +331,7 @@ export function MenuIsland(): React.JSX.Element {
               role="menuitem"
               className={styles.menuItem}
               onClick={handleMenuImport}
+              tabIndex={-1}
             >
               Import
             </button>
@@ -251,6 +340,7 @@ export function MenuIsland(): React.JSX.Element {
               role="menuitem"
               className={styles.menuItem}
               onClick={handleMenuExport}
+              tabIndex={-1}
             >
               Export
             </button>
@@ -259,6 +349,7 @@ export function MenuIsland(): React.JSX.Element {
               role="menuitem"
               className={styles.menuItem}
               onClick={handleMenuLegend}
+              tabIndex={-1}
             >
               Legend
             </button>
@@ -268,8 +359,20 @@ export function MenuIsland(): React.JSX.Element {
               role="menuitem"
               className={styles.menuItem}
               onClick={openDetails}
+              tabIndex={-1}
             >
               Document details
+            </button>
+            <div className={styles.menuSeparator} role="separator" />
+            <button
+              type="button"
+              role="menuitem"
+              className={clsx(styles.menuItem, styles.menuItemWithHint)}
+              onClick={handleMenuCommandPalette}
+              tabIndex={-1}
+            >
+              <span>Command palette…</span>
+              <kbd className={styles.menuItemKbd}>⌘K</kbd>
             </button>
           </div>
         )}
@@ -319,8 +422,10 @@ export function MenuIsland(): React.JSX.Element {
         </span>
       </div>
 
-      {/* One-time local-data notice — shown below the island until dismissed */}
-      {!noticeDismissed && (
+      {/* One-time local-data notice — shown below the island until dismissed.
+          Hidden while onboarding is active (no individuals) because
+          OnboardingHints already carries the same message. */}
+      {showNotice && (
         <div className={styles.notice} role="status">
           <span className={styles.noticeText}>
             Your work is saved only in this browser. Export → JSON to keep a

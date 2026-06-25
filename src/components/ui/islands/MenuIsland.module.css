@@ -150,6 +150,30 @@
   margin: 4px 0;
 }
 
+/**
+ * Menu item variant that contains both a label and a right-aligned hint
+ * (e.g. a keyboard shortcut badge). Use alongside `.menuItem`.
+ */
+.menuItemWithHint {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+/** Keyboard shortcut badge rendered inside `.menuItemWithHint`. */
+.menuItemKbd {
+  font-size: 11px;
+  font-family: inherit;
+  color: var(--color-text-secondary);
+  background: rgba(0, 0, 0, 0.06);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+  pointer-events: none;
+}
+
 /* ── One-time local-only notice ──────────────────────────────────────────── */
 
 .notice {

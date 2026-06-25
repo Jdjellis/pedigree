@@ -1,8 +1,12 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, vi } from 'vitest';
 import { usePedigreeStore } from '../../../stores/pedigreeStore';
 import { useUIStore } from '../../../stores/uiStore';
+import { createDefaultIndividual } from '../../../stores/pedigreeStore';
 import { MenuIsland } from './MenuIsland';
+
+/** localStorage key mirrored from MenuIsland for test assertions. */
+const LOCAL_NOTICE_DISMISSED_KEY = 'pedigree-editor-local-notice-dismissed';
 
 beforeEach(() => {
   // Reset stores to clean state before each test.
@@ -10,6 +14,9 @@ beforeEach(() => {
   usePedigreeStore.temporal.getState().clear();
   useUIStore.getState().closeModal();
   useUIStore.getState().clearSelection();
+  useUIStore.getState().setCommandPaletteOpen(false);
+  // Clear localStorage so the one-time notice is not considered dismissed.
+  localStorage.removeItem(LOCAL_NOTICE_DISMISSED_KEY);
 });
 
 afterEach(() => {
@@ -154,4 +161,86 @@ test('clicking Document details in the menu opens the details popover', () => {
   fireEvent.click(screen.getByRole('menuitem', { name: /document details/i }));
 
   expect(screen.getByRole('dialog', { name: /document details/i })).toBeInTheDocument();
+});
+
+// ── New tests for Task 4.1 ────────────────────────────────────────────────────
+
+test('menu contains a "Command palette" item that opens the command palette', () => {
+  render(<MenuIsland />);
+
+  fireEvent.click(screen.getByRole('button', { name: /open document menu/i }));
+
+  const cmdItem = screen.getByRole('menuitem', { name: /command palette/i });
+  expect(cmdItem).toBeInTheDocument();
+
+  fireEvent.click(cmdItem);
+
+  expect(useUIStore.getState().commandPaletteOpen).toBe(true);
+});
+
+test('menu closes after clicking the "Command palette" item', () => {
+  render(<MenuIsland />);
+
+  fireEvent.click(screen.getByRole('button', { name: /open document menu/i }));
+  fireEvent.click(screen.getByRole('menuitem', { name: /command palette/i }));
+
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+});
+
+test('ArrowDown after opening the menu moves focus to the first menu item', () => {
+  render(<MenuIsland />);
+
+  fireEvent.click(screen.getByRole('button', { name: /open document menu/i }));
+  fireEvent.keyDown(screen.getByRole('menu'), { key: 'ArrowDown' });
+
+  const items = screen.getAllByRole('menuitem');
+  expect(document.activeElement).toBe(items[0]);
+});
+
+test('ArrowDown moves focus from first to second menu item (wrapping off the end)', () => {
+  render(<MenuIsland />);
+
+  fireEvent.click(screen.getByRole('button', { name: /open document menu/i }));
+  const menu = screen.getByRole('menu');
+  fireEvent.keyDown(menu, { key: 'ArrowDown' });
+  fireEvent.keyDown(menu, { key: 'ArrowDown' });
+
+  const items = screen.getAllByRole('menuitem');
+  expect(document.activeElement).toBe(items[1]);
+});
+
+test('ArrowUp from the first item wraps to the last item', () => {
+  render(<MenuIsland />);
+
+  fireEvent.click(screen.getByRole('button', { name: /open document menu/i }));
+  const menu = screen.getByRole('menu');
+  // Move to first item first.
+  fireEvent.keyDown(menu, { key: 'ArrowDown' });
+  // ArrowUp from first should wrap to last.
+  fireEvent.keyDown(menu, { key: 'ArrowUp' });
+
+  const items = screen.getAllByRole('menuitem');
+  expect(document.activeElement).toBe(items[items.length - 1]);
+});
+
+test('local-notice is NOT rendered when individual count is 0', () => {
+  render(<MenuIsland />);
+  // Store starts empty; notice should be suppressed regardless of dismissal state.
+  expect(
+    screen.queryByRole('status', { name: undefined })
+  ).not.toBeInTheDocument();
+  // More specific: the notice text itself must not be present.
+  expect(
+    screen.queryByText(/saved only in this browser/i)
+  ).not.toBeInTheDocument();
+});
+
+test('local-notice IS rendered when at least one individual exists and notice is not dismissed', () => {
+  // Add a person directly to the store so the component sees count > 0.
+  usePedigreeStore.getState().addIndividual(createDefaultIndividual());
+
+  render(<MenuIsland />);
+
+  expect(screen.getByRole('status')).toBeInTheDocument();
+  expect(screen.getByText(/saved only in this browser/i)).toBeInTheDocument();
 });
