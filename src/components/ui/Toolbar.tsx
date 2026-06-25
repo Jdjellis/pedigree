@@ -72,6 +72,7 @@ export function Toolbar() {
   // while not actively editing.
   useEffect(() => {
     if (!isEditingTitle) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTitleDraft(title);
     }
   }, [title, isEditingTitle]);
