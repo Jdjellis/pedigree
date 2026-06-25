@@ -229,6 +229,9 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
     panMode = false,
   }) => {
     const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Position of the symbol when a drag began. Captured so the whole drag can
+    // be committed as a single undo step on drag end (see handleDragEnd).
+    const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
 
     const isDeceased =
       individual.vitalStatus === VitalStatus.Deceased ||
@@ -295,18 +298,56 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
           e.target.stopDrag();
           // Start link mode
           useUIStore.getState().startDragLink(individual.id);
+          return;
         }
+        const node = e.target;
+        // Remember where the symbol started so the final commit can be recorded
+        // as a single pre-drag -> drop-point undo step (see handleDragEnd).
+        dragStartPosRef.current = { x: node.x(), y: node.y() };
+        // Pause undo/redo history so the stream of live position updates during
+        // the drag does not flood the history with intermediate positions.
+        usePedigreeStore.temporal.getState().pause();
       },
       [individual.id],
     );
 
-    const handleDragEnd = useCallback(
+    const handleDragMove = useCallback(
       (e: KonvaEventObject<DragEvent>) => {
         const node = e.target;
+        // Push the live position to the store on every move so connector lines,
+        // which read positions from the store, re-anchor to the symbol in real
+        // time instead of dangling until the drag ends.
         usePedigreeStore.getState().moveIndividual(individual.id, {
           x: node.x(),
           y: node.y(),
         });
+      },
+      [individual.id]
+    );
+
+    const handleDragEnd = useCallback(
+      (e: KonvaEventObject<DragEvent>) => {
+        const startPos = dragStartPosRef.current;
+        dragStartPosRef.current = null;
+        const temporal = usePedigreeStore.temporal.getState();
+
+        // No drag was actually tracked (e.g. the alt-drag link gesture, which
+        // calls stopDrag in handleDragStart). Just make sure history is resumed.
+        if (!startPos) {
+          temporal.resume();
+          return;
+        }
+
+        const node = e.target;
+        const endPos = { x: node.x(), y: node.y() };
+        const { moveIndividual } = usePedigreeStore.getState();
+        // History is still paused here. The live drag has already moved the
+        // store to endPos, so first restore startPos untracked, then resume and
+        // re-commit endPos. zundo records the state *before* a tracked set, so
+        // this yields exactly one undo step that reverts to the pre-drag spot.
+        moveIndividual(individual.id, startPos);
+        temporal.resume();
+        moveIndividual(individual.id, endPos);
       },
       [individual.id]
     );
@@ -336,6 +377,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         onMouseEnter={handleMouseEnter}
         onMouseLeave={handleMouseLeave}
         onDragStart={handleDragStart}
+        onDragMove={handleDragMove}
         onDragEnd={handleDragEnd}
         onMouseUp={handleMouseUp}
       >
