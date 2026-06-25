@@ -79,20 +79,15 @@ export function ImportExportModal({ getStage }: ImportExportModalProps) {
     }
   }, [getStage, doc.metadata.title, clearMessages]);
 
-  const handleExportSvg = useCallback(async () => {
+  const handleExportSvg = useCallback(() => {
     clearMessages();
-    const stage = getStage();
-    if (!stage) {
-      setError('Canvas not available.');
-      return;
-    }
     try {
-      await exportToSvg(stage, doc.metadata.title || 'pedigree');
+      exportToSvg(doc, doc.metadata.title || 'pedigree');
       setStatus('SVG exported.');
     } catch {
       setError('Failed to export SVG.');
     }
-  }, [getStage, doc.metadata.title, clearMessages]);
+  }, [doc, clearMessages]);
 
   const handleExportPdf = useCallback(async () => {
     clearMessages();

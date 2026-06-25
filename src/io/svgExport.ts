@@ -1,23 +1,923 @@
-import type Konva from 'konva';
+import type {
+  PedigreeDocument,
+  Individual,
+  PartnershipRelationship,
+  ParentChildRelationship,
+  TwinGroup,
+  LegendEntry,
+  QuarterPosition,
+  FillPatternType,
+} from '../types/pedigree';
+import { GenderIdentity, RelationshipType, TwinType, VitalStatus } from '../types/enums';
+import { computeBounds, toRomanNumeral } from '../utils/boundsCalculation';
+import {
+  SYMBOL_SIZE,
+  SYMBOL_STROKE_WIDTH,
+  SYMBOL_COLOR,
+  SYMBOL_FILL,
+  LINE_COLOR,
+  LINE_WIDTH,
+  CONSANGUINITY_GAP,
+  DASH_PATTERN,
+  LABEL_FONT_SIZE,
+  LABEL_FONT_FAMILY,
+  LABEL_COLOR,
+  LABEL_OFFSET_Y,
+  DECEASED_SLASH_OVERSHOOT,
+} from '../utils/constants';
 
-export async function exportToSvg(
-  stage: Konva.Stage,
-  title: string
-): Promise<void> {
-  const width = stage.width();
-  const height = stage.height();
+// ---------------------------------------------------------------------------
+// Constants mirroring the canvas components (kept self-contained on purpose so
+// this exporter does not depend on react-konva component internals).
+// ---------------------------------------------------------------------------
 
-  // Get a high-res PNG from the stage
-  const dataUrl = stage.toDataURL({ pixelRatio: 3, mimeType: 'image/png' });
+/** Tile size used by `createPatternCanvas` in `src/utils/fillPatterns.ts`. */
+const PATTERN_TILE_SIZE = 8;
+/** Stroke width used by `createPatternCanvas` for line-based patterns. */
+const PATTERN_STROKE_WIDTH = 1.5;
+/** Vertical spacing between successive label lines (see `SymbolLabel`). */
+const LABEL_LINE_HEIGHT = LABEL_FONT_SIZE + 4;
+/** Padding added around the content bounding box for the export viewBox. */
+const VIEWBOX_PADDING = 40;
 
-  // Wrap the PNG in an SVG container
-  const svgString = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
-    `  <image href="${dataUrl}" width="${width}" height="${height}" />`,
+// Legend box geometry, mirroring `LegendLayer.tsx`.
+const LEGEND_SWATCH_SIZE = 20;
+const LEGEND_PADDING = 12;
+const LEGEND_ROW_HEIGHT = 28;
+const LEGEND_TITLE_HEIGHT = 24;
+const LEGEND_LABEL_WIDTH = 120;
+
+// ---------------------------------------------------------------------------
+// String / numeric helpers
+// ---------------------------------------------------------------------------
+
+/** Escape text so it is safe to embed inside SVG text/attribute content. */
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
+/** Round to 2 decimal places and drop trailing zeros for compact, stable output. */
+function num(value: number): string {
+  return Number.parseFloat(value.toFixed(2)).toString();
+}
+
+// ---------------------------------------------------------------------------
+// Fill pattern definitions (SVG <pattern>) — vector equivalents of the raster
+// tiles produced by `createPatternCanvas`.
+// ---------------------------------------------------------------------------
+
+/** A pattern id is unique per (patternType, color) pair so defs are deduplicated. */
+function patternId(patternType: FillPatternType, color: string): string {
+  const safeColor = color.replace(/[^a-zA-Z0-9]/g, '');
+  return `pat-${patternType}-${safeColor}`;
+}
+
+/** A clipPath id is unique per individual id. */
+function clipId(individualId: string): string {
+  return `clip-${individualId}`;
+}
+
+/**
+ * Build the inner geometry of a fill `<pattern>` tile for a given pattern type.
+ * Mirrors the tile drawing in `src/utils/fillPatterns.ts` (tile size 8).
+ */
+function patternTileBody(patternType: FillPatternType, color: string): string {
+  const t = PATTERN_TILE_SIZE;
+  const sw = PATTERN_STROKE_WIDTH;
+  const stroke = `stroke="${color}" stroke-width="${sw}"`;
+
+  switch (patternType) {
+    case 'solid':
+      return `<rect x="0" y="0" width="${t}" height="${t}" fill="${color}" />`;
+
+    case 'diagonalLines':
+      // 45-degree lines repeating across the tile.
+      return [
+        `<path d="M0 ${t} L${t} 0" ${stroke} />`,
+        `<path d="M${-t / 2} ${t / 2} L${t / 2} ${-t / 2}" ${stroke} />`,
+        `<path d="M${t / 2} ${t + t / 2} L${t + t / 2} ${t / 2}" ${stroke} />`,
+      ].join('');
+
+    case 'dots': {
+      const r = t / 5;
+      return `<circle cx="${t / 2}" cy="${t / 2}" r="${r}" fill="${color}" />`;
+    }
+
+    case 'crosshatch':
+      return [
+        // Forward diagonal
+        `<path d="M0 ${t} L${t} 0" ${stroke} />`,
+        `<path d="M${-t / 2} ${t / 2} L${t / 2} ${-t / 2}" ${stroke} />`,
+        `<path d="M${t / 2} ${t + t / 2} L${t + t / 2} ${t / 2}" ${stroke} />`,
+        // Back diagonal
+        `<path d="M0 0 L${t} ${t}" ${stroke} />`,
+        `<path d="M${-t / 2} ${t / 2} L${t / 2} ${t + t / 2}" ${stroke} />`,
+        `<path d="M${t / 2} ${-t / 2} L${t + t / 2} ${t / 2}" ${stroke} />`,
+      ].join('');
+
+    case 'horizontalStripes':
+      return `<path d="M0 ${t / 2} L${t} ${t / 2}" ${stroke} />`;
+
+    case 'verticalStripes':
+      return `<path d="M${t / 2} 0 L${t / 2} ${t}" ${stroke} />`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Symbol-shape path geometry. All shapes are centred on (0,0); callers wrap
+// them in a translate group to position them at the individual.
+// ---------------------------------------------------------------------------
+
+type SymbolShape = 'circle' | 'square' | 'diamond' | 'triangle';
+
+/** Determine the base symbol shape, matching `BaseShape` in `PedigreeSymbol.tsx`. */
+function resolveSymbolShape(individual: Individual): SymbolShape {
+  if (individual.isPregnancy && individual.pregnancyOutcome) {
+    return 'triangle';
+  }
+  switch (individual.genderIdentity) {
+    case GenderIdentity.Man:
+      return 'square';
+    case GenderIdentity.Woman:
+      return 'circle';
+    case GenderIdentity.NonBinary:
+    case GenderIdentity.Unknown:
+    default:
+      return 'diamond';
+  }
+}
+
+/**
+ * SVG markup for the base symbol outline, centred on (0,0).
+ * Used both as the visible stroked shape and (without fill/stroke) as a clip path.
+ */
+function symbolShapeElement(
+  shape: SymbolShape,
+  size: number,
+  attrs: string,
+): string {
+  const half = size / 2;
+  switch (shape) {
+    case 'circle':
+      return `<circle cx="0" cy="0" r="${half}" ${attrs} />`;
+    case 'square':
+      return `<rect x="${-half}" y="${-half}" width="${size}" height="${size}" ${attrs} />`;
+    case 'diamond':
+      return `<polygon points="0,${-half} ${half},0 0,${half} ${-half},0" ${attrs} />`;
+    case 'triangle':
+      return `<polygon points="0,${-half} ${half},${half} ${-half},${half}" ${attrs} />`;
+  }
+}
+
+/**
+ * The clip shape for condition quarter-shading. Triangles and pregnancies use
+ * their own outline, but the canvas `clipSymbolPath` only knows circle / square
+ * / diamond — so non-pregnancy shapes clip with the gender shape and pregnancy
+ * triangles clip with the triangle outline.
+ */
+function clipShapeElement(individual: Individual, size: number): string {
+  const shape = resolveSymbolShape(individual);
+  // `clipSymbolPath` maps man->square, woman->circle, everything else->diamond.
+  // Triangles (pregnancies) are not handled there, so fall back to the triangle
+  // outline to keep shading inside the visible symbol.
+  const clipShape: SymbolShape =
+    shape === 'triangle' ? 'triangle' : shape;
+  return symbolShapeElement(clipShape, size, '');
+}
+
+/** Quarter rectangle geometry, matching `getQuarterRect` in `ConditionOverlay`. */
+function quarterRect(quarter: QuarterPosition, half: number): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  switch (quarter) {
+    case 'topLeft':
+      return { x: -half, y: -half, w: half, h: half };
+    case 'topRight':
+      return { x: 0, y: -half, w: half, h: half };
+    case 'bottomLeft':
+      return { x: -half, y: 0, w: half, h: half };
+    case 'bottomRight':
+      return { x: 0, y: 0, w: half, h: half };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Derived data: active quarters, individual numbers, generation labels.
+// These mirror the derivations in `CanvasContainer.tsx`.
+// ---------------------------------------------------------------------------
+
+interface ActiveQuarter {
+  quarter: QuarterPosition;
+  fillColor: string;
+  fillPattern: FillPatternType;
+}
+
+/**
+ * Resolve which condition quarters apply to an individual. Matches the
+ * `getActiveQuarters` callback in `CanvasContainer.tsx`: a legend entry applies
+ * when its id appears in the individual's `conditionIds`.
+ */
+function getActiveQuarters(
+  individual: Individual,
+  entries: LegendEntry[],
+): ActiveQuarter[] {
+  if (!individual.conditionIds || individual.conditionIds.length === 0) return [];
+  return entries
+    .filter((entry) => individual.conditionIds.includes(entry.id))
+    .map((entry) => ({
+      quarter: entry.quarter,
+      fillColor: entry.fillColor,
+      fillPattern: entry.fillPattern,
+    }));
+}
+
+/**
+ * Compute the within-generation individual number for each individual, matching
+ * the `individualNumbers` memo in `CanvasContainer.tsx`: within each generation,
+ * individuals are sorted left-to-right by x and numbered from 1.
+ */
+function computeIndividualNumbers(individuals: Individual[]): Map<string, number> {
+  const numbers = new Map<string, number>();
+  const genGroups = new Map<number, Individual[]>();
+  for (const ind of individuals) {
+    const gen = ind.generation ?? 0;
+    if (!genGroups.has(gen)) genGroups.set(gen, []);
+    genGroups.get(gen)!.push(ind);
+  }
+  for (const [, group] of genGroups) {
+    group.sort((a, b) => a.position.x - b.position.x);
+    group.forEach((ind, idx) => {
+      numbers.set(ind.id, idx + 1);
+    });
+  }
+  return numbers;
+}
+
+/**
+ * Compute generation numeral labels, matching `BoundsLayer.tsx`: one Roman
+ * numeral per generation, vertically positioned at the average y of that
+ * generation's individuals.
+ */
+function computeGenerationLabels(
+  individuals: Individual[],
+): { roman: string; y: number }[] {
+  const genYMap = new Map<number, number[]>();
+  for (const ind of individuals) {
+    const gen = ind.generation ?? 0;
+    if (!genYMap.has(gen)) genYMap.set(gen, []);
+    genYMap.get(gen)!.push(ind.position.y);
+  }
+  const labels: { gen: number; y: number }[] = [];
+  for (const [gen, ys] of genYMap) {
+    const avgY = ys.reduce((a, b) => a + b, 0) / ys.length;
+    labels.push({ gen, y: avgY });
+  }
+  labels.sort((a, b) => a.gen - b.gen);
+  return labels.map(({ gen, y }) => ({ roman: toRomanNumeral(gen), y }));
+}
+
+// ---------------------------------------------------------------------------
+// Per-symbol rendering
+// ---------------------------------------------------------------------------
+
+/** Build the label lines for an individual, matching `SymbolLabel.tsx`. */
+function buildLabelLines(
+  individual: Individual,
+  individualNumber: number | undefined,
+): string[] {
+  const lines: string[] = [];
+
+  if (individualNumber != null) {
+    lines.push(`${individualNumber}`);
+  }
+  if (individual.displayName) {
+    lines.push(individual.displayName);
+  }
+  if (individual.age != null) {
+    if (
+      individual.vitalStatus === VitalStatus.Deceased ||
+      individual.vitalStatus === VitalStatus.Stillborn
+    ) {
+      lines.push(`d. ${individual.age}`);
+    } else {
+      lines.push(`${individual.age}`);
+    }
+  }
+  if (individual.sexAssignedAtBirth) {
+    lines.push(individual.sexAssignedAtBirth);
+  }
+  for (const condition of individual.conditions) {
+    if (condition.ageOfOnset != null) {
+      lines.push(`${condition.name} (dx ${condition.ageOfOnset})`);
+    } else {
+      lines.push(condition.name);
+    }
+  }
+
+  return lines;
+}
+
+/**
+ * Render a single individual (symbol + shading + slash + arrow + labels) as a
+ * positioned SVG group.
+ */
+function renderIndividual(
+  individual: Individual,
+  individualNumber: number | undefined,
+  entries: LegendEntry[],
+): string {
+  const half = SYMBOL_SIZE / 2;
+  const parts: string[] = [];
+
+  const shape = resolveSymbolShape(individual);
+
+  // Base outline.
+  parts.push(
+    symbolShapeElement(
+      shape,
+      SYMBOL_SIZE,
+      `fill="${SYMBOL_FILL}" stroke="${SYMBOL_COLOR}" stroke-width="${SYMBOL_STROKE_WIDTH}"`,
+    ),
+  );
+
+  // Condition quarter shading, clipped to the symbol outline.
+  const activeQuarters = getActiveQuarters(individual, entries);
+  if (activeQuarters.length > 0) {
+    const quarterRects = activeQuarters
+      .map((aq) => {
+        const r = quarterRect(aq.quarter, half);
+        const fill =
+          aq.fillPattern === 'solid'
+            ? aq.fillColor
+            : `url(#${patternId(aq.fillPattern, aq.fillColor)})`;
+        return `<rect x="${num(r.x)}" y="${num(r.y)}" width="${num(r.w)}" height="${num(
+          r.h,
+        )}" fill="${fill}" />`;
+      })
+      .join('');
+    parts.push(
+      `<g clip-path="url(#${clipId(individual.id)})">${quarterRects}</g>`,
+    );
+  }
+
+  // Deceased slash (bottom-left to top-right with overshoot).
+  const isDeceased =
+    individual.vitalStatus === VitalStatus.Deceased ||
+    individual.vitalStatus === VitalStatus.Stillborn;
+  if (isDeceased) {
+    const o = DECEASED_SLASH_OVERSHOOT;
+    parts.push(
+      `<line x1="${num(-(half + o))}" y1="${num(half + o)}" x2="${num(
+        half + o,
+      )}" y2="${num(-(half + o))}" stroke="${SYMBOL_COLOR}" stroke-width="${SYMBOL_STROKE_WIDTH}" />`,
+    );
+  }
+
+  // Proband / consultand arrow.
+  if (individual.isProband || (individual.isConsultand ?? false)) {
+    const offset = 8;
+    const arrowLen = 14;
+    const startX = -(half + offset + arrowLen);
+    const startY = half + offset + arrowLen;
+    const endX = -(half + offset);
+    const endY = half + offset;
+    parts.push(renderArrow(startX, startY, endX, endY, SYMBOL_COLOR));
+    if (individual.isProband) {
+      parts.push(
+        `<text x="${num(startX - 12)}" y="${num(
+          startY - 6 + 11,
+        )}" font-size="11" font-family="${escapeXml(
+          LABEL_FONT_FAMILY,
+        )}" font-weight="bold" fill="${SYMBOL_COLOR}">P</text>`,
+      );
+    }
+  }
+
+  // Text labels (centred under the symbol).
+  const lines = buildLabelLines(individual, individualNumber);
+  if (lines.length > 0) {
+    const startY = SYMBOL_SIZE / 2 + LABEL_OFFSET_Y;
+    const textParts = lines
+      .map((line, index) => {
+        // Konva Text positions y at the top of the line; SVG baseline sits at
+        // ~font-size below the top, so add LABEL_FONT_SIZE to align baselines.
+        const y = startY + index * LABEL_LINE_HEIGHT + LABEL_FONT_SIZE;
+        return `<text x="0" y="${num(y)}" font-size="${LABEL_FONT_SIZE}" font-family="${escapeXml(
+          LABEL_FONT_FAMILY,
+        )}" fill="${LABEL_COLOR}" text-anchor="middle">${escapeXml(line)}</text>`;
+      })
+      .join('');
+    parts.push(textParts);
+  }
+
+  return `<g transform="translate(${num(individual.position.x)}, ${num(
+    individual.position.y,
+  )})">${parts.join('')}</g>`;
+}
+
+/**
+ * Render an arrowhead line (Konva `Arrow` equivalent): a shaft plus a filled
+ * triangular head at the end point.
+ */
+function renderArrow(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  color: string,
+): string {
+  const pointerLength = 7;
+  const pointerWidth = 7;
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  // Two base corners of the arrowhead, behind the tip.
+  const backX = x2 - pointerLength * Math.cos(angle);
+  const backY = y2 - pointerLength * Math.sin(angle);
+  const perpX = (pointerWidth / 2) * Math.cos(angle + Math.PI / 2);
+  const perpY = (pointerWidth / 2) * Math.sin(angle + Math.PI / 2);
+  const c1x = backX + perpX;
+  const c1y = backY + perpY;
+  const c2x = backX - perpX;
+  const c2y = backY - perpY;
+
+  return [
+    `<line x1="${num(x1)}" y1="${num(y1)}" x2="${num(x2)}" y2="${num(
+      y2,
+    )}" stroke="${color}" stroke-width="1.5" />`,
+    `<polygon points="${num(x2)},${num(y2)} ${num(c1x)},${num(c1y)} ${num(c2x)},${num(
+      c2y,
+    )}" fill="${color}" stroke="${color}" stroke-width="1.5" />`,
+  ].join('');
+}
+
+// ---------------------------------------------------------------------------
+// Connection lines
+// ---------------------------------------------------------------------------
+
+function line(
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  dashed = false,
+): string {
+  const dash = dashed ? ` stroke-dasharray="${DASH_PATTERN.join(' ')}"` : '';
+  return `<line x1="${num(x1)}" y1="${num(y1)}" x2="${num(x2)}" y2="${num(
+    y2,
+  )}" stroke="${LINE_COLOR}" stroke-width="${LINE_WIDTH}"${dash} />`;
+}
+
+/** Render a partnership line, matching `PartnershipLine.tsx`. */
+function renderPartnershipLine(
+  partnership: PartnershipRelationship,
+  individuals: Record<string, Individual>,
+): string {
+  const p1 = individuals[partnership.partner1Id];
+  const p2 = individuals[partnership.partner2Id];
+  if (!p1 || !p2) return '';
+
+  const y = (p1.position.y + p2.position.y) / 2;
+
+  if (partnership.type === RelationshipType.Consanguinity) {
+    return [
+      line(p1.position.x, y - CONSANGUINITY_GAP / 2, p2.position.x, y - CONSANGUINITY_GAP / 2),
+      line(p1.position.x, y + CONSANGUINITY_GAP / 2, p2.position.x, y + CONSANGUINITY_GAP / 2),
+    ].join('');
+  }
+
+  if (partnership.type === RelationshipType.Separation) {
+    const midX = (p1.position.x + p2.position.x) / 2;
+    const hashSize = 6;
+    return [
+      line(p1.position.x, y, p2.position.x, y),
+      line(midX - 4, y - hashSize, midX + 4, y + hashSize),
+      line(midX + 2, y - hashSize, midX + 10, y + hashSize),
+    ].join('');
+  }
+
+  return line(p1.position.x, y, p2.position.x, y);
+}
+
+/** Render parent-child / sibship lines, matching `ParentChildLine.tsx`. */
+function renderParentChildLines(
+  partnership: PartnershipRelationship,
+  individuals: Record<string, Individual>,
+  parentChildLinks: Record<string, ParentChildRelationship>,
+): string {
+  const p1 = individuals[partnership.partner1Id];
+  const p2 = individuals[partnership.partner2Id];
+  if (!p1 || !p2) return '';
+  if (partnership.childrenIds.length === 0) return '';
+
+  const children = partnership.childrenIds
+    .map((id) => individuals[id])
+    .filter((c): c is Individual => Boolean(c));
+  if (children.length === 0) return '';
+
+  const partnershipY = (p1.position.y + p2.position.y) / 2;
+  const partnershipMidX = (p1.position.x + p2.position.x) / 2;
+
+  const childrenY = Math.min(...children.map((c) => c.position.y));
+  const sibshipY = partnershipY + (childrenY - partnershipY) / 2;
+
+  const childXPositions = children.map((c) => c.position.x);
+  const minChildX = Math.min(...childXPositions);
+  const maxChildX = Math.max(...childXPositions);
+
+  const parts: string[] = [];
+
+  // Vertical line from partnership midpoint down to sibship line.
+  parts.push(line(partnershipMidX, partnershipY, partnershipMidX, sibshipY));
+
+  // Horizontal sibship line (only if more than one child).
+  if (children.length > 1) {
+    parts.push(line(minChildX, sibshipY, maxChildX, sibshipY));
+  }
+
+  // Vertical drops to each child (dashed if adopted).
+  for (const child of children) {
+    const link = Object.values(parentChildLinks).find(
+      (l) => l.parentPartnershipId === partnership.id && l.childId === child.id,
+    );
+    const isAdopted = link?.isAdopted ?? false;
+    parts.push(line(child.position.x, sibshipY, child.position.x, child.position.y, isAdopted));
+  }
+
+  return parts.join('');
+}
+
+/** Render a twin connector, matching `TwinConnector.tsx`. */
+function renderTwinConnector(
+  twinGroup: TwinGroup,
+  individuals: Record<string, Individual>,
+  partnerships: Record<string, PartnershipRelationship>,
+): string {
+  const twins = twinGroup.individualIds
+    .map((id) => individuals[id])
+    .filter((t): t is Individual => Boolean(t));
+  if (twins.length < 2) return '';
+
+  const partnership = partnerships[twinGroup.parentPartnershipId];
+  if (!partnership) return '';
+
+  const p1 = individuals[partnership.partner1Id];
+  const p2 = individuals[partnership.partner2Id];
+  if (!p1 || !p2) return '';
+
+  const partnershipY = (p1.position.y + p2.position.y) / 2;
+  const childrenY = Math.min(...twins.map((t) => t.position.y));
+  const sibshipY = partnershipY + (childrenY - partnershipY) / 2;
+  const twinMidX = twins.reduce((sum, t) => sum + t.position.x, 0) / twins.length;
+
+  const parts: string[] = [];
+
+  // V-shaped lines from branch point to each twin.
+  for (const twin of twins) {
+    parts.push(line(twinMidX, sibshipY, twin.position.x, twin.position.y));
+  }
+
+  // Horizontal bar for monozygotic twins.
+  if (twinGroup.twinType === TwinType.Monozygotic) {
+    const barY = sibshipY + (childrenY - sibshipY) / 2;
+    const projected = twins.map((t) => {
+      const dx = t.position.x - twinMidX;
+      const dy = t.position.y - sibshipY;
+      const ratio = (barY - sibshipY) / dy;
+      return twinMidX + dx * ratio;
+    });
+    const leftX = Math.min(...projected);
+    const rightX = Math.max(...projected);
+    parts.push(line(leftX, barY, rightX, barY));
+  }
+
+  return parts.join('');
+}
+
+// ---------------------------------------------------------------------------
+// Legend / key box
+// ---------------------------------------------------------------------------
+
+/** Render the legend "Key" box, matching `LegendLayer.tsx`. */
+function renderLegend(
+  entries: LegendEntry[],
+  legendX: number,
+  legendY: number,
+): { markup: string; right: number; bottom: number } {
+  if (entries.length === 0) {
+    return { markup: '', right: legendX, bottom: legendY };
+  }
+
+  const hasBothGender = entries.some((e) => !e.applicableTo);
+  const swatchWidth = hasBothGender ? LEGEND_SWATCH_SIZE * 2 + 4 : LEGEND_SWATCH_SIZE;
+  const contentWidth = LEGEND_PADDING * 2 + swatchWidth + 8 + LEGEND_LABEL_WIDTH;
+  const contentHeight =
+    LEGEND_PADDING * 2 + LEGEND_TITLE_HEIGHT + entries.length * LEGEND_ROW_HEIGHT;
+
+  const parts: string[] = [];
+
+  // Background.
+  parts.push(
+    `<rect x="0" y="0" width="${num(contentWidth)}" height="${num(
+      contentHeight,
+    )}" fill="#ffffff" stroke="${SYMBOL_COLOR}" stroke-width="1" rx="4" ry="4" />`,
+  );
+
+  // Title.
+  parts.push(
+    `<text x="${LEGEND_PADDING}" y="${LEGEND_PADDING + 14}" font-size="14" font-family="${escapeXml(
+      LABEL_FONT_FAMILY,
+    )}" font-weight="bold" fill="${SYMBOL_COLOR}">Key</text>`,
+  );
+
+  // Entries.
+  entries.forEach((entry, idx) => {
+    const rowY = LEGEND_PADDING + LEGEND_TITLE_HEIGHT + idx * LEGEND_ROW_HEIGHT;
+    const showBoth = !entry.applicableTo;
+    const showSquare = entry.applicableTo === 'man' || showBoth;
+    const showCircle = entry.applicableTo === 'woman' || showBoth;
+
+    if (showSquare) {
+      parts.push(renderLegendSwatch(LEGEND_PADDING, rowY, GenderIdentity.Man, entry));
+    }
+    if (showCircle) {
+      const sx = showBoth ? LEGEND_PADDING + LEGEND_SWATCH_SIZE + 4 : LEGEND_PADDING;
+      parts.push(renderLegendSwatch(sx, rowY, GenderIdentity.Woman, entry));
+    }
+
+    parts.push(
+      `<text x="${LEGEND_PADDING + swatchWidth + 8}" y="${num(
+        rowY + 4 + 12,
+      )}" font-size="12" font-family="${escapeXml(
+        LABEL_FONT_FAMILY,
+      )}" fill="${SYMBOL_COLOR}">${escapeXml(entry.name)}</text>`,
+    );
+  });
+
+  const markup = `<g transform="translate(${num(legendX)}, ${num(legendY)})">${parts.join(
+    '',
+  )}</g>`;
+
+  return {
+    markup,
+    right: legendX + contentWidth,
+    bottom: legendY + contentHeight,
+  };
+}
+
+/** Render a single legend swatch (shape outline + quarter fill). */
+function renderLegendSwatch(
+  x: number,
+  y: number,
+  gender: GenderIdentity,
+  entry: LegendEntry,
+): string {
+  const size = LEGEND_SWATCH_SIZE;
+  const half = size / 2;
+  const cx = x + half;
+  const cy = y + half;
+
+  const parts: string[] = [];
+
+  // Background shape (matches LegendLayer: square for man, circle otherwise).
+  if (gender === GenderIdentity.Man) {
+    parts.push(
+      `<rect x="${-half}" y="${-half}" width="${size}" height="${size}" fill="#ffffff" stroke="${SYMBOL_COLOR}" stroke-width="1" />`,
+    );
+  } else {
+    parts.push(
+      `<circle cx="0" cy="0" r="${half - 0.5}" fill="#ffffff" stroke="${SYMBOL_COLOR}" stroke-width="1" />`,
+    );
+  }
+
+  // Quarter fill, clipped to the swatch shape.
+  const qx = entry.quarter === 'topLeft' || entry.quarter === 'bottomLeft' ? -half : 0;
+  const qy = entry.quarter === 'topLeft' || entry.quarter === 'topRight' ? -half : 0;
+  const fill =
+    entry.fillPattern === 'solid'
+      ? entry.fillColor
+      : `url(#${patternId(entry.fillPattern, entry.fillColor)})`;
+  const clip =
+    gender === GenderIdentity.Man
+      ? `<rect x="${-half}" y="${-half}" width="${size}" height="${size}" />`
+      : `<circle cx="0" cy="0" r="${half}" />`;
+  const swatchClipId = `legendclip-${gender}-${entry.id}`;
+  parts.push(
+    `<clipPath id="${swatchClipId}">${clip}</clipPath>`,
+    `<g clip-path="url(#${swatchClipId})"><rect x="${qx}" y="${qy}" width="${half}" height="${half}" fill="${fill}" /></g>`,
+  );
+
+  return `<g transform="translate(${num(cx)}, ${num(cy)})">${parts.join('')}</g>`;
+}
+
+// ---------------------------------------------------------------------------
+// Bounds / viewBox calculation
+// ---------------------------------------------------------------------------
+
+interface Extent {
+  minX: number;
+  minY: number;
+  maxX: number;
+  maxY: number;
+}
+
+function emptyExtent(): Extent {
+  return { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+}
+
+function expand(extent: Extent, x: number, y: number): void {
+  extent.minX = Math.min(extent.minX, x);
+  extent.minY = Math.min(extent.minY, y);
+  extent.maxX = Math.max(extent.maxX, x);
+  extent.maxY = Math.max(extent.maxY, y);
+}
+
+// ---------------------------------------------------------------------------
+// Public builder
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a true vector SVG document string from a pedigree document.
+ *
+ * The pedigree is rendered directly from the data model as native SVG
+ * primitives (shapes, lines, paths, patterns, text) so the output stays crisp
+ * at any scale — no rasterization. Output is deterministic for a given input,
+ * which makes it suitable for snapshot testing.
+ *
+ * Grid, bounds rectangle, and selection/hover chrome are intentionally omitted.
+ *
+ * @param doc - The pedigree document to render.
+ * @param title - Title used for the `<title>` element / accessibility.
+ * @returns A well-formed standalone SVG document string.
+ */
+export function buildPedigreeSvg(doc: PedigreeDocument, title: string): string {
+  const individuals = Object.values(doc.individuals);
+  const entries = doc.legendConfig.entries;
+
+  const individualNumbers = computeIndividualNumbers(individuals);
+  const generationLabels = computeGenerationLabels(individuals);
+
+  // ---- Collect pattern + clip defs --------------------------------------
+  const patternDefs = new Map<string, string>();
+  const clipDefs: string[] = [];
+
+  for (const ind of individuals) {
+    const activeQuarters = getActiveQuarters(ind, entries);
+    if (activeQuarters.length > 0) {
+      clipDefs.push(
+        `<clipPath id="${clipId(ind.id)}">${clipShapeElement(ind, SYMBOL_SIZE)}</clipPath>`,
+      );
+    }
+  }
+
+  // Patterns used by both symbols and legend swatches.
+  for (const entry of entries) {
+    if (entry.fillPattern !== 'solid') {
+      const id = patternId(entry.fillPattern, entry.fillColor);
+      if (!patternDefs.has(id)) {
+        patternDefs.set(
+          id,
+          `<pattern id="${id}" patternUnits="userSpaceOnUse" width="${PATTERN_TILE_SIZE}" height="${PATTERN_TILE_SIZE}">${patternTileBody(
+            entry.fillPattern,
+            entry.fillColor,
+          )}</pattern>`,
+        );
+      }
+    }
+  }
+
+  // ---- Render content groups --------------------------------------------
+  const connectionMarkup: string[] = [];
+  for (const partnership of Object.values(doc.partnerships)) {
+    connectionMarkup.push(renderPartnershipLine(partnership, doc.individuals));
+  }
+  for (const partnership of Object.values(doc.partnerships)) {
+    connectionMarkup.push(
+      renderParentChildLines(partnership, doc.individuals, doc.parentChildLinks),
+    );
+  }
+  for (const twinGroup of Object.values(doc.twinGroups)) {
+    connectionMarkup.push(
+      renderTwinConnector(twinGroup, doc.individuals, doc.partnerships),
+    );
+  }
+
+  const symbolMarkup: string[] = [];
+  for (const ind of individuals) {
+    symbolMarkup.push(renderIndividual(ind, individualNumbers.get(ind.id), entries));
+  }
+
+  // ---- Generation numerals ----------------------------------------------
+  // Canvas places these at `bounds.x + 10`; reuse computeBounds for parity.
+  const bounds = computeBounds(individuals);
+  const generationMarkup: string[] = [];
+  if (bounds) {
+    for (const label of generationLabels) {
+      generationMarkup.push(
+        `<text x="${num(bounds.x + 10)}" y="${num(
+          label.y - 7 + 14,
+        )}" font-size="14" font-family="${escapeXml(
+          LABEL_FONT_FAMILY,
+        )}" font-weight="bold" fill="${LABEL_COLOR}">${escapeXml(label.roman)}</text>`,
+      );
+    }
+  }
+
+  // ---- Legend ------------------------------------------------------------
+  // Canvas positions the legend below the bounds rect (bounds.x+10, bottom+16).
+  const legendX = bounds ? bounds.x + 10 : doc.legendConfig.position.x;
+  const legendY = bounds
+    ? bounds.y + bounds.height + 16
+    : doc.legendConfig.position.y;
+  const legend = renderLegend(entries, legendX, legendY);
+
+  // ---- Compute tight viewBox over all rendered content -------------------
+  const extent = emptyExtent();
+
+  for (const ind of individuals) {
+    const half = SYMBOL_SIZE / 2;
+    // Symbol box plus deceased-slash overshoot / arrow reach.
+    const reach = half + DECEASED_SLASH_OVERSHOOT + 22;
+    expand(extent, ind.position.x - reach, ind.position.y - half);
+    expand(extent, ind.position.x + reach, ind.position.y + half);
+    // Label lines extend below the symbol.
+    const lines = buildLabelLines(ind, individualNumbers.get(ind.id));
+    if (lines.length > 0) {
+      const labelBottom =
+        ind.position.y +
+        SYMBOL_SIZE / 2 +
+        LABEL_OFFSET_Y +
+        lines.length * LABEL_LINE_HEIGHT +
+        LABEL_FONT_SIZE;
+      expand(extent, ind.position.x - 60, labelBottom);
+      expand(extent, ind.position.x + 60, labelBottom);
+    }
+  }
+
+  if (bounds) {
+    // Generation numerals sit at bounds.x + 10.
+    expand(extent, bounds.x + 6, bounds.y);
+  }
+
+  if (legend.markup) {
+    expand(extent, legendX, legendY);
+    expand(extent, legend.right, legend.bottom);
+  }
+
+  // Fall back to a small default canvas when there is no content.
+  if (!Number.isFinite(extent.minX)) {
+    extent.minX = 0;
+    extent.minY = 0;
+    extent.maxX = 400;
+    extent.maxY = 300;
+  }
+
+  const vbX = extent.minX - VIEWBOX_PADDING;
+  const vbY = extent.minY - VIEWBOX_PADDING;
+  const vbWidth = extent.maxX - extent.minX + VIEWBOX_PADDING * 2;
+  const vbHeight = extent.maxY - extent.minY + VIEWBOX_PADDING * 2;
+
+  // ---- Assemble document -------------------------------------------------
+  const defs = [...patternDefs.values(), ...clipDefs].join('');
+
+  const svg = [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${num(vbWidth)}" height="${num(
+      vbHeight,
+    )}" viewBox="${num(vbX)} ${num(vbY)} ${num(vbWidth)} ${num(vbHeight)}">`,
+    `<title>${escapeXml(title)}</title>`,
+    defs ? `<defs>${defs}</defs>` : '',
+    `<rect x="${num(vbX)}" y="${num(vbY)}" width="${num(vbWidth)}" height="${num(
+      vbHeight,
+    )}" fill="#ffffff" />`,
+    `<g class="connections">${connectionMarkup.join('')}</g>`,
+    `<g class="symbols">${symbolMarkup.join('')}</g>`,
+    `<g class="generations">${generationMarkup.join('')}</g>`,
+    `<g class="legend">${legend.markup}</g>`,
     `</svg>`,
-  ].join('\n');
+  ]
+    .filter(Boolean)
+    .join('\n');
 
-  // Create Blob and trigger download
+  return svg;
+}
+
+/**
+ * Build a true vector SVG of the pedigree document and trigger a browser
+ * download. The SVG is rendered from the data model (not a Konva
+ * rasterization), so it remains crisp at any scale.
+ *
+ * @param doc - The pedigree document to export.
+ * @param title - The export title; also used as the download filename.
+ */
+export function exportToSvg(doc: PedigreeDocument, title: string): void {
+  const svgString = buildPedigreeSvg(doc, title);
+
   const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
