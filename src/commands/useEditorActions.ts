@@ -25,8 +25,19 @@ export interface EditorActions {
    * Placement uses `screenToCanvas` with stage-local coordinates (0,0 = top-left
    * of the `.konvajs-content` element), matching the project's Konva/Zustand
    * coordinate convention.
+   *
+   * Delegates to `addPersonAt` using the computed canvas centre.
    */
   addPerson: () => void;
+  /**
+   * Add a new individual at the given CANVAS-space position, select it, and
+   * revert the active tool to `'select'`. Coordinates are rounded to integers
+   * before placement.
+   *
+   * @param position - Canvas-space {x, y} coordinates (already converted from
+   *   screen/stage-local space by the caller, e.g. via `screenToCanvas`).
+   */
+  addPersonAt: (position: { x: number; y: number }) => void;
   /** Delete every currently-selected individual, then clear the selection. */
   deleteSelected: () => void;
   /** Undo the last pedigree document change. */
@@ -94,6 +105,18 @@ export function useEditorActions(): EditorActions {
     useUIStore.getState().openModal('legendEditor');
   };
 
+  const addPersonAt = (position: { x: number; y: number }): void => {
+    const individual = createDefaultIndividual({
+      position: {
+        x: Math.round(position.x),
+        y: Math.round(position.y),
+      },
+    });
+    usePedigreeStore.getState().addIndividual(individual);
+    useUIStore.getState().select(individual.id);
+    useUIStore.getState().setActiveTool('select');
+  };
+
   const addPerson = (): void => {
     // Place new individual at center of visible canvas area.
     // screenToCanvas expects stage-local coords (0,0 = top-left of stage element).
@@ -105,15 +128,7 @@ export function useEditorActions(): EditorActions {
       stageCenter = { x: rect.width / 2, y: rect.height / 2 };
     }
     const canvasCenter = screenToCanvas(stageCenter);
-
-    const individual = createDefaultIndividual({
-      position: {
-        x: Math.round(canvasCenter.x),
-        y: Math.round(canvasCenter.y),
-      },
-    });
-    usePedigreeStore.getState().addIndividual(individual);
-    useUIStore.getState().select(individual.id);
+    addPersonAt(canvasCenter);
   };
 
   const deleteSelected = (): void => {
@@ -167,6 +182,7 @@ export function useEditorActions(): EditorActions {
     exportDocument,
     openLegend,
     addPerson,
+    addPersonAt,
     deleteSelected,
     undo,
     redo,
