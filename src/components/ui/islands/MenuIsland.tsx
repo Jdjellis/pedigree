@@ -64,6 +64,11 @@ export function MenuIsland(): React.JSX.Element {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(title);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  // Gates the input's onBlur=commit. Cancelling (Escape) sets this false so the
+  // blur fired by React unmounting the focused input does NOT write the
+  // cancelled draft. A genuine blur (clicking away) leaves it true, so
+  // click-to-edit still commits as intended.
+  const commitOnBlurRef = useRef(true);
 
   // Focus and select the input when edit mode is entered.
   useEffect(() => {
@@ -74,18 +79,29 @@ export function MenuIsland(): React.JSX.Element {
   }, [isEditingTitle]);
 
   const startEditingTitle = (): void => {
+    commitOnBlurRef.current = true;
     setTitleDraft(title);
     setIsEditingTitle(true);
   };
 
   const commitTitle = (): void => {
+    // Disarm the blur-commit: the unmount that follows fires onBlur again, and
+    // we must not double-commit.
+    commitOnBlurRef.current = false;
     updateMetadata({ title: titleDraft.trim() });
     setIsEditingTitle(false);
   };
 
   const cancelTitle = (): void => {
+    // Disarm the blur-commit BEFORE unmounting so the unmount-driven blur does
+    // not write the cancelled draft to the store.
+    commitOnBlurRef.current = false;
     setTitleDraft(title);
     setIsEditingTitle(false);
+  };
+
+  const handleTitleBlur = (): void => {
+    if (commitOnBlurRef.current) commitTitle();
   };
 
   const handleTitleKeyDown = (
@@ -277,7 +293,7 @@ export function MenuIsland(): React.JSX.Element {
             value={titleDraft}
             placeholder={PLACEHOLDER_TITLE}
             onChange={(e) => setTitleDraft(e.target.value)}
-            onBlur={commitTitle}
+            onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
             aria-label="Document title"
           />

@@ -1,4 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
+import { afterEach, vi } from 'vitest';
 import { usePedigreeStore } from '../../../stores/pedigreeStore';
 import { useUIStore } from '../../../stores/uiStore';
 import { MenuIsland } from './MenuIsland';
@@ -9,6 +10,10 @@ beforeEach(() => {
   usePedigreeStore.temporal.getState().clear();
   useUIStore.getState().closeModal();
   useUIStore.getState().clearSelection();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
 });
 
 test('renders the document title text', () => {
@@ -53,6 +58,51 @@ test('pressing Escape in the title input cancels the edit', () => {
 
   expect(usePedigreeStore.getState().document.metadata.title).toBe('Untitled Pedigree');
   expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+});
+
+test('pressing Escape while editing the title does not write the draft to the store', () => {
+  // Spy on the store action the component captures at render. This catches any
+  // commit regardless of blur/unmount ordering: the Escape path must never call
+  // updateMetadata. (jsdom does not fire React's unmount-driven blur, so a plain
+  // store-value assertion alone would pass even against the buggy onBlur=commit
+  // wiring — the spy makes the contract explicit and discriminating.)
+  const updateSpy = vi.spyOn(usePedigreeStore.getState(), 'updateMetadata');
+
+  render(<MenuIsland />);
+
+  fireEvent.click(screen.getByRole('button', { name: /untitled pedigree/i }));
+
+  const input = screen.getByRole('textbox', { name: /document title/i });
+  fireEvent.change(input, { target: { value: 'Should Not Save' } });
+  // Real browsers fire `blur` when Escape unmounts the focused input; fire it
+  // explicitly so this regression exercises the onBlur path too.
+  fireEvent.keyDown(input, { key: 'Escape' });
+  fireEvent.blur(input);
+
+  expect(updateSpy).not.toHaveBeenCalled();
+  expect(usePedigreeStore.getState().document.metadata.title).toBe(
+    'Untitled Pedigree'
+  );
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: /untitled pedigree/i })
+  ).toBeInTheDocument();
+});
+
+test('blurring the title input commits a changed value to the store', () => {
+  render(<MenuIsland />);
+
+  fireEvent.click(screen.getByRole('button', { name: /untitled pedigree/i }));
+
+  const input = screen.getByRole('textbox', { name: /document title/i });
+  fireEvent.change(input, { target: { value: 'Blur Commit' } });
+  fireEvent.blur(input);
+
+  expect(usePedigreeStore.getState().document.metadata.title).toBe('Blur Commit');
+  expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
+  expect(
+    screen.getByRole('button', { name: /blur commit/i })
+  ).toBeInTheDocument();
 });
 
 test('☰ button opens a menu containing "Export"', () => {
