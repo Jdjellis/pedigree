@@ -1,3 +1,4 @@
+import { renderHook } from '@testing-library/react';
 import { useEditorActions } from './useEditorActions';
 import { usePedigreeStore } from '../stores/pedigreeStore';
 import { useUIStore } from '../stores/uiStore';
@@ -15,9 +16,9 @@ beforeEach(() => {
 describe('addPersonAt', () => {
   test('places an individual at the rounded canvas position', () => {
     useUIStore.getState().setActiveTool('addIndividual');
-    const { addPersonAt } = useEditorActions();
+    const { result } = renderHook(() => useEditorActions());
 
-    addPersonAt({ x: 123.4, y: 200.6 });
+    result.current.addPersonAt({ x: 123.4, y: 200.6 });
 
     const individuals = Object.values(
       usePedigreeStore.getState().document.individuals
@@ -28,9 +29,9 @@ describe('addPersonAt', () => {
 
   test('selects the newly created individual', () => {
     useUIStore.getState().setActiveTool('addIndividual');
-    const { addPersonAt } = useEditorActions();
+    const { result } = renderHook(() => useEditorActions());
 
-    addPersonAt({ x: 123.4, y: 200.6 });
+    result.current.addPersonAt({ x: 123.4, y: 200.6 });
 
     const individuals = Object.values(
       usePedigreeStore.getState().document.individuals
@@ -42,17 +43,17 @@ describe('addPersonAt', () => {
 
   test('reverts the active tool to select after placement', () => {
     useUIStore.getState().setActiveTool('addIndividual');
-    const { addPersonAt } = useEditorActions();
+    const { result } = renderHook(() => useEditorActions());
 
-    addPersonAt({ x: 123.4, y: 200.6 });
+    result.current.addPersonAt({ x: 123.4, y: 200.6 });
 
     expect(useUIStore.getState().activeTool).toBe('select');
   });
 
   test('positions are rounded, not truncated', () => {
-    const { addPersonAt } = useEditorActions();
+    const { result } = renderHook(() => useEditorActions());
 
-    addPersonAt({ x: 99.9, y: 50.1 });
+    result.current.addPersonAt({ x: 99.9, y: 50.1 });
 
     const individuals = Object.values(
       usePedigreeStore.getState().document.individuals
@@ -63,8 +64,8 @@ describe('addPersonAt', () => {
 
 describe('addPerson (center placement)', () => {
   test('adds exactly one individual to the document', () => {
-    const { addPerson } = useEditorActions();
-    addPerson();
+    const { result } = renderHook(() => useEditorActions());
+    result.current.addPerson();
 
     const individuals = Object.values(
       usePedigreeStore.getState().document.individuals
@@ -73,8 +74,8 @@ describe('addPerson (center placement)', () => {
   });
 
   test('selects the newly created individual', () => {
-    const { addPerson } = useEditorActions();
-    addPerson();
+    const { result } = renderHook(() => useEditorActions());
+    result.current.addPerson();
 
     const individuals = Object.values(
       usePedigreeStore.getState().document.individuals

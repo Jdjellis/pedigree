@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { usePedigreeStore, createDefaultIndividual } from '../stores/pedigreeStore';
 import { useUIStore } from '../stores/uiStore';
 import { useViewportStore } from '../stores/viewportStore';
@@ -175,22 +176,29 @@ export function useEditorActions(): EditorActions {
     useUIStore.getState().setActiveTool('addIndividual');
   };
 
-  return {
-    newDocument,
-    openDocument,
-    importPed,
-    exportDocument,
-    openLegend,
-    addPerson,
-    addPersonAt,
-    deleteSelected,
-    undo,
-    redo,
-    zoomIn,
-    zoomOut,
-    resetView,
-    selectTool,
-    handTool,
-    addPersonTool,
-  };
+  // Empty deps: every callback reads store state via getState() at call time,
+  // so none of them close over stale values — the object identity can be
+  // stable for the lifetime of the component.
+  return useMemo(
+    () => ({
+      newDocument,
+      openDocument,
+      importPed,
+      exportDocument,
+      openLegend,
+      addPerson,
+      addPersonAt,
+      deleteSelected,
+      undo,
+      redo,
+      zoomIn,
+      zoomOut,
+      resetView,
+      selectTool,
+      handTool,
+      addPersonTool,
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
 }
