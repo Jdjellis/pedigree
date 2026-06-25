@@ -93,6 +93,7 @@ function makeFixture(): PedigreeDocument {
       },
     },
     twinGroups: {},
+    textAnnotations: {},
     generationOrder: [['father', 'mother'], ['child']],
     legendConfig: {
       entries: [
@@ -189,6 +190,44 @@ describe('buildPedigreeSvg', () => {
     expect(svg).toContain('>II</text>');
     // Absolute numbering would have produced III for generation 2; it must not.
     expect(svg).not.toContain('>III</text>');
+  });
+
+  it('renders free-text annotations as positioned <text> at their font size', () => {
+    const doc = makeFixture();
+    doc.textAnnotations = {
+      'anno-1': {
+        id: 'anno-1',
+        text: 'Family Pedigree',
+        position: { x: 80, y: 40 },
+        fontSize: 24,
+      },
+    };
+
+    const svg = buildPedigreeSvg(doc, 'Test Pedigree');
+
+    expect(svg).toContain('Family Pedigree');
+    expect(svg).toContain('font-size="24"');
+    expect(svg).toContain('class="annotations"');
+  });
+
+  it('escapes XML-special characters in annotations and renders multi-line text', () => {
+    const doc = makeFixture();
+    doc.textAnnotations = {
+      'anno-1': {
+        id: 'anno-1',
+        text: 'A & B\n<line two>',
+        position: { x: 0, y: 0 },
+        fontSize: 16,
+      },
+    };
+
+    const svg = buildPedigreeSvg(doc, 'Test Pedigree');
+
+    expect(svg).toContain('A &amp; B');
+    expect(svg).toContain('&lt;line two&gt;');
+    expect(svg).not.toContain('A & B');
+    // Each line becomes its own <tspan>.
+    expect(svg).toContain('<tspan');
   });
 
   it('escapes XML-special characters in the title and labels', () => {

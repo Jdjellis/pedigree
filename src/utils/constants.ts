@@ -46,6 +46,12 @@ export const LABEL_FONT_FAMILY = 'Inter, system-ui, -apple-system, sans-serif';
 export const LABEL_COLOR = '#333333';
 export const LABEL_OFFSET_Y = 8;
 
+// Free-text annotations
+/** Default font size (canvas units) for a newly created text annotation. */
+export const ANNOTATION_DEFAULT_FONT_SIZE = 18;
+/** Placeholder text a new annotation opens with before the user types. */
+export const ANNOTATION_PLACEHOLDER_TEXT = 'Text';
+
 // Proband arrow
 export const PROBAND_ARROW_SIZE = 10;
 

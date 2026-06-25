@@ -4,6 +4,7 @@ import type {
   PartnershipRelationship,
   ParentChildRelationship,
   TwinGroup,
+  TextAnnotation,
   LegendEntry,
   QuarterPosition,
   FillPatternType,
@@ -597,6 +598,36 @@ function renderTwinConnector(
 }
 
 // ---------------------------------------------------------------------------
+// Free-text annotations
+// ---------------------------------------------------------------------------
+
+/**
+ * Render a single free-text annotation as a positioned SVG `<text>`.
+ *
+ * Matches the on-canvas Konva `Text`: `position` is the top-left of the text
+ * block, so the first baseline sits one font-size below it. Multi-line text is
+ * split into `<tspan>` rows spaced by the font size.
+ */
+function renderTextAnnotation(annotation: TextAnnotation): string {
+  const lines = annotation.text.split('\n');
+  const x = num(annotation.position.x);
+  const firstBaselineY = num(annotation.position.y + annotation.fontSize);
+
+  const tspans = lines
+    .map((lineText, index) => {
+      const dy = index === 0 ? 0 : annotation.fontSize;
+      return `<tspan x="${x}" dy="${num(dy)}">${escapeXml(lineText)}</tspan>`;
+    })
+    .join('');
+
+  return `<text x="${x}" y="${firstBaselineY}" font-size="${num(
+    annotation.fontSize,
+  )}" font-family="${escapeXml(
+    LABEL_FONT_FAMILY,
+  )}" fill="${LABEL_COLOR}">${tspans}</text>`;
+}
+
+// ---------------------------------------------------------------------------
 // Legend / key box
 // ---------------------------------------------------------------------------
 
@@ -810,6 +841,13 @@ export function buildPedigreeSvg(doc: PedigreeDocument, title: string): string {
     symbolMarkup.push(renderIndividual(ind, individualNumbers.get(ind.id), entries));
   }
 
+  // ---- Free-text annotations --------------------------------------------
+  const annotations = Object.values(doc.textAnnotations);
+  const annotationMarkup: string[] = [];
+  for (const annotation of annotations) {
+    annotationMarkup.push(renderTextAnnotation(annotation));
+  }
+
   // ---- Generation numerals ----------------------------------------------
   // Canvas places these at `bounds.x + 10`; reuse computeBounds for parity.
   const bounds = computeBounds(individuals);
@@ -862,6 +900,20 @@ export function buildPedigreeSvg(doc: PedigreeDocument, title: string): string {
     expand(extent, bounds.x + 6, bounds.y);
   }
 
+  for (const annotation of annotations) {
+    const lines = annotation.text.split('\n');
+    // Rough monospace-ish glyph width estimate; only used for viewBox padding.
+    const longest = lines.reduce((max, l) => Math.max(max, l.length), 0);
+    const estWidth = longest * annotation.fontSize * 0.6;
+    const estHeight = lines.length * annotation.fontSize;
+    expand(extent, annotation.position.x, annotation.position.y);
+    expand(
+      extent,
+      annotation.position.x + estWidth,
+      annotation.position.y + estHeight,
+    );
+  }
+
   if (legend.markup) {
     expand(extent, legendX, legendY);
     expand(extent, legend.right, legend.bottom);
@@ -894,6 +946,7 @@ export function buildPedigreeSvg(doc: PedigreeDocument, title: string): string {
     )}" fill="#ffffff" />`,
     `<g class="connections">${connectionMarkup.join('')}</g>`,
     `<g class="symbols">${symbolMarkup.join('')}</g>`,
+    `<g class="annotations">${annotationMarkup.join('')}</g>`,
     `<g class="generations">${generationMarkup.join('')}</g>`,
     `<g class="legend">${legend.markup}</g>`,
     `</svg>`,

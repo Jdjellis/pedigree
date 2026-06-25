@@ -7,6 +7,7 @@ import type {
   PartnershipRelationship,
   ParentChildRelationship,
   TwinGroup,
+  TextAnnotation,
   Position,
   LegendEntry,
 } from '../types/pedigree';
@@ -29,6 +30,7 @@ function createEmptyDocument(): PedigreeDocument {
     partnerships: {},
     parentChildLinks: {},
     twinGroups: {},
+    textAnnotations: {},
     generationOrder: [],
     legendConfig: { entries: [], position: { x: 50, y: 50 } },
   };
@@ -80,6 +82,11 @@ interface PedigreeState {
   // Twin group actions
   addTwinGroup: (tg: TwinGroup) => void;
   removeTwinGroup: (id: string) => void;
+
+  // Text annotation actions
+  addTextAnnotation: (annotation: TextAnnotation) => void;
+  updateTextAnnotation: (id: string, patch: Partial<TextAnnotation>) => void;
+  removeTextAnnotation: (id: string) => void;
 
   // Compound / atomic family actions (each produces one undo step)
   addParentsForChild: (
@@ -381,6 +388,55 @@ export const usePedigreeStore = create<PedigreeState>()(
                 updatedAt: new Date().toISOString(),
               },
               twinGroups: remaining,
+            },
+          };
+        }),
+
+      addTextAnnotation: (annotation) =>
+        set((state) => ({
+          document: {
+            ...state.document,
+            metadata: {
+              ...state.document.metadata,
+              updatedAt: new Date().toISOString(),
+            },
+            textAnnotations: {
+              ...state.document.textAnnotations,
+              [annotation.id]: annotation,
+            },
+          },
+        })),
+
+      updateTextAnnotation: (id, patch) =>
+        set((state) => {
+          const existing = state.document.textAnnotations[id];
+          if (!existing) return state;
+          return {
+            document: {
+              ...state.document,
+              metadata: {
+                ...state.document.metadata,
+                updatedAt: new Date().toISOString(),
+              },
+              textAnnotations: {
+                ...state.document.textAnnotations,
+                [id]: { ...existing, ...patch },
+              },
+            },
+          };
+        }),
+
+      removeTextAnnotation: (id) =>
+        set((state) => {
+          const { [id]: _, ...remaining } = state.document.textAnnotations;
+          return {
+            document: {
+              ...state.document,
+              metadata: {
+                ...state.document.metadata,
+                updatedAt: new Date().toISOString(),
+              },
+              textAnnotations: remaining,
             },
           };
         }),
