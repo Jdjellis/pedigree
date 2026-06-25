@@ -237,6 +237,10 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
     // Position of the symbol when a drag began. Captured so the whole drag can
     // be committed as a single undo step on drag end (see handleDragEnd).
     const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
+    // Absolute y the symbol is pinned to during a drag. Dragging is constrained
+    // to the horizontal axis so a symbol stays within its generation; see
+    // dragBoundFunc and handleDragStart.
+    const dragLockYRef = useRef<number | null>(null);
 
     const isDeceased =
       individual.vitalStatus === VitalStatus.Deceased ||
@@ -309,10 +313,21 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         // Remember where the symbol started so the final commit can be recorded
         // as a single pre-drag -> drop-point undo step (see handleDragEnd).
         dragStartPosRef.current = { x: node.x(), y: node.y() };
+        // Pin the vertical position for the duration of the drag (horizontal-only).
+        dragLockYRef.current = node.absolutePosition().y;
         beginSymbolDrag();
       },
       [individual.id],
     );
+
+    const dragBoundFunc = useCallback((pos: { x: number; y: number }) => {
+      // Constrain dragging to the horizontal axis: a symbol may be repositioned
+      // within its generation but cannot be moved between generations, which
+      // would misalign parent/child connectors. Vertical position is locked to
+      // where the drag began (dragBoundFunc receives absolute coordinates).
+      const lockedY = dragLockYRef.current;
+      return { x: pos.x, y: lockedY ?? pos.y };
+    }, []);
 
     const handleDragMove = useCallback(
       (e: KonvaEventObject<DragEvent>) => {
@@ -360,6 +375,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         x={individual.position.x}
         y={individual.position.y}
         draggable={!panMode}
+        dragBoundFunc={dragBoundFunc}
         onClick={handleClick}
         onTap={handleClick}
         onMouseEnter={handleMouseEnter}
