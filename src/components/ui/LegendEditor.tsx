@@ -41,18 +41,13 @@ export function LegendEditor() {
 
   if (activeModal !== 'legendEditor') return null;
 
-  const usedQuarters = new Set(legendConfig.entries.map((e) => e.quarter));
-
   const handleAdd = () => {
-    // Find first unused quarter
-    const availableQuarter = QUARTER_OPTIONS.find(
-      (q) => !usedQuarters.has(q.value),
-    );
-    if (!availableQuarter) return;
-
+    // Conditions may share a quarter (they are differentiated by colour /
+    // pattern), so there is no longer a per-quarter cap. New conditions default
+    // to the top-right quarter; the user can move them afterwards.
     addLegendEntry({
       id: generateId(),
-      quarter: availableQuarter.value,
+      quarter: 'topRight',
       fillColor: '#1a1a1a',
       fillPattern: 'solid',
       name: 'New Condition',
@@ -73,6 +68,8 @@ export function LegendEditor() {
           {legendConfig.entries.length === 0 && (
             <p className={styles.emptyMessage}>
               No conditions defined. Add conditions to shade symbol quarters.
+              Multiple conditions can share a quarter — distinguish them by
+              colour and pattern.
             </p>
           )}
 
@@ -80,19 +77,13 @@ export function LegendEditor() {
             <LegendEntryRow
               key={entry.id}
               entry={entry}
-              usedQuarters={usedQuarters}
               onUpdate={(patch) => updateLegendEntry(entry.id, patch)}
               onRemove={() => removeLegendEntry(entry.id)}
             />
           ))}
 
-          <button
-            className={styles.addButton}
-            onClick={handleAdd}
-            disabled={legendConfig.entries.length >= 4}
-          >
+          <button className={styles.addButton} onClick={handleAdd}>
             + Add Condition
-            {legendConfig.entries.length >= 4 && ' (max 4)'}
           </button>
         </div>
       </div>
@@ -102,17 +93,11 @@ export function LegendEditor() {
 
 interface LegendEntryRowProps {
   entry: LegendEntry;
-  usedQuarters: Set<QuarterPosition>;
   onUpdate: (patch: Partial<LegendEntry>) => void;
   onRemove: () => void;
 }
 
-function LegendEntryRow({
-  entry,
-  usedQuarters,
-  onUpdate,
-  onRemove,
-}: LegendEntryRowProps) {
+function LegendEntryRow({ entry, onUpdate, onRemove }: LegendEntryRowProps) {
   return (
     <div className={styles.entryRow}>
       <div className={styles.entryFields}>
@@ -137,17 +122,8 @@ function LegendEntryRow({
               }
             >
               {QUARTER_OPTIONS.map((q) => (
-                <option
-                  key={q.value}
-                  value={q.value}
-                  disabled={
-                    usedQuarters.has(q.value) && q.value !== entry.quarter
-                  }
-                >
+                <option key={q.value} value={q.value}>
                   {q.label}
-                  {usedQuarters.has(q.value) && q.value !== entry.quarter
-                    ? ' (in use)'
-                    : ''}
                 </option>
               ))}
             </select>
