@@ -29,6 +29,7 @@ import { DeceasedSlash } from './DeceasedSlash';
 import { ProbandArrow } from './ProbandArrow';
 import { SymbolLabel } from './SymbolLabel';
 import { handlePartnershipClick } from '../partnershipTool';
+import { eraseElementById } from '../eraserTool';
 
 export interface PedigreeSymbolProps {
   individual: Individual;
@@ -42,6 +43,11 @@ export interface PedigreeSymbolProps {
    * (pointer cursor, radial menu) are skipped.
    */
   panMode?: boolean;
+  /**
+   * When true the eraser drag is in progress — entering this symbol erases it
+   * immediately, enabling swath deletion by holding and dragging.
+   */
+  eraseOnHover?: boolean;
 }
 
 const SELECTION_COLOR = '#6965db';
@@ -233,6 +239,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
     activeQuarters,
     individualNumber,
     panMode = false,
+    eraseOnHover = false,
   }) => {
     const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Position of the symbol when a drag began. Captured so the whole drag can
@@ -261,6 +268,12 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
           return;
         }
 
+        if (tool === 'eraser') {
+          ui.hideRadialMenu();
+          eraseElementById(individual.id);
+          return;
+        }
+
         const { select, toggleSelection, hideRadialMenu } = ui;
         hideRadialMenu();
         const evt = e.evt;
@@ -276,6 +289,10 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
     const handleMouseEnter = useCallback(() => {
       // In pan mode, suppress hover affordances so panning feels uninterrupted.
       if (panMode) return;
+      if (eraseOnHover && useUIStore.getState().activeTool === 'eraser') {
+        eraseElementById(individual.id);
+        return;
+      }
       const uiState = useUIStore.getState();
       uiState.setHovered(individual.id);
       if (uiState.dragLink.active) {
@@ -294,7 +311,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         const screenPos = canvasToScreen(individual.position);
         useUIStore.getState().showRadialMenu(individual.id, screenPos);
       }, RADIAL_MENU_HOVER_DELAY);
-    }, [individual.id, individual.position, panMode]);
+    }, [individual.id, individual.position, panMode, eraseOnHover]);
 
     const handleMouseLeave = useCallback(() => {
       const uiState = useUIStore.getState();

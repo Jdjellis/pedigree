@@ -59,6 +59,8 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     const [marquee, setMarquee] = useState<
       { start: { x: number; y: number }; current: { x: number; y: number } } | null
     >(null);
+    // True while the eraser is held down for a drag-erase swath.
+    const [isErasing, setIsErasing] = useState(false);
 
     const scale = useViewportStore((s) => s.scale);
     const position = useViewportStore((s) => s.position);
@@ -177,6 +179,13 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
         window.removeEventListener('mousemove', onMove);
         window.removeEventListener('mouseup', onUp);
       };
+    }, []);
+
+    // --------------- Eraser drag: safety-net stop when mouse releases off-canvas ---------------
+    useEffect(() => {
+      const stop = () => setIsErasing(false);
+      window.addEventListener('mouseup', stop);
+      return () => window.removeEventListener('mouseup', stop);
     }, []);
 
     // --------------- Cursor feedback for pan modes ---------------
@@ -423,7 +432,10 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
             onDragMove={handleDragMove}
             onClick={handleStageClick}
             onTap={handleStageClick}
-            onMouseDown={handleMarqueeDown}
+            onMouseDown={(e) => {
+              handleMarqueeDown(e);
+              if (useUIStore.getState().activeTool === 'eraser') setIsErasing(true);
+            }}
             onMouseMove={(e) => {
               handleStageMouseMove(e);
               handleMarqueeMove();
@@ -431,6 +443,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
             onMouseUp={() => {
               handleStageMouseUp();
               handleMarqueeUp();
+              setIsErasing(false);
             }}
           >
             <Layer>
@@ -461,6 +474,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
                   activeQuarters={getActiveQuarters(individual)}
                   individualNumber={individualNumbers.get(individual.id)}
                   panMode={isSpaceHeld || activeTool === 'hand'}
+                  eraseOnHover={isErasing}
                 />
               ))}
             </Layer>
