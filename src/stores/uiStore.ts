@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 
-export type ActiveTool = 'select' | 'pan' | 'addIndividual';
+export type ActiveTool =
+  | 'select'
+  | 'hand'
+  | 'male'
+  | 'female'
+  | 'unknown'
+  | 'partnership'
+  | 'text'
+  | 'eraser';
 export type ActiveModal = 'import' | 'export' | 'settings' | 'legendEditor' | 'shortcuts' | null;
 
 interface UIState {
@@ -36,6 +44,14 @@ interface UIState {
   propertiesPanelOpen: boolean;
   activeModal: ActiveModal;
   activeTool: ActiveTool;
+
+  /** Whether placement tools stay active after one use (Excalidraw "lock"). */
+  toolLocked: boolean;
+  /**
+   * The first individual clicked while the partnership tool is active, awaiting
+   * a second click to complete the union. `null` when no anchor is pending.
+   */
+  partnershipAnchorId: string | null;
 
   /** Whether the ⌘K command palette is open. */
   commandPaletteOpen: boolean;
@@ -76,6 +92,10 @@ interface UIState {
   ) => void;
   hideRelationshipPopup: () => void;
   setActiveTool: (tool: ActiveTool) => void;
+  /** Toggle whether placement tools stay active after use. */
+  toggleToolLocked: () => void;
+  /** Set or clear the pending partnership anchor individual. */
+  setPartnershipAnchor: (id: string | null) => void;
   openModal: (modal: ActiveModal) => void;
   closeModal: () => void;
   setPropertiesPanelOpen: (open: boolean) => void;
@@ -125,6 +145,8 @@ export const useUIStore = create<UIState>()((set) => ({
   propertiesPanelOpen: false,
   activeModal: null,
   activeTool: 'select',
+  toolLocked: false,
+  partnershipAnchorId: null,
   commandPaletteOpen: false,
   editingAnnotationId: null,
   lastSavedAt: null,
@@ -228,6 +250,11 @@ export const useUIStore = create<UIState>()((set) => ({
     }),
 
   setActiveTool: (activeTool) => set({ activeTool }),
+
+  toggleToolLocked: () =>
+    set((state) => ({ toolLocked: !state.toolLocked })),
+
+  setPartnershipAnchor: (id) => set({ partnershipAnchorId: id }),
 
   openModal: (activeModal) => set({ activeModal }),
 
