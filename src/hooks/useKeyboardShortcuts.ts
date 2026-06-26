@@ -14,14 +14,13 @@ import { openDocumentAction, deleteSelectedAction } from '../commands/editorActi
  * - Cmd/Ctrl+S: Save to JSON
  * - Cmd/Ctrl+O: Open JSON file
  * - Cmd/Ctrl+E: Open export modal
- * - V: Select tool
- * - H: Hand (pan) tool
- * - P: Add Person tool
+ * - 1/V select, 2/M male, 3/F female, 4/U unknown, 5/R partnership,
+ *   6/T text, 7/E eraser, H hand, L toggle tool-lock
  * - ?: Open keyboard shortcuts overlay
  * - Delete/Backspace: Delete selected individuals
  * - Escape: Clear selection, close modal, hide radial menu
  *
- * All plain-letter shortcuts (V/H/P/?) are guarded by an input-focus check
+ * All plain-letter shortcuts (V/H/1-7/?) are guarded by an input-focus check
  * so they do not fire while the user is typing in an INPUT, TEXTAREA, SELECT,
  * or contentEditable element.
  */
@@ -84,6 +83,7 @@ export function useKeyboardShortcuts() {
 
       // --- Non-modifier shortcuts ---
       switch (e.key) {
+        case '1':
         case 'v': {
           e.preventDefault();
           useUIStore.getState().setActiveTool('select');
@@ -91,12 +91,48 @@ export function useKeyboardShortcuts() {
         }
         case 'h': {
           e.preventDefault();
-          useUIStore.getState().setActiveTool('pan');
+          useUIStore.getState().setActiveTool('hand');
           return;
         }
-        case 'p': {
+        case '2':
+        case 'm': {
           e.preventDefault();
-          useUIStore.getState().setActiveTool('addIndividual');
+          useUIStore.getState().setActiveTool('male');
+          return;
+        }
+        case '3':
+        case 'f': {
+          e.preventDefault();
+          useUIStore.getState().setActiveTool('female');
+          return;
+        }
+        case '4':
+        case 'u': {
+          e.preventDefault();
+          useUIStore.getState().setActiveTool('unknown');
+          return;
+        }
+        case '5':
+        case 'r': {
+          e.preventDefault();
+          useUIStore.getState().setActiveTool('partnership');
+          return;
+        }
+        case '6':
+        case 't': {
+          e.preventDefault();
+          useUIStore.getState().setActiveTool('text');
+          return;
+        }
+        case '7':
+        case 'e': {
+          e.preventDefault();
+          useUIStore.getState().setActiveTool('eraser');
+          return;
+        }
+        case 'l': {
+          e.preventDefault();
+          useUIStore.getState().toggleToolLocked();
           return;
         }
         case '?': {
@@ -108,6 +144,8 @@ export function useKeyboardShortcuts() {
           const ui = useUIStore.getState();
           if (ui.activeModal) {
             ui.closeModal();
+          } else if (ui.partnershipAnchorId) {
+            ui.setPartnershipAnchor(null);
           } else if (ui.radialMenu.visible) {
             ui.hideRadialMenu();
           } else {

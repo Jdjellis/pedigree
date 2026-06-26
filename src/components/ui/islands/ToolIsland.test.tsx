@@ -1,56 +1,49 @@
-import { render, screen, fireEvent } from '@testing-library/react';
-import { useUIStore } from '../../../stores/uiStore';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { render, screen, cleanup } from '@testing-library/react';
 import { ToolIsland } from './ToolIsland';
+import { useUIStore } from '../../../stores/uiStore';
 
-beforeEach(() => {
-  // Reset activeTool to its initial value before each test.
-  useUIStore.getState().setActiveTool('select');
-});
+describe('ToolIsland', () => {
+  beforeEach(() => {
+    cleanup();
+    useUIStore.setState({ activeTool: 'select', toolLocked: false });
+  });
 
-test('renders three tool buttons — Select, Hand, Add Person', () => {
-  render(<ToolIsland />);
+  it('renders a button for each tool plus lock and hand', () => {
+    render(<ToolIsland />);
+    for (const label of [
+      'Lock', 'Hand', 'Select', 'Add male', 'Add female',
+      'Add unknown sex', 'Partnership', 'Text', 'Eraser',
+    ]) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+    }
+  });
 
-  expect(screen.getByRole('button', { name: 'Select' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Hand' })).toBeInTheDocument();
-  expect(screen.getByRole('button', { name: 'Add Person' })).toBeInTheDocument();
-});
+  it('marks the active tool pressed', () => {
+    useUIStore.setState({ activeTool: 'male' });
+    render(<ToolIsland />);
+    expect(screen.getByRole('button', { name: 'Add male' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Select' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+  });
 
-test('clicking Select activates the select tool in the store', () => {
-  // Start from a non-select state so the click is a real change.
-  useUIStore.getState().setActiveTool('pan');
+  it('activates a tool on click', () => {
+    render(<ToolIsland />);
+    screen.getByRole('button', { name: 'Add female' }).click();
+    expect(useUIStore.getState().activeTool).toBe('female');
+  });
 
-  render(<ToolIsland />);
-  fireEvent.click(screen.getByRole('button', { name: 'Select' }));
-
-  expect(useUIStore.getState().activeTool).toBe('select');
-});
-
-test('clicking Hand activates the pan tool in the store', () => {
-  render(<ToolIsland />);
-  fireEvent.click(screen.getByRole('button', { name: 'Hand' }));
-
-  expect(useUIStore.getState().activeTool).toBe('pan');
-});
-
-test('clicking Add Person activates the addIndividual tool in the store', () => {
-  render(<ToolIsland />);
-  fireEvent.click(screen.getByRole('button', { name: 'Add Person' }));
-
-  expect(useUIStore.getState().activeTool).toBe('addIndividual');
-});
-
-test('Select button has buttonActive styling when activeTool is select', () => {
-  // Pre-condition: store is already 'select' from beforeEach.
-  render(<ToolIsland />);
-  const selectBtn = screen.getByRole('button', { name: 'Select' });
-  // The active class name contains 'buttonActive' (CSS Modules mangles the full
-  // class name but the substring is stable in test environments).
-  expect(selectBtn.className).toMatch(/buttonActive/);
-});
-
-test('Hand button has buttonActive styling when activeTool is pan', () => {
-  useUIStore.getState().setActiveTool('pan');
-  render(<ToolIsland />);
-  const handBtn = screen.getByRole('button', { name: 'Hand' });
-  expect(handBtn.className).toMatch(/buttonActive/);
+  it('reflects the lock toggle state', () => {
+    useUIStore.setState({ toolLocked: true });
+    render(<ToolIsland />);
+    expect(screen.getByRole('button', { name: 'Lock' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
 });

@@ -47,20 +47,12 @@ describe('tool hotkeys (not in an input)', () => {
     expect(useUIStore.getState().activeTool).toBe('select');
   });
 
-  test('pressing h sets activeTool to pan', () => {
+  test('pressing h sets activeTool to hand', () => {
     render(<TestHarness />);
 
     fireEvent.keyDown(document.body, { key: 'h' });
 
-    expect(useUIStore.getState().activeTool).toBe('pan');
-  });
-
-  test('pressing p sets activeTool to addIndividual', () => {
-    render(<TestHarness />);
-
-    fireEvent.keyDown(document.body, { key: 'p' });
-
-    expect(useUIStore.getState().activeTool).toBe('addIndividual');
+    expect(useUIStore.getState().activeTool).toBe('hand');
   });
 
   test('pressing ? opens the shortcuts modal', () => {
@@ -77,12 +69,12 @@ describe('tool hotkeys (not in an input)', () => {
 // ---------------------------------------------------------------------------
 
 describe('input-guard (hotkeys silenced when typing)', () => {
-  test('pressing v inside an INPUT does not change the active tool away from pan', () => {
+  test('pressing v inside an INPUT does not change the active tool away from hand', () => {
     render(<TestHarness />);
 
     // Pre-condition: start on a different tool
     act(() => {
-      useUIStore.setState({ activeTool: 'pan' });
+      useUIStore.setState({ activeTool: 'hand' });
     });
 
     const input = document.createElement('input');
@@ -90,8 +82,8 @@ describe('input-guard (hotkeys silenced when typing)', () => {
 
     fireEvent.keyDown(input, { key: 'v' });
 
-    // Still 'pan' — the guard prevented the switch
-    expect(useUIStore.getState().activeTool).toBe('pan');
+    // Still 'hand' — the guard prevented the switch
+    expect(useUIStore.getState().activeTool).toBe('hand');
 
     document.body.removeChild(input);
   });
@@ -113,7 +105,7 @@ describe('input-guard (hotkeys silenced when typing)', () => {
     document.body.removeChild(textarea);
   });
 
-  test('pressing p inside a SELECT does not change the active tool', () => {
+  test('pressing m inside a SELECT does not change the active tool', () => {
     render(<TestHarness />);
 
     act(() => {
@@ -123,11 +115,58 @@ describe('input-guard (hotkeys silenced when typing)', () => {
     const select = document.createElement('select');
     document.body.appendChild(select);
 
-    fireEvent.keyDown(select, { key: 'p' });
+    fireEvent.keyDown(select, { key: 'm' });
 
     expect(useUIStore.getState().activeTool).toBe('select');
 
     document.body.removeChild(select);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Number + letter tool shortcuts — all tool mappings and lock toggle
+// ---------------------------------------------------------------------------
+
+describe('number + letter tool shortcuts', () => {
+  test.each([
+    ['1', 'select'],
+    ['2', 'male'],
+    ['3', 'female'],
+    ['4', 'unknown'],
+    ['5', 'partnership'],
+    ['6', 'text'],
+    ['7', 'eraser'],
+    ['m', 'male'],
+    ['f', 'female'],
+    ['u', 'unknown'],
+    ['r', 'partnership'],
+    ['t', 'text'],
+    ['e', 'eraser'],
+    ['h', 'hand'],
+    ['v', 'select'],
+  ] as const)('pressing %s sets activeTool to %s', (key, tool) => {
+    render(<TestHarness />);
+
+    // Seed a different tool so each press is a real change
+    act(() => {
+      useUIStore.setState({ activeTool: 'hand' });
+    });
+
+    fireEvent.keyDown(document.body, { key });
+
+    expect(useUIStore.getState().activeTool).toBe(tool);
+  });
+
+  test('pressing l toggles toolLocked to true', () => {
+    render(<TestHarness />);
+
+    act(() => {
+      useUIStore.setState({ toolLocked: false });
+    });
+
+    fireEvent.keyDown(document.body, { key: 'l' });
+
+    expect(useUIStore.getState().toolLocked).toBe(true);
   });
 });
 
@@ -188,5 +227,20 @@ describe('Delete / Backspace key removes selected individuals', () => {
       usePedigreeStore.getState().document.individuals
     );
     expect(individuals).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Escape key — closes modals, hides radial menu, clears anchor, clears selection
+// ---------------------------------------------------------------------------
+
+describe('Escape key handling', () => {
+  test('Escape clears a pending partnership anchor', () => {
+    render(<TestHarness />);
+    act(() => {
+      useUIStore.setState({ partnershipAnchorId: 'a' });
+    });
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+    expect(useUIStore.getState().partnershipAnchorId).toBeNull();
   });
 });

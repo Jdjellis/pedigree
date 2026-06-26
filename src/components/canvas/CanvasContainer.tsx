@@ -7,12 +7,13 @@ import {
   forwardRef,
   useImperativeHandle,
 } from 'react';
-import { Stage, Layer } from 'react-konva';
+import { Stage, Layer, Rect } from 'react-konva';
 import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore } from '../../stores/uiStore';
-import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
+import { usePedigreeStore } from '../../stores/pedigreeStore';
+import { placePersonAt, genderForTool, placeTextAt } from './toolPlacement';
 import { GridLayer } from './GridLayer';
 import { ConnectionsLayer } from '../connections/ConnectionsLayer';
 import { PedigreeSymbol } from './symbols/PedigreeSymbol';
@@ -29,7 +30,13 @@ import {
   MAX_ZOOM,
   ZOOM_WHEEL_SENSITIVITY,
   WHEEL_LINE_HEIGHT,
+  SYMBOL_SIZE,
 } from '../../utils/constants';
+import {
+  marqueeRect,
+  idsIntersectingMarquee,
+  type NodeBox,
+} from './marqueeSelection';
 import styles from './CanvasContainer.module.css';
 
 export interface CanvasContainerHandle {
@@ -48,6 +55,22 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     const [isSpaceHeld, setIsSpaceHeld] = useState(false);
     // True while a middle-mouse pan gesture is in progress.
     const [isMiddlePanning, setIsMiddlePanning] = useState(false);
+    // Marquee drag in canvas space (select tool only); null when not dragging.
+    const [marquee, setMarquee] = useState<
+      { start: { x: number; y: number }; current: { x: number; y: number } } | null
+    >(null);
+    // Mirror of the marquee in a ref so marquee-up can read the final rect and
+    // run the selection mutation OUTSIDE any setState updater (mutating a store
+    // inside setMarquee's updater is a setState-in-render violation).
+    const marqueeRef = useRef<
+      { start: { x: number; y: number }; current: { x: number; y: number } } | null
+    >(null);
+    // Set true when a marquee drag (not a zero-distance click) just committed,
+    // so the Stage `click` Konva synthesizes on pointerup does not immediately
+    // clearSelection() the marquee's result. Consumed (reset) by handleStageClick.
+    const didMarqueeRef = useRef(false);
+    // True while the eraser is held down for a drag-erase swath.
+    const [isErasing, setIsErasing] = useState(false);
 
     const scale = useViewportStore((s) => s.scale);
     const position = useViewportStore((s) => s.position);
@@ -168,6 +191,13 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
       };
     }, []);
 
+    // --------------- Eraser drag: safety-net stop when mouse releases off-canvas ---------------
+    useEffect(() => {
+      const stop = () => setIsErasing(false);
+      window.addEventListener('mouseup', stop);
+      return () => window.removeEventListener('mouseup', stop);
+    }, []);
+
     // --------------- Cursor feedback for pan modes ---------------
     useEffect(() => {
       const el = stageRef.current?.container();
@@ -245,6 +275,10 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     // --------------- Click on Empty Canvas ---------------
     const handleStageClick = useCallback(
       (e: KonvaEventObject<MouseEvent | TouchEvent>) => {
+        if (didMarqueeRef.current) {
+          didMarqueeRef.current = false;
+          return;
+        }
         const clickedOnEmpty = e.target === e.target.getStage();
         if (!clickedOnEmpty) return;
 
@@ -253,27 +287,25 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
         // subscriptions inside react-konva handlers).
         const currentTool = useUIStore.getState().activeTool;
 
-        if (currentTool === 'addIndividual') {
-          // Place a new individual at the click point in canvas space.
+        if (genderForTool(currentTool) !== null) {
           const stage = stageRef.current;
           if (!stage) return;
           const pointer = stage.getPointerPosition();
           if (!pointer) return;
           const canvasPos = useViewportStore.getState().screenToCanvas(pointer);
-          const individual = createDefaultIndividual({
-            position: {
-              x: Math.round(canvasPos.x),
-              y: Math.round(canvasPos.y),
-            },
-          });
-          usePedigreeStore.getState().addIndividual(individual);
-          useUIStore.getState().select(individual.id);
-          useUIStore.getState().setActiveTool('select');
-        } else {
+          placePersonAt(currentTool, canvasPos);
+        } else if (currentTool === 'text') {
+          const stage = stageRef.current;
+          if (!stage) return;
+          const pointer = stage.getPointerPosition();
+          if (!pointer) return;
+          const canvasPos = useViewportStore.getState().screenToCanvas(pointer);
+          placeTextAt(canvasPos);
+        } else if (currentTool === 'select') {
           clearSelection();
         }
       },
-      [clearSelection]
+      [clearSelection],
     );
 
     const handleStageMouseMove = useCallback(
@@ -296,10 +328,62 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
       }
     }, [dragLink.active, endDragLink]);
 
-    // The stage is always draggable so a left-drag on empty canvas pans. When
-    // space is held, symbol dragging is suspended (see panMode below) so a
-    // left-drag over a symbol falls through to panning the stage instead.
-    const isDraggable = true;
+    const handleMarqueeDown = useCallback(
+      (e: KonvaEventObject<MouseEvent>) => {
+        didMarqueeRef.current = false;
+        if (useUIStore.getState().activeTool !== 'select') return;
+        if (e.target !== e.target.getStage()) return; // only on empty canvas
+        const stage = stageRef.current;
+        if (!stage) return;
+        const pointer = stage.getPointerPosition();
+        if (!pointer) return;
+        const pos = useViewportStore.getState().screenToCanvas(pointer);
+        marqueeRef.current = { start: pos, current: pos };
+        setMarquee(marqueeRef.current);
+      },
+      [],
+    );
+
+    const handleMarqueeMove = useCallback(() => {
+      if (!marqueeRef.current) return;
+      const stage = stageRef.current;
+      if (!stage) return;
+      const pointer = stage.getPointerPosition();
+      if (!pointer) return;
+      const pos = useViewportStore.getState().screenToCanvas(pointer);
+      marqueeRef.current = { start: marqueeRef.current.start, current: pos };
+      setMarquee(marqueeRef.current);
+    }, []);
+
+    const handleMarqueeUp = useCallback(() => {
+      const prev = marqueeRef.current;
+      marqueeRef.current = null;
+      setMarquee(null);
+      if (!prev) return;
+      didMarqueeRef.current =
+        prev.start.x !== prev.current.x || prev.start.y !== prev.current.y;
+      const rect = marqueeRect(prev.start, prev.current);
+      // Build node boxes in canvas space. Individual `position` is the symbol
+      // CENTRE, so expand by half SYMBOL_SIZE.
+      const half = SYMBOL_SIZE / 2;
+      const boxes: NodeBox[] = Object.values(
+        usePedigreeStore.getState().document.individuals,
+      ).map((ind) => ({
+        id: ind.id,
+        x: ind.position.x - half,
+        y: ind.position.y - half,
+        width: SYMBOL_SIZE,
+        height: SYMBOL_SIZE,
+      }));
+      const ids = idsIntersectingMarquee(rect, boxes);
+      const ui = useUIStore.getState();
+      if (ids.length > 0) ui.selectMultiple(ids);
+      else ui.clearSelection();
+    }, []);
+
+    // Pan by dragging only when the hand tool is active or space is held. In
+    // every other tool, dragging empty canvas is free for marquee / placement.
+    const isDraggable = activeTool === 'hand' || isSpaceHeld;
 
     const individualsList = Object.values(individuals);
 
@@ -364,8 +448,19 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
             onDragMove={handleDragMove}
             onClick={handleStageClick}
             onTap={handleStageClick}
-            onMouseMove={handleStageMouseMove}
-            onMouseUp={handleStageMouseUp}
+            onMouseDown={(e) => {
+              handleMarqueeDown(e);
+              if (useUIStore.getState().activeTool === 'eraser') setIsErasing(true);
+            }}
+            onMouseMove={(e) => {
+              handleStageMouseMove(e);
+              handleMarqueeMove();
+            }}
+            onMouseUp={() => {
+              handleStageMouseUp();
+              handleMarqueeUp();
+              setIsErasing(false);
+            }}
           >
             <Layer>
               <BoundsLayer bounds={bounds} individuals={individualsList} />
@@ -394,7 +489,8 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
                   isHovered={hoveredId === individual.id}
                   activeQuarters={getActiveQuarters(individual)}
                   individualNumber={individualNumbers.get(individual.id)}
-                  panMode={isSpaceHeld}
+                  panMode={isSpaceHeld || activeTool === 'hand'}
+                  eraseOnHover={isErasing}
                 />
               ))}
             </Layer>
@@ -407,7 +503,16 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
               />
             </Layer>
 
-            <Layer name="selection" />
+            <Layer name="selection" listening={false}>
+              {marquee && (
+                <Rect
+                  {...marqueeRect(marquee.start, marquee.current)}
+                  fill="rgba(105, 101, 219, 0.12)"
+                  stroke="#6965db"
+                  strokeWidth={1}
+                />
+              )}
+            </Layer>
 
             <Layer>
               <DragLinkLayer
