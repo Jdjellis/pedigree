@@ -13,7 +13,7 @@ import type { KonvaEventObject } from 'konva/lib/Node';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore } from '../../stores/uiStore';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
-import { placePersonAt, genderForTool } from './toolPlacement';
+import { placePersonAt, genderForTool, placeTextAt } from './toolPlacement';
 import { GridLayer } from './GridLayer';
 import { ConnectionsLayer } from '../connections/ConnectionsLayer';
 import { PedigreeSymbol } from './symbols/PedigreeSymbol';
@@ -271,6 +271,13 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
           if (!pointer) return;
           const canvasPos = useViewportStore.getState().screenToCanvas(pointer);
           placePersonAt(currentTool, canvasPos);
+        } else if (currentTool === 'text') {
+          const stage = stageRef.current;
+          if (!stage) return;
+          const pointer = stage.getPointerPosition();
+          if (!pointer) return;
+          const canvasPos = useViewportStore.getState().screenToCanvas(pointer);
+          placeTextAt(canvasPos);
         } else if (currentTool === 'select') {
           clearSelection();
         }

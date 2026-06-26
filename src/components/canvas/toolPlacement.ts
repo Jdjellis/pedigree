@@ -1,6 +1,11 @@
 import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
 import { useUIStore, type ActiveTool } from '../../stores/uiStore';
 import { GenderIdentity } from '../../types/enums';
+import { generateId } from '../../utils/idGenerator';
+import {
+  ANNOTATION_DEFAULT_FONT_SIZE,
+  ANNOTATION_PLACEHOLDER_TEXT,
+} from '../../utils/constants';
 
 /**
  * Map a placement tool id to the gender identity it creates. Returns `null`
@@ -45,4 +50,27 @@ export function placePersonAt(
   if (!ui.toolLocked) ui.setActiveTool('select');
 
   return individual.id;
+}
+
+/**
+ * Place an empty-placeholder text annotation at the given CANVAS-space position
+ * (rounded to integers), open it straight into inline edit mode, and revert the
+ * active tool to `'select'` unless the toolbar lock is engaged.
+ *
+ * @returns the new annotation's id.
+ */
+export function placeTextAt(position: { x: number; y: number }): string {
+  const annotation = {
+    id: generateId(),
+    text: ANNOTATION_PLACEHOLDER_TEXT,
+    position: { x: Math.round(position.x), y: Math.round(position.y) },
+    fontSize: ANNOTATION_DEFAULT_FONT_SIZE,
+  };
+  usePedigreeStore.getState().addTextAnnotation(annotation);
+
+  const ui = useUIStore.getState();
+  ui.startEditingAnnotation(annotation.id);
+  if (!ui.toolLocked) ui.setActiveTool('select');
+
+  return annotation.id;
 }
