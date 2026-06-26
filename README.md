@@ -1,5 +1,7 @@
 # Pedigree
 
+[![CI](https://github.com/Jdjellis/pedigree/actions/workflows/ci.yml/badge.svg)](https://github.com/Jdjellis/pedigree/actions/workflows/ci.yml)
+
 A local-first, opinionated **genetic pedigree mapping tool**. Build clinical family
 pedigrees on an infinite canvas with standardized symbols, condition shading, and
 export to shareable documents — all in your browser, no account required.
@@ -31,6 +33,31 @@ npm install
 npm run dev      # http://localhost:5173
 npm run build    # type-check + production build to dist/
 npm run lint
+```
+
+## Testing & CI
+
+The suite uses [Vitest](https://vitest.dev/) with the jsdom environment and
+React Testing Library.
+
+```bash
+npm test               # run the suite once
+npm run test:watch     # watch mode
+npm run test:coverage  # run with a v8 coverage report (text + html + lcov)
+npm run typecheck      # tsc project-wide type check, no emit
+```
+
+Coverage focuses on application logic — pure utilities (geometry, graph
+traversal, layout/respacing), the `.ped`/JSON/SVG I/O codecs, the Zustand
+stores, commands, and hooks. Konva canvas-rendering components are exercised
+indirectly and excluded from coverage targets.
+
+Every push to `main` and every pull request runs the same four gates in GitHub
+Actions (`.github/workflows/ci.yml`): **lint → type-check → test → build**.
+Run them locally before pushing with:
+
+```bash
+npm run lint && npm run typecheck && npm test && npm run build
 ```
 
 ## Data & privacy
