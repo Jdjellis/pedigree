@@ -9,14 +9,17 @@
   cursor: default;
 }
 
-.container[data-tool='pan'] {
+.container[data-tool='male'],
+.container[data-tool='female'],
+.container[data-tool='unknown'],
+.container[data-tool='text'] {
+  cursor: crosshair;
+}
+
+.container[data-tool='hand'] {
   cursor: grab;
 }
 
-.container[data-tool='pan'][data-dragging='true'] {
-  cursor: grabbing;
-}
-
-.container[data-tool='addIndividual'] {
-  cursor: crosshair;
+.container[data-tool='eraser'] {
+  cursor: cell;
 }

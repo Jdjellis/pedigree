@@ -12,7 +12,8 @@ import type Konva from 'konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore } from '../../stores/uiStore';
-import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
+import { usePedigreeStore } from '../../stores/pedigreeStore';
+import { placePersonAt, genderForTool } from './toolPlacement';
 import { GridLayer } from './GridLayer';
 import { ConnectionsLayer } from '../connections/ConnectionsLayer';
 import { PedigreeSymbol } from './symbols/PedigreeSymbol';
@@ -253,27 +254,18 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
         // subscriptions inside react-konva handlers).
         const currentTool = useUIStore.getState().activeTool;
 
-        if (currentTool === 'male') {
-          // Place a new individual at the click point in canvas space.
+        if (genderForTool(currentTool) !== null) {
           const stage = stageRef.current;
           if (!stage) return;
           const pointer = stage.getPointerPosition();
           if (!pointer) return;
           const canvasPos = useViewportStore.getState().screenToCanvas(pointer);
-          const individual = createDefaultIndividual({
-            position: {
-              x: Math.round(canvasPos.x),
-              y: Math.round(canvasPos.y),
-            },
-          });
-          usePedigreeStore.getState().addIndividual(individual);
-          useUIStore.getState().select(individual.id);
-          useUIStore.getState().setActiveTool('select');
-        } else {
+          placePersonAt(currentTool, canvasPos);
+        } else if (currentTool === 'select') {
           clearSelection();
         }
       },
-      [clearSelection]
+      [clearSelection],
     );
 
     const handleStageMouseMove = useCallback(
