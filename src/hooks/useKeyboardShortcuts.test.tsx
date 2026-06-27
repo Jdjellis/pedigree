@@ -30,6 +30,7 @@ beforeEach(() => {
       activeModal: null,
       commandPaletteOpen: false,
       selectedIds: new Set<string>(),
+      editingLocked: false,
     });
   });
 });

@@ -236,7 +236,7 @@ export function RadialMenu() {
     select,
   ]);
 
-  if (!visible || !target) return null;
+  if (!visible || !target || useUIStore.getState().editingLocked) return null;
 
   return (
     <div

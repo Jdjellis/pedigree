@@ -48,6 +48,11 @@ export interface PedigreeSymbolProps {
    * immediately, enabling swath deletion by holding and dragging.
    */
   eraseOnHover?: boolean;
+  /**
+   * When true the document is locked for editing: dragging is disabled and
+   * mutation interactions (erase, radial menu) are blocked.
+   */
+  editingLocked?: boolean;
 }
 
 const SELECTION_COLOR = '#6965db';
@@ -240,6 +245,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
     individualNumber,
     panMode = false,
     eraseOnHover = false,
+    editingLocked = false,
   }) => {
     const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Position of the symbol when a drag began. Captured so the whole drag can
@@ -401,7 +407,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
       <Group
         x={individual.position.x}
         y={individual.position.y}
-        draggable={!panMode}
+        draggable={!panMode && !editingLocked}
         dragBoundFunc={dragBoundFunc}
         onClick={handleClick}
         onTap={handleClick}

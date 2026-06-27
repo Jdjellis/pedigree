@@ -84,6 +84,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     const dragLink = useUIStore((s) => s.dragLink);
     const updateDragLinkCursor = useUIStore((s) => s.updateDragLinkCursor);
     const endDragLink = useUIStore((s) => s.endDragLink);
+    const editingLocked = useUIStore((s) => s.editingLocked);
 
     // Lift store subscriptions to react-dom context so Konva layers re-render
     const individuals = usePedigreeStore((s) => s.document.individuals);
@@ -295,6 +296,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
           const canvasPos = useViewportStore.getState().screenToCanvas(pointer);
           placePersonAt(currentTool, canvasPos);
         } else if (currentTool === 'text') {
+          if (useUIStore.getState().editingLocked) return;
           const stage = stageRef.current;
           if (!stage) return;
           const pointer = stage.getPointerPosition();
@@ -491,6 +493,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
                   individualNumber={individualNumbers.get(individual.id)}
                   panMode={isSpaceHeld || activeTool === 'hand'}
                   eraseOnHover={isErasing}
+                  editingLocked={editingLocked}
                 />
               ))}
             </Layer>
