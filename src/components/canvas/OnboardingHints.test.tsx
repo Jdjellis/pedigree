@@ -37,6 +37,11 @@ describe('OnboardingHints with 0 individuals', () => {
       screen.getByText(/saved only in this browser/i)
     ).toBeInTheDocument();
   });
+
+  test('renders the ⌘K shortcut hint', () => {
+    render(<OnboardingHints />);
+    expect(screen.getByText('⌘K')).toBeInTheDocument();
+  });
 });
 
 describe('OnboardingHints with 1 individual (seed)', () => {

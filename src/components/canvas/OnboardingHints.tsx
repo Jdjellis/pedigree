@@ -50,7 +50,7 @@ export function OnboardingHints(): ReactElement | null {
     const screen = useViewportStore.getState().canvasToScreen(seed.position);
     const t = setTimeout(() => useUIStore.getState().showRadialMenu(seedId, screen), 600);
     return () => clearTimeout(t);
-  }, []);
+  }, [individualCount]);
 
   const { openDocument, importPed } = useEditorActions();
 
