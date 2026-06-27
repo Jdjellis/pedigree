@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { usePedigreeStore, createDefaultIndividual } from '../stores/pedigreeStore';
+import { usePedigreeStore, createDefaultIndividual, createSeededDocument } from '../stores/pedigreeStore';
 import { useUIStore } from '../stores/uiStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { generateId } from '../utils/idGenerator';
@@ -10,6 +10,7 @@ import {
   ANNOTATION_PLACEHOLDER_TEXT,
 } from '../utils/constants';
 import { openDocumentAction, deleteSelectedAction } from './editorActions';
+import { getVisibleCanvasCenter } from '../utils/canvasCenter';
 
 /**
  * All imperative editor actions available to any surface (islands, ⌘K palette,
@@ -96,12 +97,13 @@ export interface EditorActions {
  */
 export function useEditorActions(): EditorActions {
   const newDocument = (): void => {
-    if (
-      window.confirm('Create a new pedigree? Unsaved changes will be lost.')
-    ) {
-      usePedigreeStore.getState().resetDocument();
-      useUIStore.getState().clearSelection();
+    if (window.confirm('Create a new pedigree? Unsaved changes will be lost.')) {
       useViewportStore.getState().resetView();
+      const sex = useUIStore.getState().defaultSex;
+      usePedigreeStore.getState().setDocument(
+        createSeededDocument(sex, getVisibleCanvasCenter()),
+      );
+      useUIStore.getState().clearSelection();
     }
   };
 
@@ -148,17 +150,9 @@ export function useEditorActions(): EditorActions {
   const addText = (): void => {
     // Drop the annotation in clear space below the existing pedigree so it does
     // not land on top of a symbol. When the document is empty, fall back to the
-    // centre of the visible canvas area (same stage-local → canvas conversion
-    // as adding an individual).
-    const { screenToCanvas } = useViewportStore.getState();
+    // centre of the visible canvas area.
     const { document: doc } = usePedigreeStore.getState();
-    const canvasEl = document.querySelector('.konvajs-content');
-    let stageCenter = { x: 300, y: 300 };
-    if (canvasEl) {
-      const rect = canvasEl.getBoundingClientRect();
-      stageCenter = { x: rect.width / 2, y: rect.height / 2 };
-    }
-    const fallback = screenToCanvas(stageCenter);
+    const fallback = getVisibleCanvasCenter();
     const position = computeAnnotationDropPosition(
       Object.values(doc.individuals),
       Object.values(doc.textAnnotations),
