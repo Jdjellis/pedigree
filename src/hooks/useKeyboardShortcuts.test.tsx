@@ -157,16 +157,16 @@ describe('number + letter tool shortcuts', () => {
     expect(useUIStore.getState().activeTool).toBe(tool);
   });
 
-  test('pressing l toggles toolLocked to true', () => {
+  test('pressing l toggles editingLocked to true', () => {
     render(<TestHarness />);
 
     act(() => {
-      useUIStore.setState({ toolLocked: false });
+      useUIStore.setState({ editingLocked: false });
     });
 
     fireEvent.keyDown(document.body, { key: 'l' });
 
-    expect(useUIStore.getState().toolLocked).toBe(true);
+    expect(useUIStore.getState().editingLocked).toBe(true);
   });
 });
 

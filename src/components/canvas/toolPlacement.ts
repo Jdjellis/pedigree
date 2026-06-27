@@ -47,7 +47,7 @@ export function placePersonAt(
 
   const ui = useUIStore.getState();
   ui.select(individual.id);
-  if (!ui.toolLocked) ui.setActiveTool('select');
+  if (!ui.editingLocked) ui.setActiveTool('select');
 
   return individual.id;
 }
@@ -70,7 +70,7 @@ export function placeTextAt(position: { x: number; y: number }): string {
 
   const ui = useUIStore.getState();
   ui.startEditingAnnotation(annotation.id);
-  if (!ui.toolLocked) ui.setActiveTool('select');
+  if (!ui.editingLocked) ui.setActiveTool('select');
 
   return annotation.id;
 }

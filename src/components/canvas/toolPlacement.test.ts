@@ -10,7 +10,7 @@ describe('toolPlacement — sex person', () => {
     usePedigreeStore.getState().resetDocument();
     useUIStore.setState({
       activeTool: 'male',
-      toolLocked: false,
+      editingLocked: false,
       selectedIds: new Set(),
     });
   });
@@ -37,7 +37,7 @@ describe('toolPlacement — sex person', () => {
   });
 
   it('keeps the tool active after placing when locked', () => {
-    useUIStore.setState({ toolLocked: true });
+    useUIStore.setState({ editingLocked: true });
     placePersonAt('male', { x: 0, y: 0 });
     expect(useUIStore.getState().activeTool).toBe('male');
   });
@@ -52,7 +52,7 @@ describe('toolPlacement — sex person', () => {
 describe('toolPlacement — text', () => {
   beforeEach(() => {
     usePedigreeStore.getState().resetDocument();
-    useUIStore.setState({ activeTool: 'text', toolLocked: false });
+    useUIStore.setState({ activeTool: 'text', editingLocked: false });
   });
 
   it('places a placeholder annotation at the rounded position and edits it', () => {

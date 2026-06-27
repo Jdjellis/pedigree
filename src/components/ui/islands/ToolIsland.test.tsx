@@ -6,13 +6,13 @@ import { useUIStore } from '../../../stores/uiStore';
 describe('ToolIsland', () => {
   beforeEach(() => {
     cleanup();
-    useUIStore.setState({ activeTool: 'select', toolLocked: false });
+    useUIStore.setState({ activeTool: 'select', editingLocked: false });
   });
 
   it('renders a button for each tool plus lock and hand', () => {
     render(<ToolIsland />);
     for (const label of [
-      'Lock', 'Hand', 'Select', 'Add male', 'Add female',
+      'Lock editing', 'Hand', 'Select', 'Add male', 'Add female',
       'Add unknown sex', 'Partnership', 'Text', 'Eraser',
     ]) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
@@ -39,9 +39,9 @@ describe('ToolIsland', () => {
   });
 
   it('reflects the lock toggle state', () => {
-    useUIStore.setState({ toolLocked: true });
+    useUIStore.setState({ editingLocked: true });
     render(<ToolIsland />);
-    expect(screen.getByRole('button', { name: 'Lock' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Lock editing' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );

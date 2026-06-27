@@ -98,7 +98,7 @@ describe('addPerson (center placement)', () => {
 
 describe('useEditorActions tool activators', () => {
   beforeEach(() => {
-    useUIStore.setState({ activeTool: 'select', toolLocked: false });
+    useUIStore.setState({ activeTool: 'select', editingLocked: false });
   });
 
   it('activates each tool', () => {
@@ -121,9 +121,9 @@ describe('useEditorActions tool activators', () => {
     expect(useUIStore.getState().activeTool).toBe('select');
   });
 
-  it('toggles the tool lock', () => {
+  it('toggles the editing lock', () => {
     const { result } = renderHook(() => useEditorActions());
-    result.current.toggleToolLock();
-    expect(useUIStore.getState().toolLocked).toBe(true);
+    result.current.toggleEditingLock();
+    expect(useUIStore.getState().editingLocked).toBe(true);
   });
 });

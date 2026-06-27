@@ -10,12 +10,12 @@ import styles from './islands.module.css';
 /**
  * Floating tool-selection island: lock and hand helpers, then the placeable
  * tools (select, male, female, unknown, partnership, text, eraser) with number
- * shortcut badges. Reads `activeTool`/`toolLocked` reactively — safe here
+ * shortcut badges. Reads `activeTool`/`editingLocked` reactively — safe here
  * because this component lives in the react-dom tree (not inside react-konva).
  */
 export function ToolIsland(): React.JSX.Element {
   const activeTool = useUIStore((s) => s.activeTool);
-  const toolLocked = useUIStore((s) => s.toolLocked);
+  const editingLocked = useUIStore((s) => s.editingLocked);
   const actions = useEditorActions();
 
   const activators: Record<PlacementToolId, () => void> = {
@@ -31,10 +31,10 @@ export function ToolIsland(): React.JSX.Element {
   return (
     <Island aria-label="Tools">
       <ToolButton
-        label="Lock"
+        label="Lock editing"
         icon={<Lock size={18} />}
-        active={toolLocked}
-        onClick={actions.toggleToolLock}
+        active={editingLocked}
+        onClick={actions.toggleEditingLock}
       />
       <span className={styles.toolDivider} aria-hidden="true" />
       <ToolButton

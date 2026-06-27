@@ -55,8 +55,8 @@ interface UIState {
   /** The sex applied to singly-added people (seed + radial +Partner/+Child/+Sibling). */
   defaultSex: DefaultSex;
 
-  /** Whether placement tools stay active after one use (Excalidraw "lock"). */
-  toolLocked: boolean;
+  /** When true, the pedigree is read-only: no structural or property edits. */
+  editingLocked: boolean;
   /**
    * The first individual clicked while the partnership tool is active, awaiting
    * a second click to complete the union. `null` when no anchor is pending.
@@ -104,8 +104,8 @@ interface UIState {
   setActiveTool: (tool: ActiveTool) => void;
   /** Set the default sex used for singly-added people. */
   setDefaultSex: (sex: DefaultSex) => void;
-  /** Toggle whether placement tools stay active after use. */
-  toggleToolLocked: () => void;
+  /** Toggle whether the pedigree is locked against editing. */
+  toggleEditingLocked: () => void;
   /** Set or clear the pending partnership anchor individual. */
   setPartnershipAnchor: (id: string | null) => void;
   openModal: (modal: ActiveModal) => void;
@@ -158,7 +158,7 @@ export const useUIStore = create<UIState>()((set) => ({
   activeModal: null,
   activeTool: 'select',
   defaultSex: 'unknown',
-  toolLocked: false,
+  editingLocked: false,
   partnershipAnchorId: null,
   commandPaletteOpen: false,
   editingAnnotationId: null,
@@ -266,8 +266,8 @@ export const useUIStore = create<UIState>()((set) => ({
 
   setDefaultSex: (defaultSex) => set({ defaultSex }),
 
-  toggleToolLocked: () =>
-    set((state) => ({ toolLocked: !state.toolLocked })),
+  toggleEditingLocked: () =>
+    set((state) => ({ editingLocked: !state.editingLocked })),
 
   setPartnershipAnchor: (id) => set({ partnershipAnchorId: id }),
 

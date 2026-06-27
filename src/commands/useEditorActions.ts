@@ -80,8 +80,8 @@ export interface EditorActions {
   textTool: () => void;
   /** Activate the eraser tool. */
   eraserTool: () => void;
-  /** Toggle whether placement tools stay active after use. */
-  toggleToolLock: () => void;
+  /** Toggle whether the pedigree is locked against editing. */
+  toggleEditingLock: () => void;
 }
 
 /**
@@ -228,8 +228,8 @@ export function useEditorActions(): EditorActions {
     useUIStore.getState().setActiveTool('eraser');
   };
 
-  const toggleToolLock = (): void => {
-    useUIStore.getState().toggleToolLocked();
+  const toggleEditingLock = (): void => {
+    useUIStore.getState().toggleEditingLocked();
   };
 
   // Empty deps: every callback reads store state via getState() at call time,
@@ -259,7 +259,7 @@ export function useEditorActions(): EditorActions {
       partnershipTool,
       textTool,
       eraserTool,
-      toggleToolLock,
+      toggleEditingLock,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []

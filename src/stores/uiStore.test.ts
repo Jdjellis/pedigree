@@ -43,7 +43,7 @@ describe('uiStore tool state', () => {
   beforeEach(() => {
     useUIStore.setState({
       activeTool: 'select',
-      toolLocked: false,
+      editingLocked: false,
       partnershipAnchorId: null,
     });
   });
@@ -55,12 +55,12 @@ describe('uiStore tool state', () => {
     expect(useUIStore.getState().activeTool).toBe('eraser');
   });
 
-  it('toggles the tool lock on and off', () => {
-    expect(useUIStore.getState().toolLocked).toBe(false);
-    useUIStore.getState().toggleToolLocked();
-    expect(useUIStore.getState().toolLocked).toBe(true);
-    useUIStore.getState().toggleToolLocked();
-    expect(useUIStore.getState().toolLocked).toBe(false);
+  it('toggles the editing lock on and off', () => {
+    expect(useUIStore.getState().editingLocked).toBe(false);
+    useUIStore.getState().toggleEditingLocked();
+    expect(useUIStore.getState().editingLocked).toBe(true);
+    useUIStore.getState().toggleEditingLocked();
+    expect(useUIStore.getState().editingLocked).toBe(false);
   });
 
   it('sets and clears the partnership anchor', () => {

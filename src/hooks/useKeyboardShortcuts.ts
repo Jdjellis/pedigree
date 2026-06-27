@@ -15,7 +15,7 @@ import { openDocumentAction, deleteSelectedAction } from '../commands/editorActi
  * - Cmd/Ctrl+O: Open JSON file
  * - Cmd/Ctrl+E: Open export modal
  * - 1/V select, 2/M male, 3/F female, 4/U unknown, 5/R partnership,
- *   6/T text, 7/E eraser, H hand, L toggle tool-lock
+ *   6/T text, 7/E eraser, H hand, L toggle edit-lock
  * - ?: Open keyboard shortcuts overlay
  * - Delete/Backspace: Delete selected individuals
  * - Escape: Clear selection, close modal, hide radial menu
@@ -132,7 +132,7 @@ export function useKeyboardShortcuts() {
         }
         case 'l': {
           e.preventDefault();
-          useUIStore.getState().toggleToolLocked();
+          useUIStore.getState().toggleEditingLocked();
           return;
         }
         case '?': {
