@@ -32,9 +32,10 @@ export function ParentChildLine({
   const anchors = children.map((c) => ({ x: c.position.x, y: c.position.y }));
 
   let parentDrop: [number, number, number, number] | null = null;
-  let sibship: [number, number, number, number] | null;
-  let childDrops: [number, number, number, number][];
+  let sibship: [number, number, number, number] | null = null;
+  let childDrops: [number, number, number, number][] = [];
 
+  // 0 partners → bare sibship bar (no descent up); 1–2 partners → descent from the averaged anchor.
   if (partners.length === 0) {
     ({ sibship, childDrops } = computeParentlessSibshipSegments(anchors));
   } else {

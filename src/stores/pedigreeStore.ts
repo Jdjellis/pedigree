@@ -774,9 +774,9 @@ export const usePedigreeStore = create<PedigreeState>()(
           const partnership = state.document.partnerships[partnershipId];
           if (!partnership) return state;
 
-          const updatedPartnership = { ...partnership };
-          if (!updatedPartnership.partner1Id) updatedPartnership.partner1Id = partner.id;
-          else updatedPartnership.partner2Id = partner.id;
+          const updatedPartnership = !partnership.partner1Id
+            ? { ...partnership, partner1Id: partner.id }
+            : { ...partnership, partner2Id: partner.id };
 
           let individuals: Record<string, Individual> = {
             ...state.document.individuals,

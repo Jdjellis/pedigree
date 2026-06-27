@@ -115,6 +115,9 @@ export function RadialMenu() {
       return;
     }
 
+    // Two parents already present — nothing to add (also gated in the UI).
+    if (union && partners.length >= 2) return;
+
     // Case C — no parent union: create a fresh couple above the target.
     const parent1 = createDefaultIndividual({
       genderIdentity: GenderIdentity.Man, generation: parentGeneration,

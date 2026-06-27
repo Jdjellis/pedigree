@@ -7,7 +7,6 @@ import {
   hasParents,
   hasPartnership,
   getPresentPartners,
-  isParentlessUnion,
 } from './graphTraversal';
 import { RelationshipType } from '../types/enums';
 import { createDefaultDocument, createDefaultIndividual } from '../stores/pedigreeStore';
@@ -177,13 +176,6 @@ describe('getPresentPartners', () => {
 
     const sibship: PartnershipRelationship = { id: 'u2', type: RelationshipType.Partnership, childrenIds: [] };
     expect(getPresentPartners(doc.individuals, sibship)).toEqual([]);
-  });
-});
-
-describe('isParentlessUnion', () => {
-  it('is true only when both partner slots are empty', () => {
-    expect(isParentlessUnion({ id: 'u', type: RelationshipType.Partnership, childrenIds: [] } as PartnershipRelationship)).toBe(true);
-    expect(isParentlessUnion({ id: 'u', type: RelationshipType.Partnership, partner1Id: 'x', childrenIds: [] } as PartnershipRelationship)).toBe(false);
   });
 });
 

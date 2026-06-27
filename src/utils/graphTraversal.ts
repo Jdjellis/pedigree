@@ -85,11 +85,6 @@ export function getPresentPartners(
   return result;
 }
 
-/** A union with no partners — a parentless sibship. */
-export function isParentlessUnion(partnership: PartnershipRelationship): boolean {
-  return !partnership.partner1Id && !partnership.partner2Id;
-}
-
 /** True only when the individual's parent union has at least one present partner. */
 export function hasParents(
   doc: PedigreeDocument,

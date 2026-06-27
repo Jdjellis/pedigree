@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { computeParentChildSegments } from './parentChildGeometry';
+import { computeParentChildSegments, computeParentlessSibshipSegments } from './parentChildGeometry';
+import { PARENTLESS_SIBSHIP_RISE } from '../../utils/constants';
 
 /**
  * Regression coverage for the broken parent-child connector (issue #13
@@ -51,9 +52,6 @@ describe('computeParentChildSegments', () => {
     expect(sibship).toEqual([300, 200, 600, 200]);
   });
 });
-
-import { computeParentlessSibshipSegments } from './parentChildGeometry';
-import { PARENTLESS_SIBSHIP_RISE } from '../../utils/constants';
 
 describe('computeParentlessSibshipSegments', () => {
   it('draws a bar above two children with a drop to each and no parent drop', () => {
