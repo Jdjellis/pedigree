@@ -206,8 +206,11 @@ Each runs inside a single `set` so one undo reverts the whole operation.
 - `fillUnionPartners(partnershipId, newIndividuals, opts)` — inserts the new
   partner individual(s), sets the union's empty partner slot(s), then reflows:
   - Add Partner (1→2): place partner beside the sole parent, `centerParentsOverChildren`.
-  - Add Parents (0→2): place the couple above the sibship, apply
-    `computeParentClearanceShift` + generation respacing, centre over children.
+  - Add Parents (0→2): place the couple above the sibship, centre over children
+    (`centerParentsOverChildren`) + generation respacing. In-law clearance
+    (`computeParentClearanceShift`) is **not** applied for the sibship case — a
+    bare sibship rarely has already-partnered children, and generation respacing
+    resolves same-row overlaps; left out to keep the action simple (YAGNI).
   - Add Parents (1→2): place the single new parent beside the existing one,
     centre over children.
 
@@ -234,6 +237,9 @@ Each runs inside a single `set` so one undo reverts the whole operation.
   parents fixes it as a side effect.
 - **PED export** of a 0-partner sibship loses the sibling link (documented
   non-goal); no crash.
-- **Deleting a partner** from a 2-partner union (existing delete flow) would
-  leave a 1-partner union, which now renders correctly rather than vanishing —
-  an incidental improvement to verify, not a regression.
+- **Deleting a partner** does **not** leave a 1-partner union: the existing
+  `removeIndividual` flow drops the whole partnership when either partner is
+  removed and prunes the children's parent-child links (unchanged here). A
+  1-partner union therefore only arises via the Add-Child-without-partner flow,
+  never from partner deletion. (A useful corollary: no union with a dangling
+  partner id — id set but individual gone — can arise through the UI.)
