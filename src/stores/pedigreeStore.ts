@@ -622,16 +622,18 @@ export const usePedigreeStore = create<PedigreeState>()(
             partnership.partner1Id === partner.id
               ? partnership.partner2Id
               : partnership.partner1Id;
-          individuals = applyMoves(
-            individuals,
-            makeRoomForPartner(
+          if (targetId) {
+            individuals = applyMoves(
               individuals,
-              state.document.partnerships,
-              targetId,
-              partner.id,
-              MIN_GENERATION_NODE_SPACING,
-            ),
-          );
+              makeRoomForPartner(
+                individuals,
+                state.document.partnerships,
+                targetId,
+                partner.id,
+                MIN_GENERATION_NODE_SPACING,
+              ),
+            );
+          }
           return {
             document: {
               ...state.document,

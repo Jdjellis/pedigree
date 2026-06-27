@@ -19,8 +19,8 @@ export function ParentChildLine({
   individuals,
   parentChildLinks,
 }: ParentChildLineProps) {
-  const p1 = individuals[partnership.partner1Id];
-  const p2 = individuals[partnership.partner2Id];
+  const p1 = partnership.partner1Id ? individuals[partnership.partner1Id] : undefined;
+  const p2 = partnership.partner2Id ? individuals[partnership.partner2Id] : undefined;
 
   if (!p1 || !p2) return null;
   if (partnership.childrenIds.length === 0) return null;

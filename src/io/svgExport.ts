@@ -483,8 +483,8 @@ function renderPartnershipLine(
   partnership: PartnershipRelationship,
   individuals: Record<string, Individual>,
 ): string {
-  const p1 = individuals[partnership.partner1Id];
-  const p2 = individuals[partnership.partner2Id];
+  const p1 = partnership.partner1Id ? individuals[partnership.partner1Id] : undefined;
+  const p2 = partnership.partner2Id ? individuals[partnership.partner2Id] : undefined;
   if (!p1 || !p2) return '';
 
   const y = (p1.position.y + p2.position.y) / 2;
@@ -515,8 +515,8 @@ function renderParentChildLines(
   individuals: Record<string, Individual>,
   parentChildLinks: Record<string, ParentChildRelationship>,
 ): string {
-  const p1 = individuals[partnership.partner1Id];
-  const p2 = individuals[partnership.partner2Id];
+  const p1 = partnership.partner1Id ? individuals[partnership.partner1Id] : undefined;
+  const p2 = partnership.partner2Id ? individuals[partnership.partner2Id] : undefined;
   if (!p1 || !p2) return '';
   if (partnership.childrenIds.length === 0) return '';
 
@@ -571,8 +571,8 @@ function renderTwinConnector(
   const partnership = partnerships[twinGroup.parentPartnershipId];
   if (!partnership) return '';
 
-  const p1 = individuals[partnership.partner1Id];
-  const p2 = individuals[partnership.partner2Id];
+  const p1 = partnership.partner1Id ? individuals[partnership.partner1Id] : undefined;
+  const p2 = partnership.partner2Id ? individuals[partnership.partner2Id] : undefined;
   if (!p1 || !p2) return '';
 
   const partnershipY = (p1.position.y + p2.position.y) / 2;

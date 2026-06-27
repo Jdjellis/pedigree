@@ -135,8 +135,8 @@ export function RadialMenu() {
     const partnership = doc.partnerships[partnershipIds[0]];
     if (!partnership) return;
 
-    const p1 = doc.individuals[partnership.partner1Id];
-    const p2 = doc.individuals[partnership.partner2Id];
+    const p1 = partnership.partner1Id ? doc.individuals[partnership.partner1Id] : undefined;
+    const p2 = partnership.partner2Id ? doc.individuals[partnership.partner2Id] : undefined;
     if (!p1 || !p2) return;
 
     const midX = (p1.position.x + p2.position.x) / 2;
