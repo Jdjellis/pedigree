@@ -2,6 +2,7 @@ import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigree
 import { useUIStore, type ActiveTool } from '../../stores/uiStore';
 import { GenderIdentity } from '../../types/enums';
 import { generateId } from '../../utils/idGenerator';
+import { computeSmartTextPosition } from '../../utils/annotationPlacement';
 import {
   ANNOTATION_DEFAULT_FONT_SIZE,
   ANNOTATION_PLACEHOLDER_TEXT,
@@ -53,17 +54,29 @@ export function placePersonAt(
 }
 
 /**
- * Place an empty-placeholder text annotation at the given CANVAS-space position
- * (rounded to integers), open it straight into inline edit mode, and revert the
- * active tool to `'select'` unless the toolbar lock is engaged.
+ * Place an empty-placeholder text annotation near the given CANVAS-space click,
+ * open it straight into inline edit mode, and revert the active tool to
+ * `'select'` unless the toolbar lock is engaged.
+ *
+ * `position` is treated as the desired annotation **centre**. Smart placement
+ * ({@link computeSmartTextPosition}) snaps the caption under a nearby symbol or
+ * onto a nearby partnership line; otherwise it sits centred on the exact click.
  *
  * @returns the new annotation's id.
  */
 export function placeTextAt(position: { x: number; y: number }): string {
+  const { document: doc } = usePedigreeStore.getState();
+  const center = computeSmartTextPosition(
+    position,
+    ANNOTATION_DEFAULT_FONT_SIZE,
+    Object.values(doc.individuals),
+    Object.values(doc.textAnnotations),
+    Object.values(doc.partnerships),
+  );
   const annotation = {
     id: generateId(),
     text: ANNOTATION_PLACEHOLDER_TEXT,
-    position: { x: Math.round(position.x), y: Math.round(position.y) },
+    position: center,
     fontSize: ANNOTATION_DEFAULT_FONT_SIZE,
   };
   usePedigreeStore.getState().addTextAnnotation(annotation);
