@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { usePedigreeStore, createDefaultIndividual, createSeededDocument } from '../stores/pedigreeStore';
+import { usePedigreeStore, createSeededDocument } from '../stores/pedigreeStore';
 import { useUIStore } from '../stores/uiStore';
 import { useViewportStore } from '../stores/viewportStore';
 import { generateId } from '../utils/idGenerator';
@@ -29,24 +29,6 @@ export interface EditorActions {
   /** Open the legend editor modal. */
   openLegend: () => void;
   /**
-   * Add a new individual placed at the visible-canvas centre and select it.
-   * Placement uses `screenToCanvas` with stage-local coordinates (0,0 = top-left
-   * of the `.konvajs-content` element), matching the project's Konva/Zustand
-   * coordinate convention.
-   *
-   * Delegates to `addPersonAt` using the computed canvas centre.
-   */
-  addPerson: () => void;
-  /**
-   * Add a new individual at the given CANVAS-space position, select it, and
-   * revert the active tool to `'select'`. Coordinates are rounded to integers
-   * before placement.
-   *
-   * @param position - Canvas-space {x, y} coordinates (already converted from
-   *   screen/stage-local space by the caller, e.g. via `screenToCanvas`).
-   */
-  addPersonAt: (position: { x: number; y: number }) => void;
-  /**
    * Add a free-text annotation in clear space below the existing pedigree
    * (falling back to the visible-canvas centre when empty) and open it
    * straight into inline edit mode.
@@ -68,14 +50,6 @@ export interface EditorActions {
   selectTool: () => void;
   /** Activate the pan (hand) tool. */
   handTool: () => void;
-  /** Activate the add-male (square) placement tool. */
-  maleTool: () => void;
-  /** Activate the add-female (circle) placement tool. */
-  femaleTool: () => void;
-  /** Activate the add-unknown-sex (diamond) placement tool. */
-  unknownTool: () => void;
-  /** Activate the partnership-line tool. */
-  partnershipTool: () => void;
   /** Activate the text placement tool. */
   textTool: () => void;
   /** Activate the eraser tool. */
@@ -119,32 +93,6 @@ export function useEditorActions(): EditorActions {
 
   const openLegend = (): void => {
     useUIStore.getState().openModal('legendEditor');
-  };
-
-  const addPersonAt = (position: { x: number; y: number }): void => {
-    const individual = createDefaultIndividual({
-      position: {
-        x: Math.round(position.x),
-        y: Math.round(position.y),
-      },
-    });
-    usePedigreeStore.getState().addIndividual(individual);
-    useUIStore.getState().select(individual.id);
-    useUIStore.getState().setActiveTool('select');
-  };
-
-  const addPerson = (): void => {
-    // Place new individual at center of visible canvas area.
-    // screenToCanvas expects stage-local coords (0,0 = top-left of stage element).
-    const { screenToCanvas } = useViewportStore.getState();
-    const canvasEl = document.querySelector('.konvajs-content');
-    let stageCenter = { x: 300, y: 300 };
-    if (canvasEl) {
-      const rect = canvasEl.getBoundingClientRect();
-      stageCenter = { x: rect.width / 2, y: rect.height / 2 };
-    }
-    const canvasCenter = screenToCanvas(stageCenter);
-    addPersonAt(canvasCenter);
   };
 
   const addText = (): void => {
@@ -204,22 +152,6 @@ export function useEditorActions(): EditorActions {
     useUIStore.getState().setActiveTool('hand');
   };
 
-  const maleTool = (): void => {
-    useUIStore.getState().setActiveTool('male');
-  };
-
-  const femaleTool = (): void => {
-    useUIStore.getState().setActiveTool('female');
-  };
-
-  const unknownTool = (): void => {
-    useUIStore.getState().setActiveTool('unknown');
-  };
-
-  const partnershipTool = (): void => {
-    useUIStore.getState().setActiveTool('partnership');
-  };
-
   const textTool = (): void => {
     useUIStore.getState().setActiveTool('text');
   };
@@ -242,8 +174,6 @@ export function useEditorActions(): EditorActions {
       importPed,
       exportDocument,
       openLegend,
-      addPerson,
-      addPersonAt,
       addText,
       deleteSelected,
       undo,
@@ -253,10 +183,6 @@ export function useEditorActions(): EditorActions {
       resetView,
       selectTool,
       handTool,
-      maleTool,
-      femaleTool,
-      unknownTool,
-      partnershipTool,
       textTool,
       eraserTool,
       toggleEditingLock,

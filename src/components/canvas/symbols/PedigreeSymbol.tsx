@@ -28,7 +28,6 @@ import type { ActiveQuarter } from './ConditionOverlay';
 import { DeceasedSlash } from './DeceasedSlash';
 import { ProbandArrow } from './ProbandArrow';
 import { SymbolLabel } from './SymbolLabel';
-import { handlePartnershipClick } from '../partnershipTool';
 import { eraseElementById } from '../eraserTool';
 
 export interface PedigreeSymbolProps {
@@ -267,12 +266,6 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         e.cancelBubble = true;
         const ui = useUIStore.getState();
         const tool = ui.activeTool;
-
-        if (tool === 'partnership') {
-          ui.hideRadialMenu();
-          handlePartnershipClick(individual.id);
-          return;
-        }
 
         if (tool === 'eraser') {
           ui.hideRadialMenu();

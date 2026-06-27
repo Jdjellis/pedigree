@@ -106,7 +106,7 @@ describe('input-guard (hotkeys silenced when typing)', () => {
     document.body.removeChild(textarea);
   });
 
-  test('pressing m inside a SELECT does not change the active tool', () => {
+  test('pressing t inside a SELECT does not change the active tool', () => {
     render(<TestHarness />);
 
     act(() => {
@@ -116,7 +116,7 @@ describe('input-guard (hotkeys silenced when typing)', () => {
     const select = document.createElement('select');
     document.body.appendChild(select);
 
-    fireEvent.keyDown(select, { key: 'm' });
+    fireEvent.keyDown(select, { key: 't' });
 
     expect(useUIStore.getState().activeTool).toBe('select');
 
@@ -131,16 +131,8 @@ describe('input-guard (hotkeys silenced when typing)', () => {
 describe('number + letter tool shortcuts', () => {
   test.each([
     ['1', 'select'],
-    ['2', 'male'],
-    ['3', 'female'],
-    ['4', 'unknown'],
-    ['5', 'partnership'],
-    ['6', 'text'],
-    ['7', 'eraser'],
-    ['m', 'male'],
-    ['f', 'female'],
-    ['u', 'unknown'],
-    ['r', 'partnership'],
+    ['2', 'text'],
+    ['3', 'eraser'],
     ['t', 'text'],
     ['e', 'eraser'],
     ['h', 'hand'],
@@ -231,17 +223,3 @@ describe('Delete / Backspace key removes selected individuals', () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Escape key — closes modals, hides radial menu, clears anchor, clears selection
-// ---------------------------------------------------------------------------
-
-describe('Escape key handling', () => {
-  test('Escape clears a pending partnership anchor', () => {
-    render(<TestHarness />);
-    act(() => {
-      useUIStore.setState({ partnershipAnchorId: 'a' });
-    });
-    fireEvent.keyDown(document.body, { key: 'Escape' });
-    expect(useUIStore.getState().partnershipAnchorId).toBeNull();
-  });
-});

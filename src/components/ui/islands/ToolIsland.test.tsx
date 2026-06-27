@@ -11,18 +11,15 @@ describe('ToolIsland', () => {
 
   it('renders a button for each tool plus lock and hand', () => {
     render(<ToolIsland />);
-    for (const label of [
-      'Lock editing', 'Hand', 'Select', 'Add male', 'Add female',
-      'Add unknown sex', 'Partnership', 'Text', 'Eraser',
-    ]) {
+    for (const label of ['Lock editing', 'Hand', 'Select', 'Text', 'Eraser']) {
       expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
     }
   });
 
   it('marks the active tool pressed', () => {
-    useUIStore.setState({ activeTool: 'male' });
+    useUIStore.setState({ activeTool: 'text' });
     render(<ToolIsland />);
-    expect(screen.getByRole('button', { name: 'Add male' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Text' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -34,8 +31,8 @@ describe('ToolIsland', () => {
 
   it('activates a tool on click', () => {
     render(<ToolIsland />);
-    screen.getByRole('button', { name: 'Add female' }).click();
-    expect(useUIStore.getState().activeTool).toBe('female');
+    screen.getByRole('button', { name: 'Text' }).click();
+    expect(useUIStore.getState().activeTool).toBe('text');
   });
 
   it('reflects the lock toggle state', () => {
@@ -45,5 +42,12 @@ describe('ToolIsland', () => {
       'aria-pressed',
       'true',
     );
+  });
+
+  it('renders the default-sex control buttons', () => {
+    render(<ToolIsland />);
+    for (const label of ['Male', 'Female', 'Unknown']) {
+      expect(screen.getByRole('button', { name: label })).toBeInTheDocument();
+    }
   });
 });

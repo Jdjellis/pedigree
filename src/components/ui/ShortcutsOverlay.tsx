@@ -43,9 +43,11 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
   {
     label: 'Tools',
     rows: [
-      { description: 'Select tool', keys: ['V'] },
+      { description: 'Select tool', keys: ['1', 'V'] },
+      { description: 'Text tool', keys: ['2', 'T'] },
+      { description: 'Eraser tool', keys: ['3', 'E'] },
       { description: 'Hand (pan) tool', keys: ['H'] },
-      { description: 'Add person', keys: ['P'] },
+      { description: 'Toggle edit lock', keys: ['L'] },
     ],
   },
   {

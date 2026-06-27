@@ -44,13 +44,12 @@ describe('uiStore tool state', () => {
     useUIStore.setState({
       activeTool: 'select',
       editingLocked: false,
-      partnershipAnchorId: null,
     });
   });
 
-  it('switches the active tool to any of the new tool ids', () => {
-    useUIStore.getState().setActiveTool('male');
-    expect(useUIStore.getState().activeTool).toBe('male');
+  it('switches the active tool to any of the valid tool ids', () => {
+    useUIStore.getState().setActiveTool('text');
+    expect(useUIStore.getState().activeTool).toBe('text');
     useUIStore.getState().setActiveTool('eraser');
     expect(useUIStore.getState().activeTool).toBe('eraser');
   });
@@ -61,12 +60,5 @@ describe('uiStore tool state', () => {
     expect(useUIStore.getState().editingLocked).toBe(true);
     useUIStore.getState().toggleEditingLocked();
     expect(useUIStore.getState().editingLocked).toBe(false);
-  });
-
-  it('sets and clears the partnership anchor', () => {
-    useUIStore.getState().setPartnershipAnchor('ind-1');
-    expect(useUIStore.getState().partnershipAnchorId).toBe('ind-1');
-    useUIStore.getState().setPartnershipAnchor(null);
-    expect(useUIStore.getState().partnershipAnchorId).toBeNull();
   });
 });
