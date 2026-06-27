@@ -8,6 +8,12 @@ export const DEFAULT_CONDITION_COLORS = ['#1a1a1a', '#e63946', '#457b9d', '#2a9d
 
 // Layout spacing
 export const GENERATION_SPACING = 150;
+/**
+ * Vertical gap between a parentless sibship's horizontal bar and the top of its
+ * children. Half a generation reads as "these are siblings" without implying a
+ * parent couple sits above.
+ */
+export const PARENTLESS_SIBSHIP_RISE = GENERATION_SPACING / 2;
 export const SIBLING_SPACING = 80;
 export const PARTNER_SPACING = 120;
 export const PARENT_CHILD_OFFSET = 50;

@@ -51,3 +51,40 @@ describe('computeParentChildSegments', () => {
     expect(sibship).toEqual([300, 200, 600, 200]);
   });
 });
+
+import { computeParentlessSibshipSegments } from './parentChildGeometry';
+import { PARENTLESS_SIBSHIP_RISE } from '../../utils/constants';
+
+describe('computeParentlessSibshipSegments', () => {
+  it('draws a bar above two children with a drop to each and no parent drop', () => {
+    const result = computeParentlessSibshipSegments([
+      { x: 100, y: 300 },
+      { x: 200, y: 300 },
+    ]);
+    const sibshipY = 300 - PARENTLESS_SIBSHIP_RISE;
+
+    expect(result.sibshipY).toBe(sibshipY);
+    expect(result.sibship).toEqual([100, sibshipY, 200, sibshipY]);
+    expect(result.childDrops).toEqual([
+      [100, sibshipY, 100, 300],
+      [200, sibshipY, 200, 300],
+    ]);
+    expect('parentDrop' in result).toBe(false);
+  });
+
+  it('omits the bar for a single child (just a short stub above it)', () => {
+    const result = computeParentlessSibshipSegments([{ x: 150, y: 300 }]);
+    const sibshipY = 300 - PARENTLESS_SIBSHIP_RISE;
+
+    expect(result.sibship).toBeNull();
+    expect(result.childDrops).toEqual([[150, sibshipY, 150, 300]]);
+  });
+
+  it('places the bar above the topmost child when children differ in y', () => {
+    const result = computeParentlessSibshipSegments([
+      { x: 100, y: 320 },
+      { x: 200, y: 300 },
+    ]);
+    expect(result.sibshipY).toBe(300 - PARENTLESS_SIBSHIP_RISE);
+  });
+});
