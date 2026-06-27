@@ -32,8 +32,10 @@ export function RadialMenu() {
     (s) => s.radialMenu
   );
   const hideRadialMenu = useUIStore((s) => s.hideRadialMenu);
+  const unpinRadialMenu = useUIStore((s) => s.unpinRadialMenu);
   const select = useUIStore((s) => s.select);
   const defaultSex = useUIStore((s) => s.defaultSex);
+  const editingLocked = useUIStore((s) => s.editingLocked);
 
   const doc = usePedigreeStore((s) => s.document);
   const addParentsForChild = usePedigreeStore((s) => s.addParentsForChild);
@@ -47,11 +49,12 @@ export function RadialMenu() {
   const canAddSibling = targetId ? hasParents(doc, targetId) : false;
   const canAddChild = targetId ? hasPartnership(doc, targetId) : false;
 
-  // Dismiss when mouse moves too far
+  // Dismiss when mouse drifts too far — pinned menus ignore drift entirely.
   useEffect(() => {
     if (!visible) return;
 
     const handleMouseMove = (e: MouseEvent) => {
+      if (useUIStore.getState().radialMenu.pinned) return;
       const dx = e.clientX - screenPosition.x;
       const dy = e.clientY - screenPosition.y;
       if (Math.sqrt(dx * dx + dy * dy) > RADIAL_MENU_DISMISS_DISTANCE) {
@@ -63,17 +66,20 @@ export function RadialMenu() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [visible, screenPosition, hideRadialMenu]);
 
-  // Dismiss on Escape
+  // Dismiss on Escape (also unpins if pinned)
   useEffect(() => {
     if (!visible) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') hideRadialMenu();
+      if (e.key === 'Escape') {
+        unpinRadialMenu();
+        hideRadialMenu();
+      }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [visible, hideRadialMenu]);
+  }, [visible, hideRadialMenu, unpinRadialMenu]);
 
   const handleAddParent = useCallback(() => {
     if (!target) return;
@@ -236,7 +242,7 @@ export function RadialMenu() {
     select,
   ]);
 
-  if (!visible || !target || useUIStore.getState().editingLocked) return null;
+  if (!visible || !target || editingLocked) return null;
 
   return (
     <div

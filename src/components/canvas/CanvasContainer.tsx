@@ -297,6 +297,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
           const canvasPos = useViewportStore.getState().screenToCanvas(pointer);
           placeTextAt(canvasPos);
         } else if (currentTool === 'select') {
+          useUIStore.getState().hideRadialMenu();
           clearSelection();
         }
       },

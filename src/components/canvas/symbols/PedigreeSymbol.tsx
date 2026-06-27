@@ -10,7 +10,6 @@ import {
   SYMBOL_STROKE_WIDTH,
   SYMBOL_COLOR,
   SYMBOL_FILL,
-  RADIAL_MENU_HOVER_DELAY,
 } from '../../../utils/constants';
 
 import {
@@ -246,7 +245,6 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
     eraseOnHover = false,
     editingLocked = false,
   }) => {
-    const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     // Position of the symbol when a drag began. Captured so the whole drag can
     // be committed as a single undo step on drag end (see handleDragEnd).
     const dragStartPosRef = useRef<{ x: number; y: number } | null>(null);
@@ -274,15 +272,20 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         }
 
         const { select, toggleSelection, hideRadialMenu } = ui;
-        hideRadialMenu();
         const evt = e.evt;
         if ('shiftKey' in evt && (evt.shiftKey || evt.metaKey || evt.ctrlKey)) {
+          hideRadialMenu();
           toggleSelection(individual.id);
         } else {
           select(individual.id);
+          if (!ui.editingLocked) {
+            const { canvasToScreen } = useViewportStore.getState();
+            ui.showRadialMenu(individual.id, canvasToScreen(individual.position));
+            ui.pinRadialMenu();
+          }
         }
       },
-      [individual.id],
+      [individual.id, individual.position],
     );
 
     const handleMouseEnter = useCallback(() => {
@@ -293,23 +296,13 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         return;
       }
       const uiState = useUIStore.getState();
+      if (uiState.editingLocked) return;
       uiState.setHovered(individual.id);
-      if (uiState.dragLink.active) {
-        uiState.setDragLinkTarget(individual.id);
-      }
-      const stage = document.querySelector('canvas');
-      if (stage) stage.style.cursor = 'pointer';
-
-      // Start hover timer for radial menu
-      if (hoverTimerRef.current) clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = setTimeout(() => {
-        const { canvasToScreen } = useViewportStore.getState();
-        // canvasToScreen gives stage-local coordinates; the RadialMenu overlay
-        // is position:absolute inside .canvasArea which wraps the stage,
-        // so stage-local coords position it correctly.
-        const screenPos = canvasToScreen(individual.position);
-        useUIStore.getState().showRadialMenu(individual.id, screenPos);
-      }, RADIAL_MENU_HOVER_DELAY);
+      if (uiState.dragLink.active) uiState.setDragLinkTarget(individual.id);
+      const stageEl = document.querySelector('canvas');
+      if (stageEl) stageEl.style.cursor = 'pointer';
+      const { canvasToScreen } = useViewportStore.getState();
+      uiState.showRadialMenu(individual.id, canvasToScreen(individual.position));
     }, [individual.id, individual.position, panMode, eraseOnHover]);
 
     const handleMouseLeave = useCallback(() => {
@@ -318,10 +311,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
       if (uiState.dragLink.active) {
         uiState.setDragLinkTarget(null);
       }
-      if (hoverTimerRef.current) {
-        clearTimeout(hoverTimerRef.current);
-        hoverTimerRef.current = null;
-      }
+      if (!uiState.radialMenu.pinned) uiState.hideRadialMenu();
       const stage = document.querySelector('canvas');
       if (stage) stage.style.cursor = 'default';
     }, []);

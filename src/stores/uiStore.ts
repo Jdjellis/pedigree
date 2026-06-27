@@ -19,6 +19,7 @@ interface UIState {
     visible: boolean;
     targetId: string | null;
     screenPosition: { x: number; y: number };
+    pinned: boolean;
   };
 
   dragLink: {
@@ -77,6 +78,10 @@ interface UIState {
     screenPos: { x: number; y: number }
   ) => void;
   hideRadialMenu: () => void;
+  /** Pin the radial menu open so it survives the pointer leaving the hot-zone. */
+  pinRadialMenu: () => void;
+  /** Release a pinned radial menu (it then follows hover rules again). */
+  unpinRadialMenu: () => void;
   startDragLink: (sourceId: string) => void;
   updateDragLinkCursor: (pos: { x: number; y: number }) => void;
   setDragLinkTarget: (targetId: string | null) => void;
@@ -117,6 +122,7 @@ export const useUIStore = create<UIState>()((set) => ({
     visible: false,
     targetId: null,
     screenPosition: { x: 0, y: 0 },
+    pinned: false,
   },
 
   dragLink: {
@@ -189,7 +195,7 @@ export const useUIStore = create<UIState>()((set) => ({
 
   showRadialMenu: (targetId, screenPosition) =>
     set({
-      radialMenu: { visible: true, targetId, screenPosition },
+      radialMenu: { visible: true, targetId, screenPosition, pinned: false },
     }),
 
   hideRadialMenu: () =>
@@ -198,8 +204,15 @@ export const useUIStore = create<UIState>()((set) => ({
         visible: false,
         targetId: null,
         screenPosition: { x: 0, y: 0 },
+        pinned: false,
       },
     }),
+
+  pinRadialMenu: () =>
+    set((state) => ({ radialMenu: { ...state.radialMenu, pinned: true } })),
+
+  unpinRadialMenu: () =>
+    set((state) => ({ radialMenu: { ...state.radialMenu, pinned: false } })),
 
   startDragLink: (sourceId) =>
     set({
