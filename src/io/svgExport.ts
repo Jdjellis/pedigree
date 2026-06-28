@@ -28,6 +28,11 @@ import {
   LABEL_OFFSET_Y,
   DECEASED_SLASH_OVERSHOOT,
 } from '../utils/constants';
+import { getPresentPartners } from '../utils/graphTraversal';
+import {
+  computeParentChildSegments,
+  computeParentlessSibshipSegments,
+} from '../components/connections/parentChildGeometry';
 
 // ---------------------------------------------------------------------------
 // Constants mirroring the canvas components (kept self-contained on purpose so
@@ -483,8 +488,8 @@ function renderPartnershipLine(
   partnership: PartnershipRelationship,
   individuals: Record<string, Individual>,
 ): string {
-  const p1 = individuals[partnership.partner1Id];
-  const p2 = individuals[partnership.partner2Id];
+  const p1 = partnership.partner1Id ? individuals[partnership.partner1Id] : undefined;
+  const p2 = partnership.partner2Id ? individuals[partnership.partner2Id] : undefined;
   if (!p1 || !p2) return '';
 
   const y = (p1.position.y + p2.position.y) / 2;
@@ -515,9 +520,6 @@ function renderParentChildLines(
   individuals: Record<string, Individual>,
   parentChildLinks: Record<string, ParentChildRelationship>,
 ): string {
-  const p1 = individuals[partnership.partner1Id];
-  const p2 = individuals[partnership.partner2Id];
-  if (!p1 || !p2) return '';
   if (partnership.childrenIds.length === 0) return '';
 
   const children = partnership.childrenIds
@@ -525,34 +527,33 @@ function renderParentChildLines(
     .filter((c): c is Individual => Boolean(c));
   if (children.length === 0) return '';
 
-  const partnershipY = (p1.position.y + p2.position.y) / 2;
-  const partnershipMidX = (p1.position.x + p2.position.x) / 2;
+  const partners = getPresentPartners(individuals, partnership);
+  const anchors = children.map((c) => ({ x: c.position.x, y: c.position.y }));
 
-  const childrenY = Math.min(...children.map((c) => c.position.y));
-  const sibshipY = partnershipY + (childrenY - partnershipY) / 2;
+  let parentDrop: [number, number, number, number] | null = null;
+  let sibship: [number, number, number, number] | null = null;
+  let childDrops: [number, number, number, number][] = [];
 
-  const childXPositions = children.map((c) => c.position.x);
-  const minChildX = Math.min(...childXPositions);
-  const maxChildX = Math.max(...childXPositions);
-
-  const parts: string[] = [];
-
-  // Vertical line from partnership midpoint down to sibship line.
-  parts.push(line(partnershipMidX, partnershipY, partnershipMidX, sibshipY));
-
-  // Horizontal sibship line (only if more than one child).
-  if (children.length > 1) {
-    parts.push(line(minChildX, sibshipY, maxChildX, sibshipY));
+  if (partners.length === 0) {
+    ({ sibship, childDrops } = computeParentlessSibshipSegments(anchors));
+  } else {
+    const anchorX = partners.reduce((s, p) => s + p.position.x, 0) / partners.length;
+    const anchorY = partners.reduce((s, p) => s + p.position.y, 0) / partners.length;
+    ({ parentDrop, sibship, childDrops } = computeParentChildSegments(anchorX, anchorY, anchors));
   }
 
-  // Vertical drops to each child (dashed if adopted).
-  for (const child of children) {
+  const parts: string[] = [];
+  if (parentDrop) parts.push(line(...parentDrop));
+  if (sibship) parts.push(line(...sibship));
+
+  children.forEach((child, i) => {
     const link = Object.values(parentChildLinks).find(
       (l) => l.parentPartnershipId === partnership.id && l.childId === child.id,
     );
     const isAdopted = link?.isAdopted ?? false;
-    parts.push(line(child.position.x, sibshipY, child.position.x, child.position.y, isAdopted));
-  }
+    const [x1, y1, x2, y2] = childDrops[i];
+    parts.push(line(x1, y1, x2, y2, isAdopted));
+  });
 
   return parts.join('');
 }
@@ -571,8 +572,8 @@ function renderTwinConnector(
   const partnership = partnerships[twinGroup.parentPartnershipId];
   if (!partnership) return '';
 
-  const p1 = individuals[partnership.partner1Id];
-  const p2 = individuals[partnership.partner2Id];
+  const p1 = partnership.partner1Id ? individuals[partnership.partner1Id] : undefined;
+  const p2 = partnership.partner2Id ? individuals[partnership.partner2Id] : undefined;
   if (!p1 || !p2) return '';
 
   const partnershipY = (p1.position.y + p2.position.y) / 2;
@@ -813,7 +814,7 @@ function expand(extent: Extent, x: number, y: number): void {
  * @param title - Title used for the `<title>` element / accessibility.
  * @returns A well-formed standalone SVG document string.
  */
-export function buildPedigreeSvg(doc: PedigreeDocument, title: string): string {
+export function buildPedigreeSvg(doc: PedigreeDocument, title = ''): string {
   const individuals = Object.values(doc.individuals);
   const entries = doc.legendConfig.entries;
 
