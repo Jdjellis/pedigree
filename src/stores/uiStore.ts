@@ -18,7 +18,8 @@ interface UIState {
   radialMenu: {
     visible: boolean;
     targetId: string | null;
-    screenPosition: { x: number; y: number };
+    /** Canvas-space anchor position. Converted to screen coords at render time so pan/zoom/drag tracks correctly. */
+    canvasPosition: { x: number; y: number };
     pinned: boolean;
   };
 
@@ -75,7 +76,7 @@ interface UIState {
   setHovered: (id: string | null) => void;
   showRadialMenu: (
     targetId: string,
-    screenPos: { x: number; y: number }
+    canvasPos: { x: number; y: number }
   ) => void;
   hideRadialMenu: () => void;
   /** Pin the radial menu open so it survives the pointer leaving the hot-zone. */
@@ -121,7 +122,7 @@ export const useUIStore = create<UIState>()((set) => ({
   radialMenu: {
     visible: false,
     targetId: null,
-    screenPosition: { x: 0, y: 0 },
+    canvasPosition: { x: 0, y: 0 },
     pinned: false,
   },
 
@@ -193,9 +194,9 @@ export const useUIStore = create<UIState>()((set) => ({
 
   setHovered: (id) => set({ hoveredId: id }),
 
-  showRadialMenu: (targetId, screenPosition) =>
+  showRadialMenu: (targetId, canvasPosition) =>
     set({
-      radialMenu: { visible: true, targetId, screenPosition, pinned: false },
+      radialMenu: { visible: true, targetId, canvasPosition, pinned: false },
     }),
 
   hideRadialMenu: () =>
@@ -203,7 +204,7 @@ export const useUIStore = create<UIState>()((set) => ({
       radialMenu: {
         visible: false,
         targetId: null,
-        screenPosition: { x: 0, y: 0 },
+        canvasPosition: { x: 0, y: 0 },
         pinned: false,
       },
     }),

@@ -3,7 +3,6 @@ import type { ReactElement } from 'react';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { useEditorActions } from '../../commands/useEditorActions';
 import { useUIStore } from '../../stores/uiStore';
-import { useViewportStore } from '../../stores/viewportStore';
 import { shouldShowOnboarding, ONBOARDED_STORAGE_KEY } from './onboarding';
 import styles from './OnboardingHints.module.css';
 
@@ -51,11 +50,7 @@ export function OnboardingHints(): ReactElement | null {
       if (ui.radialMenu.visible || ui.editingLocked) return;
       const seed = usePedigreeStore.getState().document.individuals[seedId];
       if (!seed) return;
-      // Compute the screen position at fire time — by now CanvasContainer has
-      // centred the viewport on the seed, so this lands on the (centred) person
-      // rather than the pre-centre origin.
-      const screen = useViewportStore.getState().canvasToScreen(seed.position);
-      ui.showRadialMenu(seedId, screen);
+      ui.showRadialMenu(seedId, seed.position);
       // Pin so the proximity controller doesn't dismiss it when the pointer
       // drifts away — the radial stays until the user adds a relative (which
       // calls hideRadialMenu), presses Escape, or clicks empty canvas.
