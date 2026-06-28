@@ -94,7 +94,6 @@ export function OnboardingHints(): ReactElement | null {
             strokeWidth="1.8"
             strokeLinecap="round"
             fill="none"
-            strokeDasharray="4 2"
           />
           <path
             d="M10 10 L16 18 M10 10 L20 12"
@@ -120,7 +119,6 @@ export function OnboardingHints(): ReactElement | null {
             strokeWidth="1.8"
             strokeLinecap="round"
             fill="none"
-            strokeDasharray="4 2"
           />
           <path
             d="M10 50 L16 42 M10 50 L20 48"
@@ -146,7 +144,6 @@ export function OnboardingHints(): ReactElement | null {
             strokeWidth="1.8"
             strokeLinecap="round"
             fill="none"
-            strokeDasharray="4 2"
           />
           <path
             d="M70 50 L64 42 M70 50 L60 48"
