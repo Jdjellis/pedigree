@@ -44,11 +44,22 @@ export function OnboardingHints(): ReactElement | null {
     if (previewedRef.current) return;
     const ids = Object.keys(usePedigreeStore.getState().document.individuals);
     if (ids.length !== 1) return;
-    previewedRef.current = true;
     const seedId = ids[0];
-    const seed = usePedigreeStore.getState().document.individuals[seedId];
-    const screen = useViewportStore.getState().canvasToScreen(seed.position);
-    const t = setTimeout(() => useUIStore.getState().showRadialMenu(seedId, screen), 600);
+    const t = setTimeout(() => {
+      const ui = useUIStore.getState();
+      // Don't clobber a menu the user is already interacting with, or when locked.
+      if (ui.radialMenu.visible || ui.editingLocked) return;
+      const seed = usePedigreeStore.getState().document.individuals[seedId];
+      if (!seed) return;
+      // Compute the screen position at fire time — by now CanvasContainer has
+      // centred the viewport on the seed, so this lands on the (centred) person
+      // rather than the pre-centre origin.
+      const screen = useViewportStore.getState().canvasToScreen(seed.position);
+      ui.showRadialMenu(seedId, screen);
+      // Mark only after actually firing, so StrictMode's mount→cleanup→remount
+      // (which clears the first timer) still leaves the second timer to run.
+      previewedRef.current = true;
+    }, 600);
     return () => clearTimeout(t);
   }, [individualCount]);
 
@@ -143,17 +154,11 @@ export function OnboardingHints(): ReactElement | null {
         <span className={styles.arrowLabel}>Shortcuts &amp; help</span>
       </div>
 
-      {/* ── Centered content block ── */}
-      <div className={styles.center}>
-        <h1 className={styles.wordmark}>Pedigree</h1>
-
-        <p className={styles.reassurance}>
-          Your work is saved only in this browser.
-        </p>
-
+      {/* ── Caption anchored just below the centered seed person ── */}
+      <div className={styles.caption}>
+        <p className={styles.cueLead}>This is your first person</p>
         <p className={styles.cue}>
-          This is your first person. Hover it to add relatives — parent, partner,
-          child, or sibling.
+          Hover it to add relatives — parent, partner, child, or sibling.
         </p>
         <p className={styles.cue}>
           Set the sex of new people with the ▢ ● ◇ control next to Select.

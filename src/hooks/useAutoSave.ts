@@ -2,7 +2,6 @@ import { useEffect } from 'react';
 import { usePedigreeStore, createSeededDocument } from '../stores/pedigreeStore';
 import { useUIStore } from '../stores/uiStore';
 import type { PedigreeDocument } from '../types/pedigree';
-import { getVisibleCanvasCenter } from '../utils/canvasCenter';
 
 const STORAGE_KEY = 'pedigree-editor-autosave';
 const DEBOUNCE_MS = 2000;
@@ -51,11 +50,12 @@ export function useAutoSave() {
     if (doc) {
       usePedigreeStore.getState().setDocument(doc);
     } else {
-      // Genuinely fresh start (nothing valid to restore): seed a first person.
+      // Genuinely fresh start (nothing valid to restore): seed a first person at
+      // canvas origin. CanvasContainer centres the viewport on it once the stage
+      // is measured — robust regardless of mount timing (the stage element does
+      // not exist yet at this point, so a position computed here would be wrong).
       const sex = useUIStore.getState().defaultSex;
-      usePedigreeStore.getState().setDocument(
-        createSeededDocument(sex, getVisibleCanvasCenter()),
-      );
+      usePedigreeStore.getState().setDocument(createSeededDocument(sex));
     }
   }, []);
 

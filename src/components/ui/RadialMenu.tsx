@@ -6,7 +6,6 @@ import { generateId } from '../../utils/idGenerator';
 import { RelationshipType, GenderIdentity } from '../../types/enums';
 import { PARTNER_SPACING, GENERATION_SPACING, SIBLING_SPACING } from '../../utils/constants';
 import type { PartnershipRelationship, ParentChildRelationship } from '../../types/pedigree';
-import { RADIAL_MENU_DISMISS_DISTANCE } from '../../utils/constants';
 import { createRelativeIndividual } from './radialActions';
 import styles from './RadialMenu.module.css';
 import clsx from 'clsx';
@@ -32,22 +31,9 @@ export function RadialMenu() {
   const canAddSibling = targetId ? hasParents(doc, targetId) : false;
   const canAddChild = targetId ? hasPartnership(doc, targetId) : false;
 
-  // Dismiss when mouse drifts too far — pinned menus ignore drift entirely.
-  useEffect(() => {
-    if (!visible) return;
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (useUIStore.getState().radialMenu.pinned) return;
-      const dx = e.clientX - screenPosition.x;
-      const dy = e.clientY - screenPosition.y;
-      if (Math.sqrt(dx * dx + dy * dy) > RADIAL_MENU_DISMISS_DISTANCE) {
-        hideRadialMenu();
-      }
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    return () => window.removeEventListener('mousemove', handleMouseMove);
-  }, [visible, screenPosition, hideRadialMenu]);
+  // Hover-driven open/close (with hysteresis) is owned by the proximity
+  // controller, useRadialHover. This component only handles Escape-to-dismiss
+  // and the click actions; empty-canvas clicks dismiss via the Stage handler.
 
   // Dismiss on Escape (also clears the pinned flag via hideRadialMenu)
   useEffect(() => {

@@ -301,9 +301,10 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
       if (uiState.dragLink.active) uiState.setDragLinkTarget(individual.id);
       const stageEl = document.querySelector('canvas');
       if (stageEl) stageEl.style.cursor = 'pointer';
-      const { canvasToScreen } = useViewportStore.getState();
-      uiState.showRadialMenu(individual.id, canvasToScreen(individual.position));
-    }, [individual.id, individual.position, panMode, eraseOnHover]);
+      // Opening the radial add-menu is handled by the proximity controller
+      // (useRadialHover), which uses a generous enter radius + hysteresis so the
+      // menu does not vanish the moment the cursor leaves this 40px hit area.
+    }, [individual.id, panMode, eraseOnHover]);
 
     const handleMouseLeave = useCallback(() => {
       const uiState = useUIStore.getState();
@@ -311,7 +312,9 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
       if (uiState.dragLink.active) {
         uiState.setDragLinkTarget(null);
       }
-      if (!uiState.radialMenu.pinned) uiState.hideRadialMenu();
+      // Note: the radial menu is NOT dismissed here. Closing is owned by the
+      // proximity controller (useRadialHover), which keeps the menu open until
+      // the pointer leaves a radius wide enough to reach the option buttons.
       const stage = document.querySelector('canvas');
       if (stage) stage.style.cursor = 'default';
     }, []);

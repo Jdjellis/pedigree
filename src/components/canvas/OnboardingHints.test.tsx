@@ -11,9 +11,9 @@ beforeEach(() => {
 });
 
 describe('OnboardingHints with 0 individuals', () => {
-  test('renders the Pedigree wordmark', () => {
+  test('renders the first-person lead caption', () => {
     render(<OnboardingHints />);
-    expect(screen.getByText('Pedigree')).toBeInTheDocument();
+    expect(screen.getByText('This is your first person')).toBeInTheDocument();
   });
 
   test('renders an Open button by accessible name', () => {
@@ -31,13 +31,6 @@ describe('OnboardingHints with 0 individuals', () => {
     expect(screen.getByRole('button', { name: 'Help' })).toBeInTheDocument();
   });
 
-  test('renders browser-local save reassurance text', () => {
-    render(<OnboardingHints />);
-    expect(
-      screen.getByText(/saved only in this browser/i)
-    ).toBeInTheDocument();
-  });
-
   test('renders the ⌘K shortcut hint', () => {
     render(<OnboardingHints />);
     expect(screen.getByText('⌘K')).toBeInTheDocument();
@@ -50,7 +43,7 @@ describe('OnboardingHints with 1 individual (seed)', () => {
     usePedigreeStore.getState().addIndividual(individual);
 
     render(<OnboardingHints />);
-    expect(screen.getByText('Pedigree')).toBeInTheDocument();
+    expect(screen.getByText('This is your first person')).toBeInTheDocument();
   });
 
   test('renders the hover-to-add-relatives cue', () => {

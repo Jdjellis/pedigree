@@ -37,6 +37,7 @@ import {
   idsIntersectingMarquee,
   type NodeBox,
 } from './marqueeSelection';
+import { useRadialHover } from '../../hooks/useRadialHover';
 import styles from './CanvasContainer.module.css';
 
 export interface CanvasContainerHandle {
@@ -47,6 +48,8 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
   (_props, ref) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const stageRef = useRef<Konva.Stage>(null);
+    // Guards the one-time "centre the view on content" pass (see effect below).
+    const didInitialCenterRef = useRef(false);
 
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
     const [isDragging, setIsDragging] = useState(false);
@@ -120,6 +123,35 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
         observer.disconnect();
       };
     }, []);
+
+    // --------------- Proximity-driven radial add-menu (hover with hysteresis) ---------------
+    useRadialHover(isSpaceHeld || activeTool === 'hand');
+
+    // --------------- Centre the view on content once the stage is measured ---------------
+    // The seed document places its first person at canvas origin (0,0). The
+    // viewport can't be centred on it until the stage has real dimensions, which
+    // happens after the ResizeObserver fires — so do it here, once, when both
+    // dimensions and content are available. Also frames a restored document on
+    // load (the viewport itself is not persisted).
+    useEffect(() => {
+      if (didInitialCenterRef.current) return;
+      if (dimensions.width === 0 || dimensions.height === 0) return;
+      const people = Object.values(individuals);
+      if (people.length === 0) return;
+
+      const xs = people.map((p) => p.position.x);
+      const ys = people.map((p) => p.position.y);
+      const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+      const { scale: currentScale, setPosition: setViewportPosition } =
+        useViewportStore.getState();
+      setViewportPosition({
+        x: dimensions.width / 2 - centerX * currentScale,
+        y: dimensions.height / 2 - centerY * currentScale,
+      });
+      didInitialCenterRef.current = true;
+    }, [dimensions.width, dimensions.height, individuals]);
 
     // --------------- Spacebar: hold to pan from anywhere ---------------
     useEffect(() => {
