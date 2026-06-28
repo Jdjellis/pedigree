@@ -611,14 +611,17 @@ function renderTwinConnector(
 /**
  * Render a single free-text annotation as a positioned SVG `<text>`.
  *
- * Matches the on-canvas Konva `Text`: `position` is the top-left of the text
- * block, so the first baseline sits one font-size below it. Multi-line text is
- * split into `<tspan>` rows spaced by the font size.
+ * Matches the on-canvas Konva `Text`: `position` is the CENTRE of the text
+ * block, so the block is centred horizontally (`text-anchor="middle"`) and
+ * vertically (its top sits half the block height above the centre). Multi-line
+ * text is split into `<tspan>` rows spaced by the font size.
  */
 function renderTextAnnotation(annotation: TextAnnotation): string {
   const lines = annotation.text.split('\n');
   const x = num(annotation.position.x);
-  const firstBaselineY = num(annotation.position.y + annotation.fontSize);
+  const blockHeight = lines.length * annotation.fontSize;
+  const top = annotation.position.y - blockHeight / 2;
+  const firstBaselineY = num(top + annotation.fontSize);
 
   const tspans = lines
     .map((lineText, index) => {
@@ -627,7 +630,7 @@ function renderTextAnnotation(annotation: TextAnnotation): string {
     })
     .join('');
 
-  return `<text x="${x}" y="${firstBaselineY}" font-size="${num(
+  return `<text x="${x}" y="${firstBaselineY}" text-anchor="middle" font-size="${num(
     annotation.fontSize,
   )}" font-family="${escapeXml(
     LABEL_FONT_FAMILY,

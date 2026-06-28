@@ -54,9 +54,15 @@ export const LABEL_OFFSET_Y = 8;
 
 // Free-text annotations
 /** Default font size (canvas units) for a newly created text annotation. */
-export const ANNOTATION_DEFAULT_FONT_SIZE = 18;
+export const ANNOTATION_DEFAULT_FONT_SIZE = 10;
 /** Placeholder text a new annotation opens with before the user types. */
 export const ANNOTATION_PLACEHOLDER_TEXT = 'Text';
+/**
+ * Rough average glyph width as a fraction of the font size, used to estimate a
+ * text block's width without measuring it on a canvas. Shared by the on-canvas
+ * selection box, viewport fit, and smart text placement so they all agree.
+ */
+export const ANNOTATION_GLYPH_WIDTH_RATIO = 0.6;
 /**
  * Vertical gap (canvas units) left between the lowest existing content and a
  * newly dropped annotation, so it lands in clear space rather than on top of a
