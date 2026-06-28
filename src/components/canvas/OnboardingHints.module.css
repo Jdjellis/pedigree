@@ -18,9 +18,9 @@
 /* ─── Caption block, anchored just below the seed person (top-third) ── */
 .caption {
   position: absolute;
-  /* Mirrors the 33% viewport placement in CanvasContainer. Clears the ~40px
-     symbol, its number label, and the radial option buttons (~87px out). */
-  top: calc(33% + 104px);
+  /* Anchor in the bottom third so the block reads clear of the seed person
+     (top third) and any radial options orbiting it. */
+  top: 67%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
