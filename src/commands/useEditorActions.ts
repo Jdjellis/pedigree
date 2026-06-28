@@ -12,6 +12,7 @@ import {
 } from '../utils/constants';
 import { openDocumentAction, deleteSelectedAction } from './editorActions';
 import { getVisibleCanvasCenter } from '../utils/canvasCenter';
+import { ONBOARDED_STORAGE_KEY } from '../components/canvas/onboarding';
 
 /**
  * All imperative editor actions available to any surface (islands, ⌘K palette,
@@ -78,14 +79,18 @@ export interface EditorActions {
  */
 export function useEditorActions(): EditorActions {
   const newDocument = (): void => {
-    if (window.confirm('Create a new pedigree? Unsaved changes will be lost.')) {
-      useViewportStore.getState().resetView();
-      const sex = useUIStore.getState().defaultSex;
-      usePedigreeStore.getState().setDocument(
-        createSeededDocument(sex, getVisibleCanvasCenter()),
-      );
-      useUIStore.getState().clearSelection();
+    const hasContent =
+      Object.keys(usePedigreeStore.getState().document.individuals).length > 1;
+    if (hasContent && !window.confirm('Start a new pedigree? Your current one will be cleared.')) {
+      return;
     }
+    localStorage.setItem(ONBOARDED_STORAGE_KEY, '1');
+    useViewportStore.getState().resetView();
+    const sex = useUIStore.getState().defaultSex;
+    usePedigreeStore.getState().setDocument(
+      createSeededDocument(sex, getVisibleCanvasCenter()),
+    );
+    useUIStore.getState().clearSelection();
   };
 
   const openDocument = (): Promise<void> => openDocumentAction();

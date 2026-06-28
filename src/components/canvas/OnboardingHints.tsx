@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import type { ReactElement } from 'react';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { useEditorActions } from '../../commands/useEditorActions';
@@ -30,7 +30,7 @@ export function OnboardingHints(): ReactElement | null {
     (s) => Object.keys(s.document.individuals).length
   );
 
-  const [onboarded] = useState(() => localStorage.getItem(ONBOARDED_STORAGE_KEY) === '1');
+  const onboarded = localStorage.getItem(ONBOARDED_STORAGE_KEY) === '1';
 
   // Mark onboarded once the first relative is added, so it never returns.
   useEffect(() => {
