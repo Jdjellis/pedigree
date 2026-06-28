@@ -12,7 +12,6 @@ import {
 } from '../utils/constants';
 import { openDocumentAction, deleteSelectedAction } from './editorActions';
 import { getVisibleCanvasCenter } from '../utils/canvasCenter';
-import { ONBOARDED_STORAGE_KEY } from '../components/canvas/onboarding';
 
 /**
  * All imperative editor actions available to any surface (islands, ⌘K palette,
@@ -84,7 +83,7 @@ export function useEditorActions(): EditorActions {
     if (hasContent && !window.confirm('Start a new pedigree? Your current one will be cleared.')) {
       return;
     }
-    localStorage.setItem(ONBOARDED_STORAGE_KEY, '1');
+    useUIStore.getState().setOnboarded();
     useViewportStore.getState().resetView();
     const sex = useUIStore.getState().defaultSex;
     usePedigreeStore.getState().setDocument(
