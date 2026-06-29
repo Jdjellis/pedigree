@@ -285,3 +285,42 @@
 .swatchActive {
   outline-color: var(--color-primary);
 }
+
+/* ── Add Condition: quarter grid ─────────────────── */
+.quarterField {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.quarterGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 3px;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+}
+
+.quarterCell {
+  border-radius: 3px;
+  background: var(--color-border);
+  border: none;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.quarterCell:hover:not(.quarterCellActive) {
+  background: color-mix(in srgb, var(--color-text-secondary) 40%, transparent);
+}
+
+.quarterCellActive {
+  background: var(--color-primary);
+}
+
+.quarterLabel {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}

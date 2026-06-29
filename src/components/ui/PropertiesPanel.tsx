@@ -37,6 +37,14 @@ const QUARTER_LABELS: Record<QuarterPosition, string> = {
   bottomRight: 'Bottom-Right',
 };
 
+// Render order matches the 2×2 CSS grid: TL → TR → BL → BR (left-to-right, top-to-bottom)
+const QUARTER_GRID_ORDER: QuarterPosition[] = [
+  'topLeft',
+  'topRight',
+  'bottomLeft',
+  'bottomRight',
+];
+
 const VITAL_STATUS_OPTIONS: { value: VitalStatus; label: string }[] = [
   { value: VitalStatus.Alive, label: 'Alive' },
   { value: VitalStatus.Deceased, label: 'Deceased' },
@@ -333,19 +341,26 @@ export function PropertiesPanel() {
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Quarter</label>
-              <select
-                className={styles.select}
-                value={conditionQuarter}
-                onChange={(e) =>
-                  setConditionQuarter(e.target.value as QuarterPosition)
-                }
-              >
-                {QUARTER_OPTIONS.map((q) => (
-                  <option key={q.value} value={q.value}>
-                    {q.label}
-                  </option>
-                ))}
-              </select>
+              <div className={styles.quarterField}>
+                <div className={styles.quarterGrid} role="group" aria-label="Symbol quarter">
+                  {QUARTER_GRID_ORDER.map((q) => {
+                    const option = QUARTER_OPTIONS.find((o) => o.value === q)!;
+                    return (
+                      <button
+                        key={q}
+                        type="button"
+                        className={`${styles.quarterCell} ${conditionQuarter === q ? styles.quarterCellActive : ''}`}
+                        aria-label={option.label}
+                        aria-pressed={conditionQuarter === q}
+                        onClick={() => setConditionQuarter(q)}
+                      />
+                    );
+                  })}
+                </div>
+                <span className={styles.quarterLabel}>
+                  {QUARTER_OPTIONS.find((o) => o.value === conditionQuarter)?.label}
+                </span>
+              </div>
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Pattern</label>
