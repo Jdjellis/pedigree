@@ -6,6 +6,8 @@
 - Bennett RL et al. (2022) *J Genet Couns* 31(6):1238–1248 (PMID 36106433, DOI 10.1002/jgc4.1621) — sex/gender focused revision
 - NSGC Practice Resources: https://www.nsgc.org/Policy-Research-and-Publications/Practice-Guidelines
 
+> **Local copy of the 2022 source PDF** (offline reference for the symbol/line figures, esp. Figure 3): [`references/bennett-2022-nsgc-standardized-pedigree-nomenclature.pdf`](references/bennett-2022-nsgc-standardized-pedigree-nomenclature.pdf).
+
 ---
 
 ## 1. Individual Symbols (Shapes)
@@ -100,7 +102,7 @@ Ongoing / live pregnancy: diamond symbol (sex unknown) or sex-specific symbol wh
 | Line of descent | Vertical line dropping from centre of mating line | — (computed from partnership) |
 | Sibship line | Horizontal line from which siblings drop vertically | — (computed from partnership children) |
 | Parent-child | Vertical from sibship line down to child's symbol | `RelationshipType.ParentChild` |
-| Adoption | Dashed brackets or dashed lines around adoptee symbol | `RelationshipType.Adoption` |
+| Adoption | **Brackets** enclose the adoptee for *all* adoptions; line of descent is **dashed** from adoptive parents and **solid** from biological parents (no arrow — see §9) | `RelationshipType.Adoption` |
 | Infertility / no offspring | Two vertical tick-marks through the mating line | *(not yet modelled as a relationship type)* |
 
 ---
@@ -130,10 +132,24 @@ Ongoing / live pregnancy: diamond symbol (sex unknown) or sex-specific symbol wh
 
 ## 9. Adoption Notation
 
-- **Adopted into family**: Symbol enclosed in **square brackets** (or dashed bracket lines).
-- **Adopted out of family**: Symbol with bracket + arrow indicating direction of adoption.
+Per **Bennett et al. 2022, Figure 3 ("Pedigree line definitions"), p.1242** — verbatim legend:
 
-App: `ParentChildRelationship.isAdopted = true` and `RelationshipType.Adoption` for the link.
+> "Brackets used for all adoptions. Adoptive and biological parents denoted by dashed and solid lines of descent, respectively."
+
+The figure gives three labelled examples — *Adopted Out*, *Adopted In*, and *Adopted By Relative* — all of which enclose the adoptee in **square brackets** and differ **only in the line-of-descent style**:
+
+- **Brackets** (solid square brackets) enclose the adopted individual in *every* adoption case. The brackets are a property of the **person** ("was adopted") and are drawn even when no parents are charted.
+- **Line of descent** encodes the nature of *each* parent relationship, per edge:
+  - **Dashed** line → **adoptive** parents (non-biological).
+  - **Solid** line → **biological** parents.
+- **There is no arrow.** "Adopted in" vs "adopted out" is *not* a separate symbol — it is emergent from which parents are charted and the line style of that edge:
+  - **Adopted in** = brackets + a **dashed** descent line to the (adoptive) parents shown.
+  - **Adopted out** = brackets + a **solid** descent line to the (biological) parents shown.
+- **Both families at once** (the most information-complete case): the same bracketed individual carries a **dashed** edge to the adoptive couple *and* a **solid** edge to the biological couple — simultaneously adopted-in to one family and adopted-out of another, with no extra notation.
+
+> ⚠️ **Correction (2026-06):** earlier revisions of this doc and issue #56 described adopted-out as "bracket + **arrow**". That is **not** NSGC/Bennett — the 2022 figure distinguishes adoption purely by **dashed (adoptive) vs solid (biological) lines of descent**, with no arrow. (Some non-NSGC tools use an arrow; we follow the verified standard.) Verified against the local source PDF: [`references/bennett-2022-nsgc-standardized-pedigree-nomenclature.pdf`](references/bennett-2022-nsgc-standardized-pedigree-nomenclature.pdf), Figure 3.
+
+App: brackets are driven by `Individual.adopted` (see {@link AdoptionBrackets}). The per-edge dashed/solid line style is carried on the parent-child link (`ParentChildRelationship`); `RelationshipType.Adoption` tags an adoptive link.
 
 ---
 
@@ -210,5 +226,5 @@ App: `LegendConfig` with `LegendEntry[]` (id, quarter, fillColor, fillPattern, n
 ### Gaps / Not yet modelled
 - **Carrier notation**: No dedicated `isCarrier` or `carrierStatus` field; must be approximated with a condition quarter fill + legend entry.
 - **Infertility / no-offspring line**: No `RelationshipType` value for a couple with documented infertility.
-- **Adoption-out notation**: `isAdopted` covers adoption-in; adoption-out (placing a child with another family) has no distinct representation.
+- **Adoption-out / per-edge line style**: the app currently dashes *every* descent line of an adopted individual via `Individual.adopted`, with no way to mark an individual line of descent as biological (**solid**) vs adoptive (**dashed**). So *adopted-out* (brackets + a **solid** line to the biological parents) and the both-families case cannot yet be expressed. Tracked in issue #56; per §9 the fix is a per-link line-style flag, **not** an arrow.
 - **Individual diagnosis uncertainty**: No structured `diagnosisUncertain` flag; convention is to use a notes field.
