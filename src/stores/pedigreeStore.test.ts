@@ -681,6 +681,138 @@ describe('fillUnionPartner', () => {
   });
 });
 
+describe('removeIndividual cascade', () => {
+  /**
+   * Build the family from the bug report: two parents (`dad`, `mum`) joined in a
+   * union with four children, each wired to the union by a parent-child link.
+   * Returns the ids so individual tests can delete a parent and inspect the
+   * surviving union/links.
+   */
+  function seedTwoParentFamily(): {
+    dadId: string;
+    mumId: string;
+    childIds: string[];
+    unionId: string;
+  } {
+    const store = usePedigreeStore.getState();
+    const dad = createDefaultIndividual({ id: 'dad', generation: 0, position: { x: -60, y: 0 } });
+    const mum = createDefaultIndividual({ id: 'mum', generation: 0, position: { x: 60, y: 0 } });
+    const children = ['c1', 'c2', 'c3', 'c4'].map((id, i) =>
+      createDefaultIndividual({ id, generation: 1, position: { x: i * 80, y: 150 } }),
+    );
+    const union: PartnershipRelationship = {
+      id: 'fam',
+      type: RelationshipType.Partnership,
+      partner1Id: dad.id,
+      partner2Id: mum.id,
+      childrenIds: children.map((c) => c.id),
+    };
+    store.addIndividual(dad);
+    store.addIndividual(mum);
+    children.forEach((c) => store.addIndividual(c));
+    store.addPartnership(union);
+    children.forEach((c) =>
+      store.addParentChildLink({
+        id: `link-${c.id}`,
+        type: RelationshipType.ParentChild,
+        parentPartnershipId: union.id,
+        childId: c.id,
+        isAdopted: false,
+      }),
+    );
+    return { dadId: dad.id, mumId: mum.id, childIds: children.map((c) => c.id), unionId: union.id };
+  }
+
+  it('keeps the union and points it at the surviving parent when one parent is deleted', () => {
+    const { dadId, mumId, childIds, unionId } = seedTwoParentFamily();
+
+    usePedigreeStore.getState().removeIndividual(mumId);
+
+    const doc = usePedigreeStore.getState().document;
+    const union = doc.partnerships[unionId];
+    expect(union).toBeDefined();
+    // The deleted parent is cleared from her slot; the surviving parent remains.
+    expect(union.partner1Id).toBe(dadId);
+    expect(union.partner2Id).toBeUndefined();
+    // Every child stays attached to the union.
+    expect(union.childrenIds).toEqual(childIds);
+    const links = Object.values(doc.parentChildLinks).filter(
+      (l) => l.parentPartnershipId === unionId,
+    );
+    expect(links).toHaveLength(childIds.length);
+  });
+
+  it('keeps the sibship (union with no partners) when both parents are deleted', () => {
+    const { dadId, mumId, childIds, unionId } = seedTwoParentFamily();
+
+    usePedigreeStore.getState().removeIndividual(mumId);
+    usePedigreeStore.getState().removeIndividual(dadId);
+
+    const doc = usePedigreeStore.getState().document;
+    const union = doc.partnerships[unionId];
+    // The union survives with both slots empty so siblings stay joined ...
+    expect(union).toBeDefined();
+    expect(union.partner1Id).toBeUndefined();
+    expect(union.partner2Id).toBeUndefined();
+    expect(union.childrenIds).toEqual(childIds);
+    // ... and the children keep their links to that parentless sibship.
+    const links = Object.values(doc.parentChildLinks).filter(
+      (l) => l.parentPartnershipId === unionId,
+    );
+    expect(links).toHaveLength(childIds.length);
+  });
+
+  it('prunes a childless union once its last partner is deleted', () => {
+    const store = usePedigreeStore.getState();
+    const a = createDefaultIndividual({ id: 'a', generation: 0, position: { x: 0, y: 0 } });
+    const b = createDefaultIndividual({ id: 'b', generation: 0, position: { x: 120, y: 0 } });
+    store.addIndividual(a);
+    store.addIndividual(b);
+    store.addPartnership({
+      id: 'couple',
+      type: RelationshipType.Partnership,
+      partner1Id: a.id,
+      partner2Id: b.id,
+      childrenIds: [],
+    });
+
+    store.removeIndividual(b.id);
+
+    // A childless union with a single surviving partner depicts nothing, so it
+    // is pruned rather than left dangling.
+    expect(usePedigreeStore.getState().document.partnerships['couple']).toBeUndefined();
+    expect(usePedigreeStore.getState().document.individuals['a']).toBeDefined();
+  });
+
+  it('drops a deleted child from its union and removes only that child link', () => {
+    const { childIds, unionId } = seedTwoParentFamily();
+    const [removedChild, ...survivingChildren] = childIds;
+
+    usePedigreeStore.getState().removeIndividual(removedChild);
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.partnerships[unionId].childrenIds).toEqual(survivingChildren);
+    expect(doc.parentChildLinks[`link-${removedChild}`]).toBeUndefined();
+    survivingChildren.forEach((cId) =>
+      expect(doc.parentChildLinks[`link-${cId}`]).toBeDefined(),
+    );
+  });
+
+  it('reverts a parent deletion in a single undo step', () => {
+    const { dadId, mumId, unionId } = seedTwoParentFamily();
+    usePedigreeStore.temporal.getState().clear();
+
+    usePedigreeStore.getState().removeIndividual(mumId);
+    usePedigreeStore.temporal.getState().undo();
+
+    const doc = usePedigreeStore.getState().document;
+    // Undo restores the deleted parent and both partner slots.
+    expect(doc.individuals[mumId]).toBeDefined();
+    expect(doc.partnerships[unionId].partner1Id).toBe(dadId);
+    expect(doc.partnerships[unionId].partner2Id).toBe(mumId);
+  });
+});
+
 describe('addParentsToParentlessUnion', () => {
   it('fills both slots of a 0-partner sibship without adding a child link', () => {
     const store = usePedigreeStore.getState();
