@@ -1,4 +1,4 @@
-import { useUIStore, type ActiveTool } from '../../../stores/uiStore';
+import { useUIStore } from '../../../stores/uiStore';
 import styles from './ToolHint.module.css';
 
 /**
