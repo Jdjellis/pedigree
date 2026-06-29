@@ -47,7 +47,6 @@ export function LinkTypePopup() {
         type: RelationshipType.ParentChild,
         parentPartnershipId: partnershipId,
         childId,
-        isAdopted: false,
       };
       addPartnership(partnership);
       addParentChildLink(link);
@@ -68,10 +67,10 @@ export function LinkTypePopup() {
     };
     const link: ParentChildRelationship = {
       id: generateId(),
-      type: RelationshipType.Adoption,
+      type: RelationshipType.ParentChild,
       parentPartnershipId: partnershipId,
       childId: targetId,
-      isAdopted: true,
+      isAdoptive: true,
     };
     addPartnership(partnership);
     addParentChildLink(link);

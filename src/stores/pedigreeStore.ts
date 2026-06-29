@@ -129,6 +129,26 @@ interface PedigreeState {
   /** Commit a drag: set the dropped position, then re-tidy the family (one undo step). */
   commitDragWithRelayout: (id: string, position: Position) => void;
 
+  // Adoption actions (each produces one undo step)
+  /**
+   * Set the adoption mode for an individual and update all its parent-child
+   * links in a single `set` call so the entire change is one undo step.
+   *
+   * - `'in'`   — adopted into this family: `adopted=true`, all parent links
+   *              `isAdoptive=true` (dashed descent).
+   * - `'out'`  — adopted out of this family: `adopted=true`, all parent links
+   *              `isAdoptive=false` (solid descent to biological parents).
+   * - `'none'` — clear adoption: `adopted` cleared, all parent links
+   *              `isAdoptive` cleared (set to `undefined`).
+   */
+  setAdoption: (individualId: string, mode: 'none' | 'in' | 'out') => void;
+  /**
+   * Toggle the line-of-descent style on a single parent-child link.
+   * `true` → adoptive parents (dashed); `false` → biological (solid).
+   * Used by the per-link controls in the properties panel (2+ parent links).
+   */
+  setLinkAdoptive: (linkId: string, isAdoptive: boolean) => void;
+
   // Partnership actions
   addPartnership: (partnership: PartnershipRelationship) => void;
   removePartnership: (id: string) => void;
@@ -244,6 +264,61 @@ export const usePedigreeStore = create<PedigreeState>()(
               individuals: {
                 ...state.document.individuals,
                 [id]: { ...existing, ...patch },
+              },
+            },
+          };
+        }),
+
+      setAdoption: (individualId, mode) =>
+        set((state) => {
+          const ind = state.document.individuals[individualId];
+          if (!ind) return state;
+
+          const adopted = mode !== 'none' ? true : undefined;
+          const isAdoptive: boolean | undefined =
+            mode === 'in' ? true : mode === 'out' ? false : undefined;
+
+          // Update all parent-child links for this individual in the same set
+          // call so the individual flag and every link revert together on undo.
+          const updatedLinks: Record<string, ParentChildRelationship> = {
+            ...state.document.parentChildLinks,
+          };
+          for (const [linkId, link] of Object.entries(state.document.parentChildLinks)) {
+            if (link.childId === individualId) {
+              updatedLinks[linkId] = { ...link, isAdoptive };
+            }
+          }
+
+          return {
+            document: {
+              ...state.document,
+              metadata: {
+                ...state.document.metadata,
+                updatedAt: new Date().toISOString(),
+              },
+              individuals: {
+                ...state.document.individuals,
+                [individualId]: { ...ind, adopted },
+              },
+              parentChildLinks: updatedLinks,
+            },
+          };
+        }),
+
+      setLinkAdoptive: (linkId, isAdoptive) =>
+        set((state) => {
+          const link = state.document.parentChildLinks[linkId];
+          if (!link) return state;
+          return {
+            document: {
+              ...state.document,
+              metadata: {
+                ...state.document.metadata,
+                updatedAt: new Date().toISOString(),
+              },
+              parentChildLinks: {
+                ...state.document.parentChildLinks,
+                [linkId]: { ...link, isAdoptive },
               },
             },
           };

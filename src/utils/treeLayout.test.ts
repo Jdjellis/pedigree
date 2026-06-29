@@ -19,7 +19,7 @@ function union(id: string, p1: string | undefined, p2: string | undefined, kids:
   return { id, type: RelationshipType.Partnership, partner1Id: p1, partner2Id: p2, childrenIds: kids };
 }
 function link(id: string, parentPartnershipId: string, childId: string): ParentChildRelationship {
-  return { id, type: RelationshipType.ParentChild, parentPartnershipId, childId, isAdopted: false };
+  return { id, type: RelationshipType.ParentChild, parentPartnershipId, childId, isAdoptive: false };
 }
 function doc(parts: {
   individuals?: Record<string, Individual>;
@@ -181,7 +181,7 @@ describe('computeTreeLayout — clearance & cross-sibship', () => {
       b: link('b', 'sibship', 'sib'),
     };
     const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'sibship');
-    const posOf = (id: string) => moved[id]?.x ?? individuals[id].position.x;
+    const posOf = (id: keyof typeof individuals) => moved[id]?.x ?? individuals[id].position.x;
     // The sibling must end clear of the partner: at least SIBLING_SPACING (80) past it.
     expect(posOf('sib')).toBeGreaterThanOrEqual(posOf('partner') + 80);
   });
@@ -206,8 +206,8 @@ describe('computeTreeLayout — clearance & cross-sibship', () => {
       l5: link('l5', 'u2', 'b1'), l6: link('l6', 'u2', 'b2'),
     };
     const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'top');
-    const x = (id: string) => moved[id]?.x ?? individuals[id].position.x;
-    const gen2 = ['a1', 'a2', 'b1', 'b2'].map(x).sort((m, n) => m - n);
+    const x = (id: keyof typeof individuals) => moved[id]?.x ?? individuals[id].position.x;
+    const gen2 = (['a1', 'a2', 'b1', 'b2'] as const).map(x).sort((m, n) => m - n);
     // Every adjacent pair in gen 2 is at least SIBLING_SPACING apart (no overlap).
     for (let i = 1; i < gen2.length; i++) expect(gen2[i] - gen2[i - 1]).toBeGreaterThanOrEqual(80);
   });

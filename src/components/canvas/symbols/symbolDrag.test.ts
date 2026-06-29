@@ -121,8 +121,8 @@ it('relayouts the family on drop so an overlapping drop is separated', () => {
       individuals: { a, b, p },
       partnerships: { u: { id: 'u', type: RelationshipType.Partnership, partner1Id: 'p', partner2Id: undefined, childrenIds: ['a', 'b'] } },
       parentChildLinks: {
-        la: { id: 'la', type: RelationshipType.ParentChild, parentPartnershipId: 'u', childId: 'a', isAdopted: false },
-        lb: { id: 'lb', type: RelationshipType.ParentChild, parentPartnershipId: 'u', childId: 'b', isAdopted: false },
+        la: { id: 'la', type: RelationshipType.ParentChild, parentPartnershipId: 'u', childId: 'a', isAdoptive: false },
+        lb: { id: 'lb', type: RelationshipType.ParentChild, parentPartnershipId: 'u', childId: 'b', isAdoptive: false },
       },
     },
   });

@@ -39,7 +39,6 @@ function makeDoc(): PedigreeDocument {
       type: RelationshipType.ParentChild,
       parentPartnershipId: union,
       childId: child,
-      isAdopted: false,
     };
   }
   return doc;

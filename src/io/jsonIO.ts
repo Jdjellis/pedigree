@@ -1,5 +1,53 @@
-import type { PedigreeDocument, Individual, Investigation } from '../types/pedigree';
+import type { PedigreeDocument, Individual, Investigation, ParentChildRelationship } from '../types/pedigree';
+import { RelationshipType } from '../types/enums';
 import { generateId } from '../utils/idGenerator';
+
+// ---------------------------------------------------------------------------
+// Legacy migration helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * SUNSET (pre-launch shim — delete before launch, see #66): a one-off upgrade of
+ * legacy adoption data to the per-edge model. We have no external users; this only
+ * upgrades our own localStorage + saved files, which self-heal on first load+save.
+ * Do NOT grow this into a versioned migration chain.
+ *
+ * Mutates `doc` in place and returns it. Idempotent.
+ *
+ * - Legacy `link.isAdopted === true` or `link.type === 'adoption'` ⇒ `isAdoptive: true`.
+ * - Legacy `individual.adopted === true` ⇒ that person's parent link(s) become
+ *   adoptive (the old properties-panel checkbox only ever meant adopted-IN/dashed).
+ * - Drops the dead `partnership.isAdoptive` field.
+ */
+export function migrateAdoption(doc: PedigreeDocument): PedigreeDocument {
+  const links = Object.values(doc.parentChildLinks ?? {});
+
+  for (const link of links) {
+    const legacy = link as ParentChildRelationship & { isAdopted?: boolean };
+    if (legacy.isAdopted === true || (legacy.type as RelationshipType) === RelationshipType.Adoption) {
+      legacy.isAdoptive = true;
+    }
+    delete legacy.isAdopted;
+    legacy.type = RelationshipType.ParentChild;
+  }
+
+  for (const ind of Object.values(doc.individuals ?? {})) {
+    if (ind.adopted !== true) continue;
+    for (const link of links) {
+      // Legacy `Individual.adopted` predates per-edge styling and only ever meant
+      // adopted-IN. Upgrade ONLY links the old format left unset (`undefined`) —
+      // never overwrite an explicit biological edge (`false` = adopted-out), or we
+      // would revert adopted-out to adopted-in on every load.
+      if (link.childId === ind.id && link.isAdoptive === undefined) link.isAdoptive = true;
+    }
+  }
+
+  for (const partnership of Object.values(doc.partnerships ?? {})) {
+    delete (partnership as { isAdoptive?: boolean }).isAdoptive;
+  }
+
+  return doc;
+}
 
 // ---------------------------------------------------------------------------
 // File format wrapper
@@ -161,7 +209,7 @@ export function deserializeDocument(json: string): PedigreeDocument {
     }
   }
 
-  return result;
+  return migrateAdoption(result);
 }
 
 // ---------------------------------------------------------------------------

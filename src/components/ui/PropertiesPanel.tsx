@@ -5,10 +5,11 @@ import {
   GenderIdentity,
   SexAssignedAtBirth,
   VitalStatus,
-  TwinType,
 } from '../../types/enums';
 import { GenderIconButtons } from './GenderIconButtons';
 import { SegmentedControl } from './SegmentedControl';
+import { ConnectionProperties } from './ConnectionProperties';
+import { TwinZygosityFields } from './TwinZygosityFields';
 import { generateId } from '../../utils/idGenerator';
 import { collectInvestigations } from '../../utils/investigations';
 import {
@@ -21,6 +22,12 @@ import {
   QUARTER_OPTIONS,
   createConditionEntry,
 } from './legendOptions';
+import {
+  parentLinksForChild,
+  adoptionModeForLink,
+  parentCoupleLabel,
+  type AdoptionMode,
+} from '../../utils/adoption';
 import type {
   FillPatternType,
   Individual,
@@ -60,18 +67,29 @@ const ROLE_OPTIONS: { value: RoleValue; label: string }[] = [
   { value: 'consultand', label: 'Consultand' },
 ];
 
+const ADOPTION_OPTIONS: { value: AdoptionMode; label: string }[] = [
+  { value: 'none', label: 'Not adopted' },
+  { value: 'in', label: 'Adopted in' },
+  { value: 'out', label: 'Adopted out' },
+];
+
 export function PropertiesPanel() {
   const selectedIds = useUIStore((s) => s.selectedIds);
   const propertiesPanelOpen = useUIStore((s) => s.propertiesPanelOpen);
   const editingLocked = useUIStore((s) => s.editingLocked);
+  const selectedConnection = useUIStore((s) => s.selectedConnection);
   const individuals = usePedigreeStore((s) => s.document.individuals);
+  const partnerships = usePedigreeStore((s) => s.document.partnerships);
+  const parentChildLinks = usePedigreeStore((s) => s.document.parentChildLinks);
+  const legendConfig = usePedigreeStore((s) => s.document.legendConfig);
+  const twinGroups = usePedigreeStore((s) => s.document.twinGroups);
   const updateIndividual = usePedigreeStore((s) => s.updateIndividual);
   const updateLegendEntry = usePedigreeStore((s) => s.updateLegendEntry);
   const addLegendEntry = usePedigreeStore((s) => s.addLegendEntry);
-  const legendConfig = usePedigreeStore((s) => s.document.legendConfig);
-  const twinGroups = usePedigreeStore((s) => s.document.twinGroups);
   const updateTwinGroup = usePedigreeStore((s) => s.updateTwinGroup);
   const removeTwinGroup = usePedigreeStore((s) => s.removeTwinGroup);
+  const setAdoption = usePedigreeStore((s) => s.setAdoption);
+  const setLinkAdoptive = usePedigreeStore((s) => s.setLinkAdoptive);
 
   const selectedId =
     selectedIds.size === 1 ? Array.from(selectedIds)[0] : null;
@@ -189,6 +207,10 @@ export function PropertiesPanel() {
       ),
     [individuals]
   );
+
+  if (selectedConnection) {
+    return <ConnectionProperties />;
+  }
 
   if (!propertiesPanelOpen || !individual) {
     return (
@@ -674,20 +696,75 @@ export function PropertiesPanel() {
           />
         </div>
 
-        <div className={styles.field}>
-          <label className={styles.checkbox}>
-            <input
-              type="checkbox"
-              checked={individual.adopted ?? false}
-              onChange={(e) => update({ adopted: e.target.checked || undefined })}
-            />
-            Adopted
-          </label>
-          <p className={styles.hint}>
-            Draws the symbol in square brackets and dashes the line of descent
-            from the (adoptive) parents.
-          </p>
-        </div>
+        {(() => {
+          const childLinks = parentLinksForChild(parentChildLinks, selectedId ?? '');
+
+          if (childLinks.length >= 2) {
+            return (
+              <div className={styles.field}>
+                <label className={styles.label}>Adoption</label>
+                <label className={styles.checkbox}>
+                  <input
+                    type="checkbox"
+                    checked={individual.adopted ?? false}
+                    onChange={(e) => update({ adopted: e.target.checked || undefined })}
+                  />
+                  Adopted (brackets)
+                </label>
+                {childLinks.map((cl) => (
+                  <div key={cl.id} className={styles.field}>
+                    <label className={styles.label}>{parentCoupleLabel({ individuals, partnerships }, cl)}</label>
+                    <SegmentedControl
+                      options={[
+                        { value: 'biological', label: 'Biological' },
+                        { value: 'adoptive', label: 'Adoptive' },
+                      ]}
+                      value={cl.isAdoptive ? 'adoptive' : 'biological'}
+                      onChange={(v) => setLinkAdoptive(cl.id, v === 'adoptive')}
+                      ariaLabel={`Line of descent for ${parentCoupleLabel({ individuals, partnerships }, cl)}`}
+                    />
+                  </div>
+                ))}
+              </div>
+            );
+          }
+
+          if (childLinks.length === 1) {
+            const mode = adoptionModeForLink(individual.adopted, childLinks[0]);
+            return (
+              <div className={styles.field}>
+                <label className={styles.label}>Adoption</label>
+                <SegmentedControl
+                  options={ADOPTION_OPTIONS}
+                  value={mode}
+                  onChange={(v) => selectedId && setAdoption(selectedId, v)}
+                  ariaLabel="Adoption status"
+                />
+                <p className={styles.hint}>
+                  In = dashed line to adoptive parents; Out = solid line to
+                  biological parents. Both draw the symbol in brackets.
+                </p>
+              </div>
+            );
+          }
+
+          return (
+            <div className={styles.field}>
+              <label className={styles.checkbox}>
+                <input
+                  type="checkbox"
+                  checked={individual.adopted ?? false}
+                  onChange={(e) => update({ adopted: e.target.checked || undefined })}
+                />
+                Adopted
+              </label>
+              <p className={styles.hint}>
+                Draws the symbol in brackets. Add parents to mark the line of
+                descent adopted-in (dashed) or adopted-out (solid).
+              </p>
+            </div>
+          );
+        })()}
       </div>
 
       {twinGroup && (
@@ -695,28 +772,11 @@ export function PropertiesPanel() {
           <div className={styles.divider} />
           <div className={styles.section}>
             <div className={styles.sectionTitle}>Twin</div>
-            <div className={styles.field}>
-              <label className={styles.label}>Zygosity</label>
-              <select
-                className={styles.select}
-                value={twinGroup.twinType}
-                onChange={(e) =>
-                  updateTwinGroup(twinGroup.id, {
-                    twinType: e.target.value as TwinType,
-                  })
-                }
-              >
-                <option value={TwinType.Monozygotic}>Monozygotic (identical)</option>
-                <option value={TwinType.Dizygotic}>Dizygotic (fraternal)</option>
-                <option value={TwinType.Unknown}>Unknown zygosity</option>
-              </select>
-            </div>
-            <button
-              className={styles.addButton}
-              onClick={() => removeTwinGroup(twinGroup.id)}
-            >
-              Ungroup twins
-            </button>
+            <TwinZygosityFields
+              twinGroup={twinGroup}
+              onChangeType={(twinType) => updateTwinGroup(twinGroup.id, { twinType })}
+              onUngroup={() => removeTwinGroup(twinGroup.id)}
+            />
           </div>
         </>
       )}
