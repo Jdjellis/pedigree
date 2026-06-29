@@ -176,7 +176,8 @@ The picker and commit logic are react-dom / store-level, so both are **jsdom-tes
 ## Out of scope
 
 - Pregnancy/loss outcomes (SAB/TOP/ECT/SB) in the picker — stays in the Properties panel.
-- Twins in the picker — MZ/DZ stay on the Alt-radial.
+- Twins in the picker — MZ/DZ stay on the Alt-radial, created as Unknown with **no** picker for now.
+  **Deferred deliberately:** the twins gender picker will be implemented *after both* (a) this inline-gender-picker work and (b) the parallel **multi-select property editing** feature have landed — twin gender-setting is expected to flow through that multi-select path rather than a bespoke per-twin popup. Do not fold twins into this picker.
 - Same-sex parents — `Parent` stays a fixed Man+Woman couple.
 - Sticky/last-used default — explicitly rejected; revisit only if dogfooding shows same-sex runs are painful.
 - First-run onboarding redesign (#37) beyond opening the proband picker.
