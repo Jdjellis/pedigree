@@ -167,6 +167,16 @@ interface PedigreeState {
    * bulk edit is a single undo step. Unknown ids are skipped.
    */
   updateIndividuals: (ids: string[], patch: Partial<Individual>) => void;
+  /**
+   * Add or remove a single condition id across several individuals in one `set`
+   * call (one undo step). `applied` true adds it to those lacking it; false
+   * removes it from those that have it. Unknown ids are skipped.
+   */
+  setConditionForIndividuals: (
+    ids: string[],
+    entryId: string,
+    applied: boolean,
+  ) => void;
   removeIndividual: (id: string) => void;
   moveIndividual: (id: string, position: Position) => void;
 
@@ -319,6 +329,39 @@ export const usePedigreeStore = create<PedigreeState>()(
             if (!existing) continue;
             individuals[id] = { ...existing, ...patch };
             changed = true;
+          }
+          if (!changed) return state;
+          return {
+            document: {
+              ...state.document,
+              metadata: {
+                ...state.document.metadata,
+                updatedAt: new Date().toISOString(),
+              },
+              individuals,
+            },
+          };
+        }),
+
+      setConditionForIndividuals: (ids, entryId, applied) =>
+        set((state) => {
+          const individuals = { ...state.document.individuals };
+          let changed = false;
+          for (const id of ids) {
+            const existing = individuals[id];
+            if (!existing) continue;
+            const current = existing.conditionIds ?? [];
+            const has = current.includes(entryId);
+            if (applied && !has) {
+              individuals[id] = { ...existing, conditionIds: [...current, entryId] };
+              changed = true;
+            } else if (!applied && has) {
+              individuals[id] = {
+                ...existing,
+                conditionIds: current.filter((c) => c !== entryId),
+              };
+              changed = true;
+            }
           }
           if (!changed) return state;
           return {

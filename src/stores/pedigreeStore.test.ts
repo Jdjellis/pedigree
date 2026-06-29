@@ -1066,3 +1066,42 @@ describe('updateIndividuals (bulk)', () => {
     expect(doc.individuals.b.adopted).toBeUndefined();
   });
 });
+
+describe('setConditionForIndividuals (bulk)', () => {
+  it('adds the condition to every individual that lacks it (idempotent for those that have it)', () => {
+    const store = usePedigreeStore.getState();
+    store.addIndividual(createDefaultIndividual({ id: 'a', conditionIds: [] }));
+    store.addIndividual(createDefaultIndividual({ id: 'b', conditionIds: ['x'] }));
+
+    store.setConditionForIndividuals(['a', 'b'], 'x', true);
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals.a.conditionIds).toEqual(['x']);
+    expect(doc.individuals.b.conditionIds).toEqual(['x']); // not duplicated
+  });
+
+  it('removes the condition from every individual that has it', () => {
+    const store = usePedigreeStore.getState();
+    store.addIndividual(createDefaultIndividual({ id: 'a', conditionIds: ['x', 'y'] }));
+    store.addIndividual(createDefaultIndividual({ id: 'b', conditionIds: ['x'] }));
+
+    store.setConditionForIndividuals(['a', 'b'], 'x', false);
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals.a.conditionIds).toEqual(['y']);
+    expect(doc.individuals.b.conditionIds).toEqual([]);
+  });
+
+  it('records a single undoable step', () => {
+    const store = usePedigreeStore.getState();
+    store.addIndividual(createDefaultIndividual({ id: 'a', conditionIds: [] }));
+    store.addIndividual(createDefaultIndividual({ id: 'b', conditionIds: [] }));
+
+    store.setConditionForIndividuals(['a', 'b'], 'x', true);
+    usePedigreeStore.temporal.getState().undo();
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals.a.conditionIds).toEqual([]);
+    expect(doc.individuals.b.conditionIds).toEqual([]);
+  });
+});
