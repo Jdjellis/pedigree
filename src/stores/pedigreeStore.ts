@@ -175,7 +175,7 @@ interface PedigreeState {
    * - `'out'`  — adopted out of this family: `adopted=true`, all parent links
    *              `isAdoptive=false` (solid descent to biological parents).
    * - `'none'` — clear adoption: `adopted` cleared, all parent links
-   *              `isAdoptive=false`.
+   *              `isAdoptive` cleared (set to `undefined`).
    */
   setAdoption: (individualId: string, mode: 'none' | 'in' | 'out') => void;
   /**
@@ -311,7 +311,8 @@ export const usePedigreeStore = create<PedigreeState>()(
           if (!ind) return state;
 
           const adopted = mode !== 'none' ? true : undefined;
-          const isAdoptive = mode === 'in';
+          const isAdoptive: boolean | undefined =
+            mode === 'in' ? true : mode === 'out' ? false : undefined;
 
           // Update all parent-child links for this individual in the same set
           // call so the individual flag and every link revert together on undo.

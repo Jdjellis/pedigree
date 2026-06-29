@@ -784,15 +784,20 @@ describe('setAdoption', () => {
     expect(doc.parentChildLinks[linkId].isAdoptive).toBe(false);
   });
 
-  it("'none' clears adopted and marks the parent link isAdoptive=false", () => {
+  it("'none' clears adopted and clears the parent link isAdoptive to undefined, and undo restores 'in'", () => {
     const { childId, linkId } = seedChildWithLink();
     usePedigreeStore.getState().setAdoption(childId, 'in');
-    usePedigreeStore.temporal.getState().clear();
     usePedigreeStore.getState().setAdoption(childId, 'none');
 
     const doc = usePedigreeStore.getState().document;
-    expect(doc.individuals[childId].adopted).toBeFalsy();
-    expect(doc.parentChildLinks[linkId].isAdoptive).toBe(false);
+    expect(doc.individuals[childId].adopted).toBeUndefined();
+    expect(doc.parentChildLinks[linkId].isAdoptive).toBeUndefined();
+
+    usePedigreeStore.temporal.getState().undo();
+
+    const reverted = usePedigreeStore.getState().document;
+    expect(reverted.individuals[childId].adopted).toBe(true);
+    expect(reverted.parentChildLinks[linkId].isAdoptive).toBe(true);
   });
 
   it("'in' with no parent links only sets adopted=true and leaves parentChildLinks unchanged", () => {
