@@ -36,7 +36,7 @@ Per `docs/bennett-pedigree-standards.md` (NSGC/Bennett 2022, PMID 36106433): **s
 5. **Single-step undo:** the gender pick amends the creation's history entry instead of adding its own, so one undo removes the whole node. Implemented by pausing zundo's `temporal` around the pick mutation (see §4).
 6. **Parent is unchanged** — still spawns a fixed Man+Woman couple (structural, no picker).
 
-> This supersedes the "Default-sex control" section (§2) of `2026-06-27-tool-model-onboarding-design.md`. The three-tool → single-tool-plus-default decision recorded there is reverted in favour of no default at all.
+> **Deliberate override (owner-approved 2026-06-29).** This supersedes the "Default-sex control" section (§2) of `2026-06-27-tool-model-onboarding-design.md`. The single-tool-plus-persistent-default decision recorded there is intentionally reverted in favour of *no default at all*. That earlier spec has been annotated to point here.
 
 ---
 
@@ -50,6 +50,7 @@ A small **HTML overlay** (react-dom), *not* a Konva node — same rendering clas
 - **Position:** anchored directly **above** the node — `x = node.position.x · scale + viewportX`, `y = node.position.y · scale + viewportY − (pickerHeight + gap)`. (`RadialMenu` centres on the node; this offsets upward.)
 - **Contents:** renders `GenderIconButtons` (`value` = the node's current `genderIdentity`, `onChange` = commit, see §4). Zero new symbol artwork.
 - **Visibility:** shown when `uiStore.genderPicker.targetId` is set and the target exists; suppressed when `editingLocked` (mirrors the radial gate).
+- **Picker > radial (sequencing):** `RadialMenu`'s visibility gate gains `&& !genderPicker.targetId`, so the radial never renders while a picker is open. The picker takes precedence; the radial (re)appears once the pick resolves. This is the single rule that prevents the first-run proband collision (see §3) and any hover-opens-radial-under-picker case — no per-node bookkeeping needed.
 
 #### Keyboard & dismissal
 
@@ -81,7 +82,8 @@ create node (genderIdentity: Unknown) → select(id) → showGenderPicker(id)
 
 - **`RadialMenu.tsx`** — `handleAddPartner`, `handleAddChild`, `handleAddSibling`: replace `createRelativeIndividual(defaultSex, …)` with `createDefaultIndividual({ genderIdentity: GenderIdentity.Unknown, … })`, then `showGenderPicker(newId)` after the existing `select(newId)`. The *"existing parents"* branches already create as Unknown — they simply gain the `showGenderPicker` call, which **also resolves the latent inconsistency** noted above. `handleAddTwin` must still drop its `createRelativeIndividual(defaultSex, …)` call (that helper and `defaultSex` are being deleted) and create the twin as Unknown — but it gains **no** picker (twins are out of scope this round). Net: twins become consistently Unknown, instead of today's mix (Unknown for the in-family branch, `defaultSex` for the parentless branch).
 - **`useEditorActions.ts`** — click-to-place: drop the `defaultSex` read; create Unknown; `showGenderPicker(newId)`.
-- **`useAutoSave.ts` / seed** — `createSeededDocument` no longer takes a sex (proband seeded as Unknown). After the seed mounts and the viewport centres on it, open the picker for the proband id (first-run only, by construction). See §5 review item on sequencing vs. `OnboardingHints`.
+- **`useAutoSave.ts` / seed** — `createSeededDocument` no longer takes a sex (proband seeded as Unknown). After the seed mounts and the viewport centres on it, open the picker for the proband id (first-run only, by construction).
+- **`OnboardingHints.tsx` — sequencing.** Today onboarding calls `showRadialMenu(seedId)` on first run to guide the user. With the picker rule in §1, that radial call is now *gated behind the picker*: on first run the proband's gender picker shows first; once it resolves (pick or dismiss), the onboarding radial appears to nudge "add a relation." Concretely, the picker rule already suppresses the radial while the picker is open, so onboarding's existing `showRadialMenu(seedId)` call simply has no visible effect until the picker closes — giving the desired *pick gender → then add relations* order with minimal change. Verify the two don't compete for the same screen space during the brief transition.
 
 `handleAddParent` is untouched.
 
@@ -140,7 +142,8 @@ Net: the feature **deletes more than it adds** — the picker reuses `GenderIcon
 | `src/components/ui/commitGenderPick.ts` (new) + test | the pause/resume amendment, unit-tested |
 | `src/stores/uiStore.ts` | add `genderPicker` + actions; remove `defaultSex`/`setDefaultSex` |
 | `src/components/canvas/CanvasContainer.tsx` | render `InlineGenderPicker` |
-| `src/components/ui/RadialMenu.tsx` | 3 handlers create Unknown + `showGenderPicker`; drop `createRelativeIndividual` |
+| `src/components/ui/RadialMenu.tsx` | 3 handlers create Unknown + `showGenderPicker`; `handleAddTwin` drops `createRelativeIndividual` (Unknown, no picker); add `&& !genderPicker.targetId` to the visibility gate |
+| `src/components/canvas/OnboardingHints.tsx` | first-run radial is gated behind the proband picker (no code change beyond verifying the transition; see §3) |
 | `src/commands/useEditorActions.ts` | click-to-place: Unknown + `showGenderPicker` |
 | `src/hooks/useAutoSave.ts` | seed Unknown; open proband picker first-run |
 | `src/stores/pedigreeStore.ts` | seed builder drops `genderForSex`; (no temporal config change) |
@@ -163,10 +166,10 @@ The picker and commit logic are react-dom / store-level, so both are **jsdom-tes
 
 ## Risks & edge cases
 
-- **Undo layer coupling.** §4 uses zundo's `temporal.pause()/resume()` — first use of that API in this codebase. Risk is contained to `commitGenderPick` and covered by undo/redo tests. *(Highest-scrutiny item — see review flags.)*
+- **Undo layer coupling.** §4 uses zundo's `temporal.pause()/resume()` — first use of that API in this codebase. Risk is contained to `commitGenderPick` and covered by undo/redo tests. *(Owner reviewed and approved keeping single-step, 2026-06-29.)*
 - **Intervening edit before pick.** If the user creates a node and performs another *tracked* edit (e.g. drags it) *before* picking, the untracked amendment attaches to the post-edit state; undo then unwinds that edit + the gender together. Unusual (picker is focused/expected to resolve first); accepted, noted.
 - **Autosave during pending pick.** The node lives in `document` as Unknown during the open picker, so a debounced autosave may persist Unknown; a reload mid-pick yields an honest Unknown node with the picker gone. No data loss.
-- **Proband picker vs. `OnboardingHints`.** Must not visually collide; picker takes precedence on the node, the "add a relation" nudge follows after dismiss. *(Review flag.)*
+- **Proband picker vs. `OnboardingHints` / radial — resolved.** On first run, onboarding opens the radial on the seed *and* the picker wants the same node. Resolved by the §1 picker-precedence rule (`RadialMenu` hidden while a picker is open): the proband picker shows first, the radial/onboarding nudge follows once it resolves. Remaining build-time check is purely visual — confirm no awkward flash during the transition.
 
 ---
 
