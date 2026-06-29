@@ -1,6 +1,6 @@
 name: CI
 
-# Lightweight CI: lint, type-check, test, and build on every push and PR.
+# Lightweight CI: lint, type-check, and test on every push and PR. Build is covered by Vercel preview comments.
 on:
   push:
     branches: [main]
@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   verify:
-    name: Lint · Type-check · Test · Build
+    name: Lint · Type-check · Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -36,9 +36,6 @@ jobs:
 
       - name: Test
         run: npm run test:coverage
-
-      - name: Build
-        run: npm run build
 
       - name: Upload coverage report
         if: always()
