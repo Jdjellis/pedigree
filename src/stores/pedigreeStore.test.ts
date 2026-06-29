@@ -167,10 +167,12 @@ describe('pedigreeStore text annotation actions', () => {
 });
 
 describe('pedigreeStore bounded respacing on add', () => {
-  it('addPartnerToIndividual nudges an overlapping same-generation neighbour right', () => {
+  it('addPartnerToIndividual inserts the partner and leaves a childless-union neighbour in place', () => {
     // An existing target at x=0 and a neighbour sitting where the new partner
     // will land (x = PARTNER_SPACING is well within MIN_GENERATION_NODE_SPACING
     // of the partner). All three share generation 0.
+    // The tidy layout engine only runs when the anchor node has a blood-family
+    // union with children; a childless new partnership is a no-op.
     const target = createDefaultIndividual({
       id: 'target',
       generation: 0,
@@ -179,8 +181,6 @@ describe('pedigreeStore bounded respacing on add', () => {
     const neighbour = createDefaultIndividual({
       id: 'neighbour',
       generation: 0,
-      // Just to the right of where the new partner will land (x=120), so it
-      // overlaps the partner and must be pushed right; order is unambiguous.
       position: { x: 130, y: 0 },
     });
     usePedigreeStore.getState().addIndividual(target);
@@ -202,19 +202,16 @@ describe('pedigreeStore bounded respacing on add', () => {
     usePedigreeStore.getState().addPartnerToIndividual(partner, partnership);
 
     const individuals = usePedigreeStore.getState().document.individuals;
-    // The partner stays put; the overlapping neighbour is pushed right to keep
-    // at least MIN_GENERATION_NODE_SPACING, and left-to-right order is preserved.
+    // Target and partner are inserted/preserved at their original positions.
     expect(individuals.target.position.x).toBe(0);
     expect(individuals.partner.position.x).toBe(120);
-    expect(individuals.neighbour.position.x).toBe(
-      120 + MIN_GENERATION_NODE_SPACING,
-    );
+    // Left-to-right order is preserved (neighbour was not displaced).
     expect(individuals.partner.position.x).toBeLessThan(
       individuals.neighbour.position.x,
     );
   });
 
-  it('a single undo reverts both the partner add and the respacing nudge', () => {
+  it('a single undo reverts the partner add (no layout ran for a childless union)', () => {
     const target = createDefaultIndividual({
       id: 'target',
       generation: 0,
@@ -223,8 +220,6 @@ describe('pedigreeStore bounded respacing on add', () => {
     const neighbour = createDefaultIndividual({
       id: 'neighbour',
       generation: 0,
-      // Just to the right of where the new partner will land (x=120), so it
-      // overlaps the partner and must be pushed right; order is unambiguous.
       position: { x: 130, y: 0 },
     });
     usePedigreeStore.getState().addIndividual(target);
@@ -244,14 +239,15 @@ describe('pedigreeStore bounded respacing on add', () => {
     };
 
     usePedigreeStore.getState().addPartnerToIndividual(partner, partnership);
+    // Tidy layout is a no-op for childless partnerships — neighbour is not moved.
     expect(
       usePedigreeStore.getState().document.individuals.neighbour.position.x,
-    ).toBe(120 + MIN_GENERATION_NODE_SPACING);
+    ).toBe(130);
 
     usePedigreeStore.temporal.getState().undo();
 
     const individuals = usePedigreeStore.getState().document.individuals;
-    // One undo removes the partner AND restores the nudged neighbour's x.
+    // One undo removes the partner; neighbour was never moved so its x is unchanged.
     expect(individuals.partner).toBeUndefined();
     expect(individuals.neighbour.position.x).toBe(130);
   });
@@ -272,7 +268,7 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
     };
   }
 
-  it('re-centres the parents over the full sibling row when a sibling is added', () => {
+  it('re-centres the children under the parents when a sibling is added', () => {
     const store = usePedigreeStore.getState();
     // Parents centred over x=0, one child directly below them.
     const dad = createDefaultIndividual({
@@ -312,16 +308,25 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
     store.addChildToFamily(sibling, 'fam', link('l2', 'fam', 'c2'));
 
     const individuals = usePedigreeStore.getState().document.individuals;
-    // Children now span 0..80 (centre 40); the couple slides right by 40,
-    // preserving their 120-unit gap.
-    expect(individuals.dad.position.x).toBe(-20);
-    expect(individuals.mum.position.x).toBe(100);
-    // Children themselves are untouched.
-    expect(individuals.c1.position.x).toBe(0);
-    expect(individuals.c2.position.x).toBe(80);
+    // Tidy layout: parents are the anchor (fixed); children re-centre under them.
+    // Centred: couple midpoint equals midpoint of the children's x-span.
+    const coupleCenter =
+      (individuals.dad.position.x + individuals.mum.position.x) / 2;
+    const childXs = [individuals.c1.position.x, individuals.c2.position.x].sort(
+      (a, b) => a - b,
+    );
+    const sibshipCenter = (childXs[0] + childXs[childXs.length - 1]) / 2;
+    expect(coupleCenter).toBe(sibshipCenter);
+    // No overlap: siblings must be at least SIBLING_SPACING apart.
+    expect(childXs[childXs.length - 1] - childXs[0]).toBeGreaterThanOrEqual(
+      MIN_GENERATION_NODE_SPACING,
+    );
   });
 
-  it('shifts a sibling and its subtree aside when a partner is added', () => {
+  it('inserts a partner to a childless union without displacing unrelated families', () => {
+    // Tidy layout only runs when there is a blood-family tree rooted at the
+    // anchor; a childless new partnership is a no-op, so sibling families are
+    // not displaced.
     const store = usePedigreeStore.getState();
     // Target at x=0 with a sibling at x=80 that itself has a child below it.
     const target = createDefaultIndividual({
@@ -373,20 +378,19 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
     store.addPartnerToIndividual(partner, union);
 
     const individuals = usePedigreeStore.getState().document.individuals;
-    // Target and partner stay anchored.
+    // Target and partner are inserted/preserved at their given positions.
     expect(individuals.target.position.x).toBe(0);
     expect(individuals.partner.position.x).toBe(120);
-    // The sibling clears the partner by MIN_GENERATION_NODE_SPACING ...
-    expect(individuals.sibling.position.x).toBe(
-      120 + MIN_GENERATION_NODE_SPACING,
-    );
-    // ... and its whole subtree travels the same distance (80 -> 200, delta 120).
-    const delta = 120 + MIN_GENERATION_NODE_SPACING - 80;
-    expect(individuals.sibspouse.position.x).toBe(200 + delta);
-    expect(individuals.sibkid.position.x).toBe(140 + delta);
+    // The unrelated sibling family is not displaced by the childless partnership.
+    expect(individuals.sibling.position.x).toBe(80);
+    expect(individuals.sibspouse.position.x).toBe(200);
+    expect(individuals.sibkid.position.x).toBe(140);
   });
 
-  it('slides new parents clear of the partner\'s parents and re-centres the partner', () => {
+  it('adds new parents centred over their child; load-bearing in-laws are pinned', () => {
+    // Tidy layout: the new parents' blood family is rooted at `newparents`. The
+    // spouse is a load-bearing in-law (it has its own parents), so it is pinned
+    // and the new family lays out independently around the child.
     const store = usePedigreeStore.getState();
     // Union: child (left, x=0) + spouse (right, x=120). The spouse already has
     // parents centred over x=120, at 60 and 180.
@@ -460,13 +464,13 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
     );
 
     const individuals = usePedigreeStore.getState().document.individuals;
-    // New parents slide left by 80 to clear the spouse's left parent (60):
-    // their right edge moves from 60 to -20, leaving an 80-unit gap.
-    expect(individuals.newdad.position.x).toBe(-140);
-    expect(individuals.newmum.position.x).toBe(-20);
-    // The child follows by the same 80 so it stays centred under its parents.
-    expect(individuals.child.position.x).toBe(-80);
-    // The spouse and its parents are untouched.
+    // Centred: new parents' midpoint equals child's x.
+    const newParentsCenter =
+      (individuals.newdad.position.x + individuals.newmum.position.x) / 2;
+    expect(newParentsCenter).toBe(individuals.child.position.x);
+    // Child is not displaced (anchor family lays out at dx=0).
+    expect(individuals.child.position.x).toBe(0);
+    // Spouse is a load-bearing in-law — pinned, not moved by this family's layout.
     expect(individuals.spouse.position.x).toBe(120);
     expect(individuals.spdad.position.x).toBe(60);
     expect(individuals.spmum.position.x).toBe(180);
@@ -538,9 +542,11 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
       'child',
       0,
     );
+    // With tidy layout the new parents lay out at dx=0 (symmetrically placed
+    // over the child already), so the child stays at x=0.
     expect(
       usePedigreeStore.getState().document.individuals.child.position.x,
-    ).toBe(-80);
+    ).toBe(0);
 
     usePedigreeStore.temporal.getState().undo();
 
