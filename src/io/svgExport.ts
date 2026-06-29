@@ -32,9 +32,11 @@ import {
 } from '../utils/constants';
 import { adoptionBracketPolylines } from '../components/canvas/symbols/adoptionBrackets';
 import { getPresentPartners } from '../utils/graphTraversal';
+import { twinApexXByMember } from '../utils/twinOperations';
 import {
   computeParentChildSegments,
   computeParentlessSibshipSegments,
+  computeSibshipY,
 } from '../components/connections/parentChildGeometry';
 import {
   PADDING as LEGEND_PADDING,
@@ -560,7 +562,13 @@ function renderParentChildLines(
   if (children.length === 0) return '';
 
   const partners = getPresentPartners(individuals, partnership);
-  const anchors = children.map((c) => ({ x: c.position.x, y: c.position.y }));
+  // Twin members anchor the sibship bar at their group's apex (see
+  // ParentChildLine) so a centred twins-only sibship collapses to no bar.
+  const twinApexX = twinApexXByMember(twinGroups, individuals);
+  const anchors = children.map((c) => ({
+    x: twinApexX.get(c.id) ?? c.position.x,
+    y: c.position.y,
+  }));
 
   let parentDrop: [number, number, number, number] | null = null;
   let sibship: [number, number, number, number] | null = null;
@@ -613,13 +621,23 @@ function renderTwinConnector(
   const partnership = partnerships[twinGroup.parentPartnershipId];
   if (!partnership) return '';
 
-  const p1 = partnership.partner1Id ? individuals[partnership.partner1Id] : undefined;
-  const p2 = partnership.partner2Id ? individuals[partnership.partner2Id] : undefined;
-  if (!p1 || !p2) return '';
+  // Share the sibship-bar depth with renderParentChildLines so the V apex lands
+  // on it for any number of present parents (0, 1, or 2). Earlier this required
+  // BOTH partners and rendered nothing otherwise, leaving single-parent and
+  // parentless twins unconnected.
+  const childAnchors = partnership.childrenIds
+    .map((id) => individuals[id])
+    .filter((c): c is Individual => Boolean(c))
+    .map((c) => ({ x: c.position.x, y: c.position.y }));
+  if (childAnchors.length === 0) return '';
 
-  const partnershipY = (p1.position.y + p2.position.y) / 2;
+  const partnerAnchors = getPresentPartners(individuals, partnership).map((p) => ({
+    x: p.position.x,
+    y: p.position.y,
+  }));
+
+  const sibshipY = computeSibshipY(partnerAnchors, childAnchors);
   const childrenY = Math.min(...twins.map((t) => t.position.y));
-  const sibshipY = partnershipY + (childrenY - partnershipY) / 2;
   const twinMidX = twins.reduce((sum, t) => sum + t.position.x, 0) / twins.length;
 
   const parts: string[] = [];

@@ -420,6 +420,109 @@ describe('twin connector rendering (issue #54)', () => {
     expect(svg).not.toContain(`<line x1="130" y1="${sibshipY}" x2="130" y2="250"`);
     expect(svg).not.toContain(`<line x1="190" y1="${sibshipY}" x2="190" y2="250"`);
   });
+
+  it('connects single-parent twins with converging lines and no spanning bar', () => {
+    // Regression (issue #54 follow-up): TwinConnector bailed out unless BOTH
+    // parents existed, and ParentChildLine still drew a bar spanning the twins.
+    // A centred twins-only sibship is just: parent drop -> apex -> V to twins.
+    const parent = person('parent', 160, 100);
+    const twin1 = person('twin1', 130, 250);
+    const twin2 = person('twin2', 190, 250);
+    const doc = minimalDoc(
+      { parent, twin1, twin2 },
+      {
+        'pship-1': {
+          id: 'pship-1', type: RelationshipType.Partnership,
+          partner1Id: 'parent', childrenIds: ['twin1', 'twin2'],
+        },
+      },
+      {
+        'pc-1': { id: 'pc-1', type: RelationshipType.ParentChild, parentPartnershipId: 'pship-1', childId: 'twin1', isAdopted: false },
+        'pc-2': { id: 'pc-2', type: RelationshipType.ParentChild, parentPartnershipId: 'pship-1', childId: 'twin2', isAdopted: false },
+      },
+    );
+    doc.twinGroups['tg-1'] = {
+      id: 'tg-1', twinType: TwinType.Monozygotic,
+      individualIds: ['twin1', 'twin2'], parentPartnershipId: 'pship-1',
+    };
+
+    const svg = buildPedigreeSvg(doc);
+    const sibshipY = 175; // 100 + (250 - 100) / 2
+
+    // Parent drops to the apex, then converging lines fan out to each twin.
+    expect(svg).toContain(`<line x1="160" y1="100" x2="160" y2="${sibshipY}"`);
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="190" y2="250"`);
+    // No horizontal sibship bar spanning the twins, and no straight drops.
+    expect(svg).not.toContain(`<line x1="130" y1="${sibshipY}" x2="190" y2="${sibshipY}"`);
+    expect(svg).not.toContain(`<line x1="130" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).not.toContain(`<line x1="190" y1="${sibshipY}" x2="190" y2="250"`);
+  });
+
+  it('connects parentless twins with converging lines and no floating bar', () => {
+    // The radial menu's "no parents" twin path creates a 0-partner partnership.
+    // The twins must still converge; there must be no bar floating above them.
+    const twin1 = person('twin1', 130, 250);
+    const twin2 = person('twin2', 190, 250);
+    const doc = minimalDoc(
+      { twin1, twin2 },
+      { u1: { id: 'u1', type: RelationshipType.Partnership, childrenIds: ['twin1', 'twin2'] } },
+      {
+        l1: { id: 'l1', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'twin1', isAdopted: false },
+        l2: { id: 'l2', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'twin2', isAdopted: false },
+      },
+    );
+    doc.twinGroups['tg-1'] = {
+      id: 'tg-1', twinType: TwinType.Dizygotic,
+      individualIds: ['twin1', 'twin2'], parentPartnershipId: 'u1',
+    };
+
+    const svg = buildPedigreeSvg(doc);
+    const sibshipY = 250 - PARENTLESS_SIBSHIP_RISE; // 175
+
+    // Converging lines from the apex to each twin (the regression: absent before).
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="190" y2="250"`);
+    // No horizontal bar floating above the twins, and no straight drops.
+    expect(svg).not.toContain(`<line x1="130" y1="${sibshipY}" x2="190" y2="${sibshipY}"`);
+    expect(svg).not.toContain(`<line x1="130" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).not.toContain(`<line x1="190" y1="${sibshipY}" x2="190" y2="250"`);
+  });
+
+  it('keeps a sibship bar joining the parent drop to an offset twin apex', () => {
+    // When the parent drop and the twin apex are not aligned, a short bar still
+    // joins them — but only as far as the apex, never out to the twins.
+    const parent = person('parent', 100, 100);
+    const twin1 = person('twin1', 130, 250);
+    const twin2 = person('twin2', 190, 250);
+    const doc = minimalDoc(
+      { parent, twin1, twin2 },
+      {
+        'pship-1': {
+          id: 'pship-1', type: RelationshipType.Partnership,
+          partner1Id: 'parent', childrenIds: ['twin1', 'twin2'],
+        },
+      },
+      {
+        'pc-1': { id: 'pc-1', type: RelationshipType.ParentChild, parentPartnershipId: 'pship-1', childId: 'twin1', isAdopted: false },
+        'pc-2': { id: 'pc-2', type: RelationshipType.ParentChild, parentPartnershipId: 'pship-1', childId: 'twin2', isAdopted: false },
+      },
+    );
+    doc.twinGroups['tg-1'] = {
+      id: 'tg-1', twinType: TwinType.Dizygotic,
+      individualIds: ['twin1', 'twin2'], parentPartnershipId: 'pship-1',
+    };
+
+    const svg = buildPedigreeSvg(doc);
+    const sibshipY = 175;
+
+    // Bar joins the parent drop (x=100) to the twin apex (x=160), no further.
+    expect(svg).toContain(`<line x1="100" y1="${sibshipY}" x2="160" y2="${sibshipY}"`);
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="190" y2="250"`);
+    // The bar does not run out to the twins' own X positions.
+    expect(svg).not.toContain(`<line x1="100" y1="${sibshipY}" x2="190" y2="${sibshipY}"`);
+  });
 });
 
 describe('single-parent union rendering', () => {

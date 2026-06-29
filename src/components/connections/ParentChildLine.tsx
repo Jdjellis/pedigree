@@ -8,6 +8,7 @@ import type {
 } from '../../types/pedigree';
 import { LINE_COLOR, LINE_WIDTH, DASH_PATTERN } from '../../utils/constants';
 import { getPresentPartners } from '../../utils/graphTraversal';
+import { twinApexXByMember } from '../../utils/twinOperations';
 import {
   computeParentChildSegments,
   computeParentlessSibshipSegments,
@@ -32,7 +33,15 @@ export function ParentChildLine({
   if (children.length === 0) return null;
 
   const partners = getPresentPartners(individuals, partnership);
-  const anchors = children.map((c) => ({ x: c.position.x, y: c.position.y }));
+  // Twin members anchor the sibship bar at their group's apex, not their own
+  // positions, so the bar joins the parent drop to the twin junction instead of
+  // spanning the twins (whose converging lines TwinConnector draws). A centred
+  // twins-only sibship therefore collapses to no bar at all.
+  const twinApexX = twinApexXByMember(twinGroups, individuals);
+  const anchors = children.map((c) => ({
+    x: twinApexX.get(c.id) ?? c.position.x,
+    y: c.position.y,
+  }));
 
   let parentDrop: [number, number, number, number] | null = null;
   let sibship: [number, number, number, number] | null = null;
