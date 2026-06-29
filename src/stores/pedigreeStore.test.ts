@@ -749,6 +749,53 @@ describe('addChildViaNewUnion', () => {
 });
 
 describe('fillUnionPartner', () => {
+  it('centres the child under the couple when the existing partner is load-bearing (3-gen fix)', () => {
+    // Regression: fillUnionPartner anchored relayoutFamily on the NEW partner.
+    // When the existing partner is load-bearing (has parents) it was pinned, so the
+    // layout placed C at newPartner's x instead of centring the couple over C.
+    //
+    // Fixture: gp1+gp2 (gen -1) → E (gen 0) heads 1-partner union fam → C (gen 1).
+    const store = usePedigreeStore.getState();
+
+    const gp1 = createDefaultIndividual({ id: 'gp1', generation: -1, position: { x: -60, y: -150 } });
+    const gp2 = createDefaultIndividual({ id: 'gp2', generation: -1, position: { x: 60, y: -150 } });
+    const E = createDefaultIndividual({ id: 'E', generation: 0, position: { x: 0, y: 0 } });
+    const C = createDefaultIndividual({ id: 'C', generation: 1, position: { x: 0, y: 150 } });
+
+    store.addIndividual(gp1);
+    store.addIndividual(gp2);
+    store.addIndividual(E);
+    store.addPartnership({
+      id: 'gpUnion',
+      type: RelationshipType.Partnership,
+      partner1Id: gp1.id,
+      partner2Id: gp2.id,
+      childrenIds: [E.id],
+    });
+    store.addParentChildLink({
+      id: 'gpLink',
+      type: RelationshipType.ParentChild,
+      parentPartnershipId: 'gpUnion',
+      childId: E.id,
+      isAdopted: false,
+    });
+    // 1-partner union: E is the sole parent, C is the child.
+    store.addChildViaNewUnion(
+      C,
+      { id: 'fam', type: RelationshipType.Partnership, partner1Id: E.id, childrenIds: [C.id] },
+      { id: 'famLink', type: RelationshipType.ParentChild, parentPartnershipId: 'fam', childId: C.id, isAdopted: false },
+    );
+
+    // Fill the empty partner slot with a new partner placed to the right of E.
+    const newPartner = createDefaultIndividual({ id: 'newPartner', generation: 0, position: { x: 120, y: 0 } });
+    store.fillUnionPartner(newPartner, 'fam');
+
+    const individuals = usePedigreeStore.getState().document.individuals;
+    // The couple must be centred over their single child.
+    const coupleMidpoint = (individuals['E'].position.x + individuals['newPartner'].position.x) / 2;
+    expect(coupleMidpoint).toBe(individuals['C'].position.x);
+  });
+
   it('fills the empty slot of a 1-partner union', () => {
     const store = usePedigreeStore.getState();
     const parent = createDefaultIndividual({ generation: 0, position: { x: 0, y: 0 } });
@@ -1199,5 +1246,80 @@ describe('autospacing acceptance (#55)', () => {
     const childrenXs = [individuals.childA.position.x, individuals.childB.position.x];
     const childrenMidpoint = (Math.min(...childrenXs) + Math.max(...childrenXs)) / 2;
     expect(coupleMidpoint).toBe(childrenMidpoint);
+  });
+});
+
+describe('3-generation layout integration (#55 FIX 4)', () => {
+  beforeEach(() => {
+    usePedigreeStore.setState({ document: createDefaultDocument() });
+    usePedigreeStore.temporal.getState().clear();
+  });
+
+  it('keeps each couple centred over its children and avoids same-generation overlap', () => {
+    // Build grandparents → parents (a real couple) → two children using store ops.
+    // After each add, the tidy layout runs; the final state must satisfy:
+    //   1. Grandparent couple midpoint == midpoint of parents' x-span.
+    //   2. Parent couple midpoint == midpoint of children's x-span.
+    //   3. No same-generation overlap (gap ≥ 80 between adjacent nodes in each row).
+    //
+    // Invariants, not hard-coded x values, so the test is stable under spacing changes.
+    const store = usePedigreeStore.getState();
+
+    const gDad = createDefaultIndividual({ id: 'gDad', generation: -1, position: { x: -60, y: -300 } });
+    const gMum = createDefaultIndividual({ id: 'gMum', generation: -1, position: { x: 60, y: -300 } });
+    store.addIndividual(gDad);
+    store.addIndividual(gMum);
+    store.addPartnership({
+      id: 'gpUnion',
+      type: RelationshipType.Partnership,
+      partner1Id: gDad.id,
+      partner2Id: gMum.id,
+      childrenIds: [],
+    });
+
+    // Add a child (parent) to the grandparents' union.
+    const parent = createDefaultIndividual({ id: 'parent', generation: 0, position: { x: 0, y: -150 } });
+    store.addChildToFamily(parent, 'gpUnion', parentChildLink('gpUnion', parent.id));
+
+    // Give the parent a spouse.
+    const spouse = createDefaultIndividual({ id: 'spouse', generation: 0, position: { x: 120, y: -150 } });
+    const famUnion: PartnershipRelationship = {
+      id: 'famUnion',
+      type: RelationshipType.Partnership,
+      partner1Id: parent.id,
+      partner2Id: spouse.id,
+      childrenIds: [],
+    };
+    store.addPartnerToIndividual(spouse, famUnion);
+
+    // Add two children to the parent couple.
+    const kidA = createDefaultIndividual({ id: 'kidA', generation: 1, position: { x: 0, y: 150 } });
+    store.addChildToFamily(kidA, 'famUnion', parentChildLink('famUnion', kidA.id));
+
+    const kidB = createDefaultIndividual({ id: 'kidB', generation: 1, position: { x: 80, y: 150 } });
+    store.addChildToFamily(kidB, 'famUnion', parentChildLink('famUnion', kidB.id));
+
+    const ind = usePedigreeStore.getState().document.individuals;
+
+    // --- Centring invariants ---
+    // Row -1: grandparent couple midpoint == midpoint of parents' x-span (only 'parent' in gen 0).
+    const gpMidpoint = (ind.gDad.position.x + ind.gMum.position.x) / 2;
+    expect(gpMidpoint).toBe(ind.parent.position.x);
+
+    // Row 0: parent couple midpoint == midpoint of children's x-span.
+    const parentMidpoint = (ind.parent.position.x + ind.spouse.position.x) / 2;
+    const childXs = [ind.kidA.position.x, ind.kidB.position.x].sort((a, b) => a - b);
+    const childMidpoint = (childXs[0] + childXs[childXs.length - 1]) / 2;
+    expect(parentMidpoint).toBe(childMidpoint);
+
+    // --- No same-generation overlap ---
+    // Gen -1: just two grandparents — must be ≥ 80 apart.
+    expect(Math.abs(ind.gDad.position.x - ind.gMum.position.x)).toBeGreaterThanOrEqual(80);
+
+    // Gen 0: parent + spouse — must be ≥ 80 apart.
+    expect(Math.abs(ind.parent.position.x - ind.spouse.position.x)).toBeGreaterThanOrEqual(80);
+
+    // Gen 1: two children — must be ≥ 80 apart.
+    expect(childXs[childXs.length - 1] - childXs[0]).toBeGreaterThanOrEqual(80);
   });
 });

@@ -782,6 +782,15 @@ export const usePedigreeStore = create<PedigreeState>()(
           const partnership = state.document.partnerships[partnershipId];
           if (!partnership) return state;
 
+          // Derive the EXISTING partner from the original slots (before the fill)
+          // so the relayout anchors on the blood-family member, not the new arrival.
+          // The new partner has no parents, so findRootUnion(partner.id) would only
+          // reach this union, pinning the load-bearing existing partner and pulling
+          // the children under the new partner's x instead of centring the couple.
+          const existingId = !partnership.partner1Id
+            ? partnership.partner2Id
+            : partnership.partner1Id;
+
           const updatedPartnership = !partnership.partner1Id
             ? { ...partnership, partner1Id: partner.id }
             : { ...partnership, partner2Id: partner.id };
@@ -795,10 +804,11 @@ export const usePedigreeStore = create<PedigreeState>()(
             [partnershipId]: updatedPartnership,
           };
           // Both slots are now filled; re-tidy the family so the couple is
-          // centred over their children.
+          // centred over their children. Anchor on the EXISTING partner so
+          // findRootUnion can climb the full blood-family tree to the real root.
           individuals = relayoutFamily(
             { individuals, partnerships, parentChildLinks: state.document.parentChildLinks },
-            partner.id,
+            existingId ?? partner.id,
           );
           return {
             document: {

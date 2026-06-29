@@ -66,6 +66,12 @@ export function isLoadBearingInLaw(doc: LayoutDoc, individualId: string): boolea
  * connected blood family. When the node is itself a founder (no parents), return
  * its own child-bearing union if it has one. Returns null when the node heads no
  * union. Guards against consanguinity cycles.
+ *
+ * @remarks
+ * At each union the climb prefers whichever partner has their own parent link in
+ * the document (i.e. continues a blood line upward) over a founder/in-law with no
+ * parents. This prevents the traversal from jumping to a married-in family tree
+ * when `partner1Id` happens to be an in-law founder placed first in the slot.
  */
 export function findRootUnion(doc: LayoutDoc, nodeId: string): string | null {
   let childId = nodeId;
@@ -81,7 +87,15 @@ export function findRootUnion(doc: LayoutDoc, nodeId: string): string | null {
     seen.add(rootUnion);
     const u = doc.partnerships[rootUnion];
     if (!u) break;
-    const next = u.partner1Id ?? u.partner2Id;
+    // Prefer the partner who has their own parents in the document so the
+    // climb follows the blood line rather than jumping into an in-law's tree.
+    const candidates = [u.partner1Id, u.partner2Id].filter(
+      (id): id is string => !!id,
+    );
+    const next =
+      candidates.find((id) =>
+        Object.values(doc.parentChildLinks).some((l) => l.childId === id),
+      ) ?? candidates[0];
     if (!next) break;
     childId = next;
   }
@@ -95,24 +109,32 @@ export function findRootUnion(doc: LayoutDoc, nodeId: string): string | null {
 }
 
 /**
- * Position a blood individual (and its married-in partner, if any) centred on
- * `center`. A sole parent sits exactly on the centre; a couple splits by
- * `partnerSpacing`, preserving whichever side the in-law currently occupies.
+ * Position two individuals (or one) centred on `center`. A sole individual sits
+ * exactly on `center`; a pair splits by `partnerSpacing`, preserving whichever
+ * side `secondaryId` currently occupies relative to `primaryId`.
+ *
+ * @param primaryId - The individual that is always placed (never null).
+ * @param secondaryId - The optional partner; when null only `primaryId` is placed.
+ *
+ * @remarks
+ * The parameter names are intentionally neutral. At the `placeable.length === 2`
+ * call site in `layoutUnionFrame` neither argument is guaranteed to be a blood
+ * parent — `coupleAround` decides left/right purely from the current x positions.
  */
 export function coupleAround(
   center: number,
-  bloodId: string,
-  inLawId: string | null,
+  primaryId: string,
+  secondaryId: string | null,
   individuals: Record<string, Individual>,
   partnerSpacing: number,
 ): Record<string, number> {
-  if (!inLawId || !individuals[inLawId]) return { [bloodId]: center };
-  const bloodX = individuals[bloodId]?.position.x ?? 0;
-  const inLawX = individuals[inLawId].position.x;
+  if (!secondaryId || !individuals[secondaryId]) return { [primaryId]: center };
+  const primaryX = individuals[primaryId]?.position.x ?? 0;
+  const secondaryX = individuals[secondaryId].position.x;
   const half = partnerSpacing / 2;
-  return inLawX < bloodX
-    ? { [inLawId]: center - half, [bloodId]: center + half }
-    : { [bloodId]: center - half, [inLawId]: center + half };
+  return secondaryX < primaryX
+    ? { [secondaryId]: center - half, [primaryId]: center + half }
+    : { [primaryId]: center - half, [secondaryId]: center + half };
 }
 
 /**
@@ -150,6 +172,13 @@ interface Frame {
  * Lay out the subtree headed by `childId` (a blood node): the child, its
  * married-in partner(s), and everything below. `anchorX` is the blood child's
  * own x, used by the parent union to centre over its children.
+ *
+ * @remarks
+ * Only the **first** child-bearing union for this individual (by insertion order
+ * in `doc.partnerships`) is tidy-laid-out. Children from later unions (e.g. a
+ * remarriage) are left at their current canvas positions — a known best-effort
+ * limitation. All unions are still traversed for leaf-partner placement when
+ * checking for a childless partner block.
  */
 function layoutChildBlock(
   childId: string,

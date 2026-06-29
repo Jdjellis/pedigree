@@ -232,3 +232,63 @@ describe('computeTreeLayout — clearance & cross-sibship', () => {
     expect(moved.inlaw).toBeUndefined();
   });
 });
+
+describe('computeTreeLayout — remarriage (best-effort limitation)', () => {
+  it('does not crash when a person has two child-bearing unions; second sibship is left untouched', () => {
+    // layoutChildBlock only lays out the first child-bearing union (by insertion
+    // order).  Children from a second union (remarriage) are left in place.
+    // This test documents the known limitation and guards against a crash.
+    const individuals = {
+      p: ind('p', 0, 0),
+      spouse1: ind('spouse1', 120, 0),
+      spouse2: ind('spouse2', -120, 0),
+      kidA: ind('kidA', 60, 1),
+      kidB: ind('kidB', -60, 1),
+    };
+    const partnerships = {
+      u1: union('u1', 'p', 'spouse1', ['kidA']),
+      u2: union('u2', 'p', 'spouse2', ['kidB']),
+    };
+    const parentChildLinks = {
+      la: link('la', 'u1', 'kidA'),
+      lb: link('lb', 'u2', 'kidB'),
+    };
+    // Must not throw.
+    let moved: Record<string, { x: number; y: number }> | undefined;
+    expect(() => {
+      moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'u1');
+    }).not.toThrow();
+    // kidB belongs to the second union (u2) which is not laid out; it must be
+    // absent from the moves map (left at its current position).
+    expect(moved!['kidB']).toBeUndefined();
+  });
+});
+
+describe('findRootUnion — blood-line preference', () => {
+  it('climbs the partner WITH a parent link when partner1Id has none', () => {
+    // Bug: current code picks u.partner1Id unconditionally; if partner1Id is an
+    // in-law founder (no parents in this doc) the climb stops at the low union
+    // instead of reaching the blood root.
+    //
+    // Fixture: bloodRoot (gp1+gp2) → blood; low union: partner1Id=inlaw (no parents),
+    // partner2Id=blood (has parents in bloodRoot); child C belongs to low union.
+    const d = doc({
+      individuals: {
+        gp1: ind('gp1', -120, 0), gp2: ind('gp2', 0, 0),
+        blood: ind('blood', -60, 1),
+        inlaw: ind('inlaw', 60, 1),
+        C: ind('C', 0, 2),
+      },
+      partnerships: {
+        bloodRoot: union('bloodRoot', 'gp1', 'gp2', ['blood']),
+        low: union('low', 'inlaw', 'blood', ['C']),
+      },
+      parentChildLinks: {
+        l1: link('l1', 'bloodRoot', 'blood'),
+        l2: link('l2', 'low', 'C'),
+      },
+    });
+    // findRootUnion from C should reach bloodRoot, not stop at low.
+    expect(findRootUnion(d, 'C')).toBe('bloodRoot');
+  });
+});
