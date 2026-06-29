@@ -11,6 +11,8 @@ beforeEach(() => {
   useUIStore.getState().closeModal();
   useUIStore.getState().clearSelection();
   useUIStore.getState().setCommandPaletteOpen(false);
+  // Default to persistent storage; individual tests opt into the blocked state.
+  useUIStore.setState({ storagePersistent: true });
 });
 
 afterEach(() => {
@@ -223,4 +225,22 @@ test('local-data notice is never rendered (notice removed)', () => {
   expect(
     screen.queryByText(/saved only in this browser/i)
   ).not.toBeInTheDocument();
+});
+
+// ── Storage-blocked persistence warning ──────────────────────────────────────
+
+test('shows the "Saved locally" status when storage is persistent', () => {
+  useUIStore.setState({ storagePersistent: true });
+  render(<MenuIsland />);
+
+  expect(screen.getByText(/saved locally/i)).toBeInTheDocument();
+  expect(screen.queryByText(/not saved/i)).not.toBeInTheDocument();
+});
+
+test('shows a "Not saved" warning instead of "Saved locally" when storage is blocked', () => {
+  useUIStore.setState({ storagePersistent: false });
+  render(<MenuIsland />);
+
+  expect(screen.getByText(/not saved/i)).toBeInTheDocument();
+  expect(screen.queryByText(/saved locally/i)).not.toBeInTheDocument();
 });
