@@ -698,9 +698,18 @@ export const usePedigreeStore = create<PedigreeState>()(
 
       addPartnerToIndividual: (partner, partnership) =>
         set((state) => {
-          // Insert the partner and the new union, then re-tidy any blood family
-          // rooted at the partner. The insert and the layout share this one `set`
-          // so a single undo reverts both.
+          // Insert the partner and the new union, then re-tidy the blood family
+          // rooted at the EXISTING target individual (not the new partner).
+          // The new partner has no parents and the new partnership is childless,
+          // so findRootUnion(partner.id) returns null and no layout would run.
+          // Anchoring on the target traverses up to the family root so real
+          // siblings are pushed clear of the incoming partner.
+          // The insert and the layout share this one `set` so a single undo
+          // reverts both.
+          const targetId =
+            partnership.partner1Id === partner.id
+              ? partnership.partner2Id
+              : partnership.partner1Id;
           let individuals: Record<string, Individual> = {
             ...state.document.individuals,
             [partner.id]: partner,
@@ -711,7 +720,7 @@ export const usePedigreeStore = create<PedigreeState>()(
           };
           individuals = relayoutFamily(
             { individuals, partnerships, parentChildLinks: state.document.parentChildLinks },
-            partner.id,
+            targetId ?? partner.id,
           );
           return {
             document: {

@@ -556,6 +556,106 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
     expect(individuals.newmum).toBeUndefined();
     expect(individuals.child.position.x).toBe(0);
   });
+
+  it('adds a partner to a real sibling and pushes siblings clear (issue #55 regression)', () => {
+    // Regression: addPartnerToIndividual was anchoring relayoutFamily on the
+    // NEW partner (no family tree → no-op). Siblings of the target were never
+    // pushed clear. The fix anchors on the TARGET (blood-family member).
+    //
+    // Setup: dad + mum at gen -1, with two children (target + sib) at gen 0.
+    const store = usePedigreeStore.getState();
+
+    const dad = createDefaultIndividual({
+      id: 'dad',
+      generation: -1,
+      position: { x: -60, y: -150 },
+    });
+    const mum = createDefaultIndividual({
+      id: 'mum',
+      generation: -1,
+      position: { x: 60, y: -150 },
+    });
+    const target = createDefaultIndividual({
+      id: 'target',
+      generation: 0,
+      position: { x: 0, y: 0 },
+    });
+    const sib = createDefaultIndividual({
+      id: 'sib',
+      generation: 0,
+      position: { x: 80, y: 0 },
+    });
+
+    const fam: PartnershipRelationship = {
+      id: 'fam',
+      type: RelationshipType.Partnership,
+      partner1Id: dad.id,
+      partner2Id: mum.id,
+      childrenIds: [target.id, sib.id],
+    };
+
+    store.addIndividual(dad);
+    store.addIndividual(mum);
+    store.addIndividual(target);
+    store.addIndividual(sib);
+    store.addPartnership(fam);
+    store.addParentChildLink(link('l-target', 'fam', 'target'));
+    store.addParentChildLink(link('l-sib', 'fam', 'sib'));
+
+    // Clear undo history so the setup ops don't interfere with the undo test.
+    usePedigreeStore.temporal.getState().clear();
+
+    // Add a partner to target via a childless union.
+    const partner = createDefaultIndividual({
+      id: 'partner',
+      generation: 0,
+      position: { x: 120, y: 0 },
+    });
+    const targetUnion: PartnershipRelationship = {
+      id: 'targetfam',
+      type: RelationshipType.Partnership,
+      partner1Id: target.id,
+      partner2Id: partner.id,
+      childrenIds: [],
+    };
+    store.addPartnerToIndividual(partner, targetUnion);
+
+    const individuals = usePedigreeStore.getState().document.individuals;
+
+    // 1. Real sibling sib must be pushed clear of the new partner.
+    expect(
+      Math.abs(individuals.sib.position.x - individuals.partner.position.x),
+    ).toBeGreaterThanOrEqual(MIN_GENERATION_NODE_SPACING);
+
+    // 2. No same-generation overlap: every adjacent pair in gen 0
+    //    (target, partner, sib) must be at least MIN_GENERATION_NODE_SPACING apart.
+    const gen0Xs = [
+      individuals.target.position.x,
+      individuals.partner.position.x,
+      individuals.sib.position.x,
+    ].sort((a, b) => a - b);
+    for (let i = 1; i < gen0Xs.length; i++) {
+      expect(gen0Xs[i] - gen0Xs[i - 1]).toBeGreaterThanOrEqual(
+        MIN_GENERATION_NODE_SPACING,
+      );
+    }
+
+    // 3. Parents stay centred: couple midpoint == midpoint of blood children's x-span.
+    //    Only target and sib are blood children of fam; partner is an in-law.
+    const bloodXs = [individuals.target.position.x, individuals.sib.position.x].sort(
+      (a, b) => a - b,
+    );
+    const bloodChildrenMidpoint = (bloodXs[0] + bloodXs[bloodXs.length - 1]) / 2;
+    const coupleMidpoint = (individuals.dad.position.x + individuals.mum.position.x) / 2;
+    expect(coupleMidpoint).toBe(bloodChildrenMidpoint);
+
+    // 4. Single undo step: partner is gone and sib is back at its original x=80.
+    usePedigreeStore.temporal.getState().undo();
+
+    const afterUndo = usePedigreeStore.getState().document.individuals;
+    expect(afterUndo.partner).toBeUndefined();
+    expect(afterUndo.sib.position.x).toBe(80);
+  });
 });
 
 function parentChildLink(partnershipId: string, childId: string): ParentChildRelationship {
