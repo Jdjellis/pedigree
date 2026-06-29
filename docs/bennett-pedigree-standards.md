@@ -102,7 +102,7 @@ Ongoing / live pregnancy: diamond symbol (sex unknown) or sex-specific symbol wh
 | Line of descent | Vertical line dropping from centre of mating line | — (computed from partnership) |
 | Sibship line | Horizontal line from which siblings drop vertically | — (computed from partnership children) |
 | Parent-child | Vertical from sibship line down to child's symbol | `RelationshipType.ParentChild` |
-| Adoption | **Brackets** enclose the adoptee for *all* adoptions; line of descent is **dashed** from adoptive parents and **solid** from biological parents (no arrow — see §9) | `RelationshipType.Adoption` |
+| Adoption | **Brackets** enclose the adoptee for *all* adoptions; line of descent is **dashed** from adoptive parents and **solid** from biological parents (no arrow — see §9) | `Individual.adopted` + `ParentChildRelationship.isAdoptive` |
 | Infertility / no offspring | Two vertical tick-marks through the mating line | *(not yet modelled as a relationship type)* |
 
 ---
@@ -149,7 +149,7 @@ The figure gives three labelled examples — *Adopted Out*, *Adopted In*, and *A
 
 > ⚠️ **Correction (2026-06):** earlier revisions of this doc and issue #56 described adopted-out as "bracket + **arrow**". That is **not** NSGC/Bennett — the 2022 figure distinguishes adoption purely by **dashed (adoptive) vs solid (biological) lines of descent**, with no arrow. (Some non-NSGC tools use an arrow; we follow the verified standard.) Verified against the local source PDF: [`references/bennett-2022-nsgc-standardized-pedigree-nomenclature.pdf`](references/bennett-2022-nsgc-standardized-pedigree-nomenclature.pdf), Figure 3.
 
-App: brackets are driven by `Individual.adopted` (see {@link AdoptionBrackets}). The per-edge dashed/solid line style is carried on the parent-child link (`ParentChildRelationship`); `RelationshipType.Adoption` tags an adoptive link.
+App: brackets are driven by `Individual.adopted` (see {@link AdoptionBrackets}). The per-edge dashed/solid line style is carried on the parent-child link as `ParentChildRelationship.isAdoptive` (`true` → adoptive/dashed, `false`/absent → biological/solid).
 
 ---
 
@@ -215,7 +215,7 @@ App: `LegendConfig` with `LegendEntry[]` (id, quarter, fillColor, fillPattern, n
 - Quarter-based multi-condition shading with fill patterns and legend
 - Partnership, consanguinity, separation relationship types
 - Consanguinity double line with optional degree-of-relationship annotation (`PartnershipRelationship.consanguinityDegree`)
-- Parent-child and adoption links; adopted individuals are drawn in square brackets (`Individual.adopted`, `AdoptionBrackets`) with a dashed line of descent
+- Parent-child and adoption links; adopted individuals are drawn in square brackets (`Individual.adopted`, `AdoptionBrackets`), and each line of descent is **dashed for adoptive** parents / **solid for biological** parents via `ParentChildRelationship.isAdoptive` (adopted-in vs adopted-out). Showing both families for one child at once is deferred to multi-parentage (#64).
 - MZ / DZ / unknown twin groups (with the `?` rendered for unknown zygosity); created via the "Mark selected as twins" command, zygosity editable in the properties panel
 - Pregnancy outcomes: SAB, TOP, ECT, SB
 - Vital status: alive, deceased, stillborn
@@ -226,5 +226,4 @@ App: `LegendConfig` with `LegendEntry[]` (id, quarter, fillColor, fillPattern, n
 ### Gaps / Not yet modelled
 - **Carrier notation**: No dedicated `isCarrier` or `carrierStatus` field; must be approximated with a condition quarter fill + legend entry.
 - **Infertility / no-offspring line**: No `RelationshipType` value for a couple with documented infertility.
-- **Adoption-out / per-edge line style**: the app currently dashes *every* descent line of an adopted individual via `Individual.adopted`, with no way to mark an individual line of descent as biological (**solid**) vs adoptive (**dashed**). So *adopted-out* (brackets + a **solid** line to the biological parents) and the both-families case cannot yet be expressed. Tracked in issue #56; per §9 the fix is a per-link line-style flag, **not** an arrow.
 - **Individual diagnosis uncertainty**: No structured `diagnosisUncertain` flag; convention is to use a notes field.
