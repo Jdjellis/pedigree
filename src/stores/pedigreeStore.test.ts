@@ -1048,6 +1048,15 @@ describe('autospacing acceptance (#55)', () => {
     };
     store.addPartnerToIndividual(newPartner, union);
 
+    const afterAdd = usePedigreeStore.getState().document.individuals;
+    // Adding the partner to a blood-family member must have re-tidied the existing
+    // family (proves relayout ran, so the single-undo below genuinely reverts both
+    // the insert and the relayout, not just a trivial no-op insert).
+    expect(
+      afterAdd.parent.position.x !== before.parent.position.x ||
+      afterAdd.child.position.x !== before.child.position.x,
+    ).toBe(true);
+
     // A single undo must fully restore the pre-add individuals map (positions included).
     usePedigreeStore.temporal.getState().undo();
     expect(usePedigreeStore.getState().document.individuals).toEqual(before);
