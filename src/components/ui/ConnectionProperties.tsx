@@ -43,7 +43,7 @@ export function ConnectionProperties() {
 
   const empty = (
     <div className={styles.panel}>
-      <div className={styles.empty}>Select an individual to edit their properties</div>
+      <div className={styles.empty}>Select an individual or connection to edit its properties</div>
     </div>
   );
 
