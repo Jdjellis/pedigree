@@ -13,8 +13,10 @@ Today, the gender of a newly added person is fixed **at creation** by a persiste
 | Path | File | Today |
 |---|---|---|
 | Radial Partner / Child / Sibling / Twin | `RadialMenu.tsx` | `createRelativeIndividual(defaultSex, …)` |
-| Click-to-place on empty canvas | `useEditorActions.ts:88` | reads `defaultSex` |
-| Proband seed (genuinely fresh start only) | `useAutoSave.ts:58` → `createSeededDocument(sex)` | reads `defaultSex` |
+| "New pedigree" re-seed | `useEditorActions.ts` `newDocument` → `createSeededDocument(sex, …)` | reads `defaultSex` |
+| First-run seed (empty storage only) | `useAutoSave.ts` → `createSeededDocument(sex)` | reads `defaultSex` |
+
+*(There is no "click-to-place a person" path — the empty-canvas click handler only places text or clears selection. The two seed paths above are the only non-radial single-person creators.)*
 
 This is a **global mode**, and modes leak across these entry points: a user forgets which sex is "armed" and silently creates the wrong symbol. It is the source of the unintuitive feel. Two further problems:
 
@@ -29,10 +31,10 @@ Per `docs/bennett-pedigree-standards.md` (NSGC/Bennett 2022, PMID 36106433): **s
 
 ## Locked decisions
 
-1. **Create-then-pick everywhere** a single free-gender person is made (radial Partner/Child/Sibling + click-to-place + proband seed).
+1. **Create-then-pick everywhere** a single free-gender person is made: radial Partner/Child/Sibling, plus both seed paths (the first-run auto-seed and the "New pedigree" re-seed).
 2. **Neutral default = `GenderIdentity.Unknown`** before the pick. No sticky/last-used (it would reintroduce a hidden mode; an explicit Unknown diamond is honest, a silently-inherited wrong shape is a false clinical assertion).
 3. **Picker = 4 gender shapes** (Man / Woman / Non-binary / Unknown), reusing the existing `GenderIconButtons`. Twins stay on the Alt-radial; pregnancy/loss stays in the Properties panel — both out of scope here.
-4. **Pop-on-proband:** the picker also opens for the auto-seeded proband. This is *first-run only* (the seed exists only when nothing valid is restorable), so it doubles as a self-documenting onboarding moment rather than a recurring ambush.
+4. **Pop-on-seed:** the picker also opens for the seeded first person (note: the seed is *not* auto-flagged proband — it's just the first individual). The first-run auto-seed appears only when nothing valid is restorable, so its picker doubles as a self-documenting onboarding moment rather than a recurring ambush; the "New pedigree" re-seed is an explicit user gesture, so popping the picker there is plainly wanted too.
 5. **Single-step undo:** the gender pick amends the creation's history entry instead of adding its own, so one undo removes the whole node. Implemented by pausing zundo's `temporal` around the pick mutation (see §4).
 6. **Parent is unchanged** — still spawns a fixed Man+Woman couple (structural, no picker).
 
@@ -81,8 +83,8 @@ create node (genderIdentity: Unknown) → select(id) → showGenderPicker(id)
 ```
 
 - **`RadialMenu.tsx`** — `handleAddPartner`, `handleAddChild`, `handleAddSibling`: replace `createRelativeIndividual(defaultSex, …)` with `createDefaultIndividual({ genderIdentity: GenderIdentity.Unknown, … })`, then `showGenderPicker(newId)` after the existing `select(newId)`. The *"existing parents"* branches already create as Unknown — they simply gain the `showGenderPicker` call, which **also resolves the latent inconsistency** noted above. `handleAddTwin` must still drop its `createRelativeIndividual(defaultSex, …)` call (that helper and `defaultSex` are being deleted) and create the twin as Unknown — but it gains **no** picker (twins are out of scope this round; deferred to [#71](https://github.com/Jdjellis/pedigree/issues/71)). Net: twins become consistently Unknown, instead of today's mix (Unknown for the in-family branch, `defaultSex` for the parentless branch).
-- **`useEditorActions.ts`** — click-to-place: drop the `defaultSex` read; create Unknown; `showGenderPicker(newId)`.
-- **`useAutoSave.ts` / seed** — `createSeededDocument` no longer takes a sex (proband seeded as Unknown). After the seed mounts and the viewport centres on it, open the picker for the proband id (first-run only, by construction).
+- **`useEditorActions.ts` — `newDocument`** — drop the `defaultSex` read; `createSeededDocument` returns a doc whose single individual is the seed; after `setDocument`, read that seed's id and `showGenderPicker(seedId)`.
+- **`useAutoSave.ts` / first-run seed** — `createSeededDocument` no longer takes a sex (seed created as Unknown). After the seed mounts and the viewport centres on it, open the picker for the seed id (first-run only, by construction).
 - **`OnboardingHints.tsx` — sequencing.** Today onboarding calls `showRadialMenu(seedId)` on first run to guide the user. With the picker rule in §1, that radial call is now *gated behind the picker*: on first run the proband's gender picker shows first; once it resolves (pick or dismiss), the onboarding radial appears to nudge "add a relation." Concretely, the picker rule already suppresses the radial while the picker is open, so onboarding's existing `showRadialMenu(seedId)` call simply has no visible effect until the picker closes — giving the desired *pick gender → then add relations* order with minimal change. Verify the two don't compete for the same screen space during the brief transition.
 
 `handleAddParent` is untouched.
@@ -91,7 +93,7 @@ create node (genderIdentity: Unknown) → select(id) → showGenderPicker(id)
 
 **Constraint:** this store tracks **one history entry per `set()`** (`temporal` from zundo, `partialize: { document }`, `limit: 100`, no `handleSet`/`groupBy`). Its existing "one undo reverts both" trick works only because the insert and its respacing happen inside a *single* `set`. Create and pick are **separated in time by user interaction**, so by default they are two `set`s → two undo entries.
 
-**Mechanism:** the **creation** is a normal tracked `set` (the one entry we keep). The **gender pick** is applied as an *untracked amendment* by wrapping it in zundo's public pause/resume:
+**Mechanism:** the **creation** is a normal tracked `set` (the one entry we keep). The **gender pick** is applied as an *untracked amendment* by wrapping it in zundo's public pause/resume. This reuses the pattern already proven in `src/components/canvas/symbols/symbolDrag.ts` (`beginSymbolDrag` pauses, `commitSymbolDrag` resumes) for collapsing a multi-step drag into one undo entry — so it is **not** a novel use of the API, and `symbolDrag.ts` is the reference to copy from:
 
 ```ts
 const temporal = usePedigreeStore.temporal;          // zundo temporal store
@@ -144,8 +146,8 @@ Net: the feature **deletes more than it adds** — the picker reuses `GenderIcon
 | `src/components/canvas/CanvasContainer.tsx` | render `InlineGenderPicker` |
 | `src/components/ui/RadialMenu.tsx` | 3 handlers create Unknown + `showGenderPicker`; `handleAddTwin` drops `createRelativeIndividual` (Unknown, no picker); add `&& !genderPicker.targetId` to the visibility gate |
 | `src/components/canvas/OnboardingHints.tsx` | first-run radial is gated behind the proband picker (no code change beyond verifying the transition; see §3) |
-| `src/commands/useEditorActions.ts` | click-to-place: Unknown + `showGenderPicker` |
-| `src/hooks/useAutoSave.ts` | seed Unknown; open proband picker first-run |
+| `src/commands/useEditorActions.ts` | `newDocument` re-seed: drop `defaultSex`; seed Unknown; open picker on the new seed |
+| `src/hooks/useAutoSave.ts` | first-run seed Unknown; open picker on the seed |
 | `src/stores/pedigreeStore.ts` | seed builder drops `genderForSex`; (no temporal config change) |
 | `src/components/ui/islands/ToolIsland.tsx`, `toolIcons.tsx` | remove default-sex control + glyphs |
 | `src/utils/sex.ts`, `src/components/ui/radialActions.ts` | delete dead translation layer |
@@ -166,7 +168,7 @@ The picker and commit logic are react-dom / store-level, so both are **jsdom-tes
 
 ## Risks & edge cases
 
-- **Undo layer coupling.** §4 uses zundo's `temporal.pause()/resume()` — first use of that API in this codebase. Risk is contained to `commitGenderPick` and covered by undo/redo tests. *(Owner reviewed and approved keeping single-step, 2026-06-29.)*
+- **Undo layer coupling.** §4 uses zundo's `temporal.pause()/resume()` — the same pattern already shipping in `symbolDrag.ts`. Risk is contained to `commitGenderPick` and covered by undo/redo tests. *(Owner reviewed and approved keeping single-step, 2026-06-29.)*
 - **Intervening edit before pick.** If the user creates a node and performs another *tracked* edit (e.g. drags it) *before* picking, the untracked amendment attaches to the post-edit state; undo then unwinds that edit + the gender together. Unusual (picker is focused/expected to resolve first); accepted, noted.
 - **Autosave during pending pick.** The node lives in `document` as Unknown during the open picker, so a debounced autosave may persist Unknown; a reload mid-pick yields an honest Unknown node with the picker gone. No data loss.
 - **Proband picker vs. `OnboardingHints` / radial — resolved.** On first run, onboarding opens the radial on the seed *and* the picker wants the same node. Resolved by the §1 picker-precedence rule (`RadialMenu` hidden while a picker is open): the proband picker shows first, the radial/onboarding nudge follows once it resolves. Remaining build-time check is purely visual — confirm no awkward flash during the transition.
