@@ -98,3 +98,68 @@ describe('packBlocks', () => {
     expect(offsets).toEqual([0, 0]);
   });
 });
+
+import { computeTreeLayout } from './treeLayout';
+
+describe('computeTreeLayout — centring', () => {
+  it('centres a sole parent over a fanned-right sibling row (scenario 4)', () => {
+    // Parent p (gen 0) at x=0; three children fanned right at 0,80,160 (gen 1).
+    const individuals = {
+      p: ind('p', 0, 0),
+      c1: ind('c1', 0, 1), c2: ind('c2', 80, 1), c3: ind('c3', 160, 1),
+    };
+    const partnerships = { u: union('u', 'p', undefined, ['c1', 'c2', 'c3']) };
+    const parentChildLinks = {
+      a: link('a', 'u', 'c1'), b: link('b', 'u', 'c2'), c: link('c', 'u', 'c3'),
+    };
+    const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'u');
+    // Anchor keeps the parent's x (0) fixed; children re-centre symmetrically.
+    expect(moved.p?.x ?? 0).toBe(0);
+    const xs = [moved.c1?.x ?? 0, moved.c2?.x ?? 80, moved.c3?.x ?? 160];
+    // Children span 160 wide, centred on parent (0): -80, 0, 80.
+    expect(xs).toEqual([-80, 0, 80]);
+  });
+
+  it('centres a two-parent couple over their children', () => {
+    const individuals = {
+      m: ind('m', 0, 0), f: ind('f', 120, 0),
+      c1: ind('c1', 0, 1), c2: ind('c2', 80, 1), c3: ind('c3', 160, 1),
+    };
+    const partnerships = { u: union('u', 'm', 'f', ['c1', 'c2', 'c3']) };
+    const parentChildLinks = {
+      a: link('a', 'u', 'c1'), b: link('b', 'u', 'c2'), c: link('c', 'u', 'c3'),
+    };
+    const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'u');
+    // Couple midpoint (60) is the anchor and stays fixed; children centre on 60.
+    const cxs = [moved.c1?.x, moved.c2?.x, moved.c3?.x].map((x, i) => x ?? [0, 80, 160][i]);
+    const childCentre = (Math.min(...cxs) + Math.max(...cxs)) / 2;
+    expect(childCentre).toBe(60);
+  });
+
+  it('is idempotent: a tidy family returns no moves', () => {
+    const individuals = {
+      p: ind('p', 0, 0),
+      c1: ind('c1', -80, 1), c2: ind('c2', 0, 1), c3: ind('c3', 80, 1),
+    };
+    const partnerships = { u: union('u', 'p', undefined, ['c1', 'c2', 'c3']) };
+    const parentChildLinks = {
+      a: link('a', 'u', 'c1'), b: link('b', 'u', 'c2'), c: link('c', 'u', 'c3'),
+    };
+    const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'u');
+    expect(moved).toEqual({});
+  });
+
+  it('normalises y to one row per generation', () => {
+    const individuals = {
+      p: ind('p', 0, 0),
+      c1: ind('c1', -80, 1),
+      // c2 dropped a few px off the row (e.g. mid-drag); layout pulls it back.
+      c2: { ...ind('c2', 0, 1), position: { x: 0, y: 137 } },
+    };
+    const partnerships = { u: union('u', 'p', undefined, ['c1', 'c2']) };
+    const parentChildLinks = { a: link('a', 'u', 'c1'), b: link('b', 'u', 'c2') };
+    const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'u');
+    // Root p at gen 0, y=0; gen 1 row sits at y = 0 + 1*150 = 150.
+    expect(moved.c2?.y).toBe(150);
+  });
+});
