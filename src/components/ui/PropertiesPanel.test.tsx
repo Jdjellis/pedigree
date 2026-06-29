@@ -108,4 +108,10 @@ describe('PropertiesPanel adoption control', () => {
     // Plain "Adopted" checkbox must NOT appear in this branch
     expect(screen.queryByRole('checkbox', { name: 'Adopted' })).not.toBeInTheDocument();
   });
+
+  // NOTE: The 2+-link (multi-family) branch of the adoption control is not
+  // tested here because it is currently unreachable in the data model — an
+  // individual cannot belong to more than one parent partnership until
+  // multi-parentage (#64) is implemented. RTL coverage is intentionally
+  // deferred to that issue.
 });

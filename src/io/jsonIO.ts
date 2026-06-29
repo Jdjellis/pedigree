@@ -34,7 +34,11 @@ export function migrateAdoption(doc: PedigreeDocument): PedigreeDocument {
   for (const ind of Object.values(doc.individuals ?? {})) {
     if (ind.adopted !== true) continue;
     for (const link of links) {
-      if (link.childId === ind.id) link.isAdoptive = true;
+      // Legacy `Individual.adopted` predates per-edge styling and only ever meant
+      // adopted-IN. Upgrade ONLY links the old format left unset (`undefined`) —
+      // never overwrite an explicit biological edge (`false` = adopted-out), or we
+      // would revert adopted-out to adopted-in on every load.
+      if (link.childId === ind.id && link.isAdoptive === undefined) link.isAdoptive = true;
     }
   }
 

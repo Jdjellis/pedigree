@@ -170,4 +170,41 @@ describe('migrateAdoption', () => {
     const twice = JSON.stringify(migrateAdoption(doc));
     expect(twice).toBe(once);
   });
+
+  it('preserves an explicit biological edge (adopted-out) across multiple loads', () => {
+    // Regression for the unguarded step-2 bug: a person marked adopted:true
+    // whose parent link is explicitly isAdoptive:false (= adopted-out) must NOT
+    // be flipped back to adopted-in on load. This test would fail without the
+    // `&& link.isAdoptive === undefined` guard.
+    const doc = makeDocument();
+    // 'kid-1' has parent link 'link-1' in makeDocument().
+    doc.individuals['kid-1'] = { ...doc.individuals['kid-1'], adopted: true };
+    doc.parentChildLinks['link-1'] = { ...doc.parentChildLinks['link-1'], isAdoptive: false };
+
+    migrateAdoption(doc);
+    expect(doc.parentChildLinks['link-1'].isAdoptive).toBe(false);
+
+    // Run again to confirm true idempotency for the adopted-out case.
+    migrateAdoption(doc);
+    expect(doc.parentChildLinks['link-1'].isAdoptive).toBe(false);
+  });
+
+  it('migrates a link with only type="adoption" (no isAdopted field) to isAdoptive', () => {
+    // Exercises the `type === Adoption` branch of the OR in isolation —
+    // a link that used only the old type field and had no isAdopted property.
+    const doc = makeDocument();
+    (doc.parentChildLinks as Record<string, unknown>)['type-only'] = {
+      id: 'type-only',
+      type: 'adoption',
+      parentPartnershipId: 'p1',
+      childId: 'other-kid',
+    };
+
+    migrateAdoption(doc);
+
+    const link = doc.parentChildLinks['type-only'] as unknown as Record<string, unknown>;
+    expect(link.isAdoptive).toBe(true);
+    expect(link.type).toBe(RelationshipType.ParentChild);
+    expect('isAdopted' in link).toBe(false);
+  });
 });
