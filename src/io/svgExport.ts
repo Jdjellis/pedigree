@@ -597,11 +597,8 @@ function renderParentChildLines(
     const link = Object.values(parentChildLinks).find(
       (l) => l.parentPartnershipId === partnership.id && l.childId === child.id,
     );
-    // Mirror ParentChildLine.tsx: dash when adopted via the link flag OR the
-    // child individual's `adopted` toggle.
-    const isAdopted = (link?.isAdopted ?? false) || (child.adopted ?? false);
-    const [x1, y1, x2, y2] = childDrops[i];
-    parts.push(line(x1, y1, x2, y2, isAdopted));
+    // Mirror ParentChildLine.tsx: dash only an adoptive (non-biological) edge.
+    parts.push(line(...childDrops[i], link?.isAdoptive ?? false));
   });
 
   return parts.join('');

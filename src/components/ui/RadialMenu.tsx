@@ -140,7 +140,7 @@ export function RadialMenu() {
     };
     const link: ParentChildRelationship = {
       id: generateId(), type: RelationshipType.ParentChild,
-      parentPartnershipId: partnership.id, childId: target.id, isAdopted: false,
+      parentPartnershipId: partnership.id, childId: target.id,
     };
     addParentsForChild(parent1, parent2, partnership, link, target.id, childGeneration);
     hideRadialMenu();
@@ -200,7 +200,7 @@ export function RadialMenu() {
       };
       const link: ParentChildRelationship = {
         id: generateId(), type: RelationshipType.ParentChild,
-        parentPartnershipId: partnershipId, childId: child.id, isAdopted: false,
+        parentPartnershipId: partnershipId, childId: child.id,
       };
       addChildViaNewUnion(child, partnership, link);
       hideRadialMenu();
@@ -224,7 +224,7 @@ export function RadialMenu() {
     });
     const link: ParentChildRelationship = {
       id: generateId(), type: RelationshipType.ParentChild,
-      parentPartnershipId: partnership.id, childId: child.id, isAdopted: false,
+      parentPartnershipId: partnership.id, childId: child.id,
     };
     addChildToFamily(child, partnership.id, link);
     hideRadialMenu();
@@ -250,7 +250,7 @@ export function RadialMenu() {
       });
       const link: ParentChildRelationship = {
         id: generateId(), type: RelationshipType.ParentChild,
-        parentPartnershipId: partnership.id, childId: sibling.id, isAdopted: false,
+        parentPartnershipId: partnership.id, childId: sibling.id,
       };
       addChildToFamily(sibling, partnership.id, link);
       hideRadialMenu();
@@ -270,11 +270,11 @@ export function RadialMenu() {
     };
     const targetLink: ParentChildRelationship = {
       id: generateId(), type: RelationshipType.ParentChild,
-      parentPartnershipId: partnershipId, childId: target.id, isAdopted: false,
+      parentPartnershipId: partnershipId, childId: target.id,
     };
     const siblingLink: ParentChildRelationship = {
       id: generateId(), type: RelationshipType.ParentChild,
-      parentPartnershipId: partnershipId, childId: sibling.id, isAdopted: false,
+      parentPartnershipId: partnershipId, childId: sibling.id,
     };
     addSiblingViaNewUnion(target, sibling, partnership, targetLink, siblingLink);
     hideRadialMenu();
@@ -297,7 +297,7 @@ export function RadialMenu() {
       });
       const link: ParentChildRelationship = {
         id: generateId(), type: RelationshipType.ParentChild,
-        parentPartnershipId: partnership.id, childId: twin.id, isAdopted: false,
+        parentPartnershipId: partnership.id, childId: twin.id,
       };
       const twinGroup: TwinGroup = {
         id: generateId(), twinType,
@@ -322,11 +322,11 @@ export function RadialMenu() {
     };
     const targetLink: ParentChildRelationship = {
       id: generateId(), type: RelationshipType.ParentChild,
-      parentPartnershipId: partnershipId, childId: target.id, isAdopted: false,
+      parentPartnershipId: partnershipId, childId: target.id,
     };
     const siblingLink: ParentChildRelationship = {
       id: generateId(), type: RelationshipType.ParentChild,
-      parentPartnershipId: partnershipId, childId: twin.id, isAdopted: false,
+      parentPartnershipId: partnershipId, childId: twin.id,
     };
     const twinGroup: TwinGroup = {
       id: generateId(), twinType,

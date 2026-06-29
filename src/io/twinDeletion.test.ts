@@ -26,7 +26,6 @@ function link(id: string, partnershipId: string, childId: string): ParentChildRe
     type: RelationshipType.ParentChild,
     parentPartnershipId: partnershipId,
     childId,
-    isAdopted: false,
   };
 }
 

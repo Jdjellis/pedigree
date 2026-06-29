@@ -54,7 +54,6 @@ function makeFamily(): {
       type: RelationshipType.ParentChild,
       parentPartnershipId: partnershipId,
       childId,
-      isAdopted: false,
     };
   }
 
@@ -187,8 +186,8 @@ describe('hasParents with partnerless unions', () => {
     doc.individuals[a.id] = a;
     doc.individuals[b.id] = b;
     doc.partnerships['s1'] = { id: 's1', type: RelationshipType.Partnership, childrenIds: [a.id, b.id] };
-    doc.parentChildLinks['l1'] = { id: 'l1', type: RelationshipType.ParentChild, parentPartnershipId: 's1', childId: a.id, isAdopted: false };
-    doc.parentChildLinks['l2'] = { id: 'l2', type: RelationshipType.ParentChild, parentPartnershipId: 's1', childId: b.id, isAdopted: false };
+    doc.parentChildLinks['l1'] = { id: 'l1', type: RelationshipType.ParentChild, parentPartnershipId: 's1', childId: a.id };
+    doc.parentChildLinks['l2'] = { id: 'l2', type: RelationshipType.ParentChild, parentPartnershipId: 's1', childId: b.id };
     return { doc, aId: a.id };
   }
 

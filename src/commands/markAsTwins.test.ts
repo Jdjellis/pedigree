@@ -24,7 +24,6 @@ function seedSiblings(ids: string[]): void {
       type: RelationshipType.ParentChild,
       parentPartnershipId: 'u1',
       childId: id,
-      isAdopted: false,
     }),
   );
 }

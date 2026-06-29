@@ -46,29 +46,41 @@ function makeFamily(): PedigreeDocument {
     type: RelationshipType.ParentChild,
     parentPartnershipId: 'u1',
     childId: 'c1',
-    isAdopted: false,
   };
   doc.parentChildLinks.l2 = {
     id: 'l2',
     type: RelationshipType.ParentChild,
     parentPartnershipId: 'u1',
     childId: 'c2',
-    isAdopted: false,
   };
   return doc;
 }
 
 describe('SVG export — adoption notation', () => {
-  it('draws bracket polylines and dashes the descent for an adopted child', () => {
+  it('draws brackets and a DASHED descent for an adopted-IN child', () => {
     const doc = makeFamily();
     doc.individuals.c1 = { ...doc.individuals.c1, adopted: true };
+    doc.parentChildLinks.l1 = { ...doc.parentChildLinks.l1, isAdoptive: true };
 
-    const svg = buildPedigreeSvg(doc, 'Adoption');
+    const svg = buildPedigreeSvg(doc, 'Adopted in');
 
-    // Two bracket polylines (left + right) around the adopted symbol.
+    // Brackets around the adopted symbol (left + right polylines).
     expect((svg.match(/<polyline/g) ?? []).length).toBeGreaterThanOrEqual(2);
-    // The line of descent into the adopted child is dashed.
+    // Adoptive line of descent is dashed.
     expect(svg).toContain(`stroke-dasharray="${DASH_PATTERN.join(' ')}"`);
+  });
+
+  it('draws brackets and a SOLID descent for an adopted-OUT child', () => {
+    const doc = makeFamily();
+    doc.individuals.c1 = { ...doc.individuals.c1, adopted: true };
+    doc.parentChildLinks.l1 = { ...doc.parentChildLinks.l1, isAdoptive: false };
+
+    const svg = buildPedigreeSvg(doc, 'Adopted out');
+
+    // Brackets are still drawn (brackets = "was adopted", any direction).
+    expect((svg.match(/<polyline/g) ?? []).length).toBeGreaterThanOrEqual(2);
+    // Biological line of descent is solid → no dash array in the export.
+    expect(svg).not.toContain('stroke-dasharray');
   });
 
   it('does not draw brackets when nobody is adopted', () => {
