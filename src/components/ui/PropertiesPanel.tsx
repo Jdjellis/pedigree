@@ -6,6 +6,7 @@ import {
   SexAssignedAtBirth,
   VitalStatus,
 } from '../../types/enums';
+import { SegmentedControl } from './SegmentedControl';
 import { generateId } from '../../utils/idGenerator';
 import { collectInvestigations } from '../../utils/investigations';
 import {
@@ -34,6 +35,20 @@ const QUARTER_LABELS: Record<QuarterPosition, string> = {
   bottomLeft: 'Bottom-Left',
   bottomRight: 'Bottom-Right',
 };
+
+const VITAL_STATUS_OPTIONS: { value: VitalStatus; label: string }[] = [
+  { value: VitalStatus.Alive, label: 'Alive' },
+  { value: VitalStatus.Deceased, label: 'Deceased' },
+  { value: VitalStatus.Stillborn, label: 'Stillborn' },
+];
+
+type RoleValue = 'none' | 'proband' | 'consultand';
+
+const ROLE_OPTIONS: { value: RoleValue; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'proband', label: 'Proband' },
+  { value: 'consultand', label: 'Consultand' },
+];
 
 export function PropertiesPanel() {
   const selectedIds = useUIStore((s) => s.selectedIds);
@@ -573,19 +588,11 @@ export function PropertiesPanel() {
 
         <div className={styles.field}>
           <label className={styles.label}>Status</label>
-          <select
-            className={styles.select}
+          <SegmentedControl
+            options={VITAL_STATUS_OPTIONS}
             value={individual.vitalStatus}
-            onChange={(e) =>
-              update({
-                vitalStatus: e.target.value as VitalStatus,
-              })
-            }
-          >
-            <option value={VitalStatus.Alive}>Alive</option>
-            <option value={VitalStatus.Deceased}>Deceased</option>
-            <option value={VitalStatus.Stillborn}>Stillborn</option>
-          </select>
+            onChange={(v) => update({ vitalStatus: v })}
+          />
         </div>
 
         <div className={styles.field}>
@@ -631,8 +638,8 @@ export function PropertiesPanel() {
 
         <div className={styles.field}>
           <label className={styles.label}>Role</label>
-          <select
-            className={styles.select}
+          <SegmentedControl
+            options={ROLE_OPTIONS}
             value={
               individual.isProband
                 ? 'proband'
@@ -640,18 +647,13 @@ export function PropertiesPanel() {
                   ? 'consultand'
                   : 'none'
             }
-            onChange={(e) => {
-              const val = e.target.value;
+            onChange={(v) =>
               update({
-                isProband: val === 'proband',
-                isConsultand: val === 'consultand',
-              });
-            }}
-          >
-            <option value="none">None</option>
-            <option value="proband">Proband</option>
-            <option value="consultand">Consultand</option>
-          </select>
+                isProband: v === 'proband',
+                isConsultand: v === 'consultand',
+              })
+            }
+          />
         </div>
       </div>
 
