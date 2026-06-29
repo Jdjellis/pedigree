@@ -41,31 +41,56 @@ an evenly-spaced row centred under its parents, recursively."**
   layout with no manual cleanup for the common cases.
 - Each sibship is centred under its parents, at every generation, including
   single-parent unions.
-- Dragging a node and dropping it never leaves it overlapping another node or
-  sitting inside a partnership; same-generation neighbours adjust to make room.
-- The whole operation (insert + relayout) remains a single undo step.
-- Layout is **deterministic from the relationship graph** — path-independent and
-  idempotent (re-running on a tidy tree is a no-op, no jitter).
+- Dragging a node can only **reorder** it horizontally within its generation; it
+  can never be dropped overlapping another node or inside a partnership.
+- The whole operation (insert/drag + relayout) remains a single undo step.
+- Layout is **deterministic from the relationship graph + current left-to-right
+  order** — path-independent and idempotent (re-running on a tidy tree is a
+  no-op, no jitter).
+
+## Decisions (resolved during brainstorming)
+
+- **Approach:** deterministic tidy layout (not targeted patches).
+- **Auto-layout wins:** each structural add (and each drag) re-tidies the
+  affected family from its structure. There is no per-node manual-position
+  pinning.
+- **Order-preserving relayout (safety refinement 1):** the tidy pass orders
+  siblings and partners by their **current x**, so manual *ordering* and partner
+  sides survive a relayout even though exact spacing is normalised. This is what
+  makes "drag to reorder" meaningful.
+- **Load-bearing in-law guard (safety refinement 2):** an in-law (married-in
+  partner) that has its *own* parents present in the document is treated as a
+  fixed anchor — the blood tree lays out relative to it rather than dragging it
+  away from its own family.
+- **Drag is a reorder gesture (constrain):** drag is horizontal-only (y locked
+  to the generation row); the drop position sets order; the same tidy engine
+  settles final positions. No separate drag-respace path.
+- **Packaging:** one PR.
 
 ## Non-goals
 
 - General pedigree-graph layout with consanguinity loops or a person marrying
-  into two families. Multi-union (remarriage) is handled best-effort, not
-  fully solved; documented as a known limitation.
-- Cross-*generation* overlap resolution on drag (drag respaces only the dropped
-  node's generation, per the agreed scope).
-- Manual-position pinning. Per decision, **auto-layout wins**: each structural
-  add re-tidies the affected family from its structure; a prior manual drag
-  within that family is recomputed by the next add to it.
+  into two families. Multi-union (remarriage) is handled best-effort, not fully
+  solved; documented as a known limitation.
+- Free pixel-placement by drag. Drag controls *order*, not absolute position; a
+  node cannot be parked at a deliberately non-tidy spot. This is an accepted
+  consequence of "auto-layout wins".
+- Re-parenting by drag (dragging a node into a different family). Drag reorders
+  within the node's existing sibship / swaps partner sides only.
 
 ## Design
 
 ### Coordinate model
 
-Layout computes **x only**. `y` continues to be derived from `generation`
-(`generation × GENERATION_SPACING` offset from the family anchor, as set today in
-`RadialMenu.tsx`). The whole problem is therefore a 1-D horizontal packing
-problem, matching the altitude of the existing `respacing.ts` module.
+The tidy engine owns **both axes**:
+- **x** — computed by the tidy-tree packing below.
+- **y** — normalised to one row per generation:
+  `y = rootY + (generation − rootGeneration) × GENERATION_SPACING`. This
+  guarantees every generation is a straight horizontal line, which is what makes
+  "drag horizontally within the row" well-defined.
+
+Anchoring (below) keeps the canvas stable so assigning both axes does not make
+the chart jump.
 
 ### The blood tree
 
@@ -73,7 +98,8 @@ The recursive unit is the **blood tree** rooted at the affected family's
 founder. Married-in partners (in-laws) are not blood descendants; they ride
 along beside their spouse. This is exactly the split `collectDescendants`
 already models (it walks children through partnerships but excludes partners
-married into the line).
+married into the line). Exception: a **load-bearing in-law** (one with its own
+parents present) is pinned, not floated (safety refinement 2).
 
 ### New module: `src/utils/treeLayout.ts` (pure)
 
@@ -83,7 +109,8 @@ A two-pass tidy-tree (Reingold–Tilford reduced to 1-D):
 1. Recursively lay out each child's subtree. Each subtree reports
    `{ center, leftExtent, rightExtent }` where the extents are the min/max node
    *center* x within that subtree.
-2. Place sibling subtrees left-to-right so that
+2. Order the children **by their current x** (safety refinement 1), then place
+   their subtrees left-to-right so that
    `nextBlock.leftExtent ≥ prevBlock.rightExtent + SIBLING_SPACING`. Leaf
    siblings (no descendants) have `leftExtent === rightExtent === center`, so
    adjacent leaves end up exactly `SIBLING_SPACING` apart — matching today's
@@ -92,16 +119,16 @@ A two-pass tidy-tree (Reingold–Tilford reduced to 1-D):
 4. Seat the union's partners centred on `sibshipCenter`: two partners at
    `sibshipCenter ∓ PARTNER_SPACING / 2`; a sole parent at `sibshipCenter`;
    a 0-partner (parentless) sibship has no partners and is centred on its own
-   children's centroid. Preserve each couple's existing left/right order (don't
-   flip partners).
+   children's centroid. Partner left/right order is taken from current x, so a
+   manual side-swap survives.
 5. The union's subtree extent spans both the partners and the children blocks.
 
 **Pass 2 — assign (pre-order).** Walk down assigning absolute x from relative
 offsets, then translate the entire result so the **layout root keeps its current
-x** (the canvas does not jump on relayout). "Root x" means: for a founder
-individual, that individual's pre-layout x; for a parentless-sibship root, the
-pre-layout centroid of the sibship's children. The single translation that
-satisfies this is applied to every moved node.
+x**. "Root x" means: for a founder individual, that individual's pre-layout x;
+for a parentless-sibship root, the pre-layout centroid of the sibship's children.
+The single translation that satisfies this is applied to every moved node. `y`
+is assigned per generation row (see coordinate model).
 
 **Consequences (by construction):**
 - One tree packs into disjoint horizontal intervals → no cross-sibship overlap
@@ -110,100 +137,93 @@ satisfies this is applied to every moved node.
   sole-parent case (fixes #4).
 - A newly added sibling just re-packs its row, so which side it was seeded on no
   longer matters (fixes #1).
-- Same structure → same layout, always (path-independent, idempotent).
+- A dragged node re-packs into the order implied by its dropped x, never
+  overlapping (fixes #3).
+- Same structure + same order → same layout, always (path-independent,
+  idempotent).
 
 **Helpers (each unit-tested in isolation):**
 - `findLayoutRoot(doc, nodeId): string` — walk parent links upward to the
   founder of the connected blood family containing `nodeId`. For a parentless
   sibship, the root is the sibship itself (anchor on its centroid).
+- `orderChildrenByX(childIds, individuals): string[]` — safety refinement 1.
 - `placeSiblingBlocks(childLayouts, siblingSpacing): Placed[]` — the edge-gap
   packing of pass-1 step 2.
 - `centerCoupleOver(sibshipCenter, partners, partnerSpacing): Record<id, number>`
-  — pass-1 step 4.
+  — pass-1 step 4, preserving current side order.
+- `isLoadBearingInLaw(doc, inLawId): boolean` — safety refinement 2.
 - `layoutUnionSubtree(...)` — the recursion; returns member offsets + extents.
-- `computeTreeLayout(individuals, partnerships, parentChildLinks, rootId,
-  spacing): Record<id, number>` — top-level; returns id → new x for every node
-  in the rooted blood tree plus the in-law partners attached to it. Only nodes
-  whose x actually changes are returned (so callers can detect no-ops).
+- `computeTreeLayout(doc, rootId, spacing): Record<id, {x, y}>` — top-level;
+  returns id → new position for every node in the rooted blood tree plus the
+  in-law partners attached to it. Only nodes whose position actually changes are
+  returned (so callers can detect no-ops / idempotence).
 
 ### Store wiring (`src/stores/pedigreeStore.ts`)
 
-One orchestration helper:
+One orchestration helper used by **both** adds and drag:
 
 ```
-relayoutFamily(individuals, partnerships, parentChildLinks, anchorId)
+relayoutFamily(document, anchorId)
   → Record<string, Individual>   // new individuals map with moves applied
 ```
 
 It resolves `findLayoutRoot(anchorId)`, runs `computeTreeLayout`, and applies the
-moves via the existing `applyMoves`. Every add operation
-(`addParentsForChild`, `addPartnerToIndividual`, `addChildToFamily`,
-`addSiblingViaNewUnion`, `addChildViaNewUnion`, `addParentsToParentlessUnion`)
-inserts the new node(s) and then calls `relayoutFamily` **inside the same
-`set(...)`** so insert + relayout collapse into one zundo history entry.
+moves via the existing `applyMoves` (extended to carry y as well as x).
 
-`RadialMenu.tsx` initial-x computation becomes a seed only (it still sets
-`generation` and `y`); the tidy pass owns final x. The seed placement logic
-simplifies accordingly (no more side guessing for siblings).
+- **Adds.** Every add operation (`addParentsForChild`,
+  `addPartnerToIndividual`, `addChildToFamily`, `addSiblingViaNewUnion`,
+  `addChildViaNewUnion`, `addParentsToParentlessUnion`) inserts the new node(s)
+  and then calls `relayoutFamily` **inside the same `set(...)`** so insert +
+  relayout collapse into one zundo history entry. `RadialMenu.tsx` initial
+  placement becomes a seed only (it still establishes structure + a rough x to
+  set order); the tidy pass owns final position, so the side-guessing logic for
+  siblings is removed.
+- **Drag.** On commit, the dragged node's x (set by the horizontal-only drag)
+  determines its order; `relayoutFamily` then settles the family. This replaces
+  the direct position commit in `symbolDrag.ts` with a store action
+  (`commitDragWithRelayout`) so the dropped order + the settle land in one
+  tracked update — preserving the existing "whole drag is one undo step"
+  invariant.
 
-### Drag — respace on drop (`src/utils/respacing.ts` + `symbolDrag.ts`)
+### Drag input (`symbolDrag.ts` + the Konva symbol handler)
 
-New pure function:
-
-```
-respaceAfterDrag(individuals, partnerships, draggedId, minSpacing)
-  → Record<string, number>   // id → new x for neighbours pushed aside
-```
-
-- Anchor the dropped node at the position the user left it.
-- Group the dropped node's generation into **rigid couple-blocks** via union-find
-  (extracted from `makeRoomForPartner`'s existing block logic into a shared
-  `groupGenerationIntoBlocks` helper).
-- Push only the blocks that overlap the dropped node **outward** — blocks to the
-  left move further left, blocks to the right move further right — until every
-  gap is ≥ `minSpacing`. Each pushed block carries its subtree
-  (`collectDescendants`) so families don't tear.
-
-Result: dropping on top of someone separates them (Image 4); dropping inside a
-union pushes the *whole couple* aside rather than splitting it (Image 3).
-
-Wired into the drag commit (`commitSymbolDrag` / a store action
-`commitDragWithRespace`) so the dropped position and the neighbour respace land
-in one tracked update — preserving the existing "whole drag is one undo step"
-invariant.
+- Constrain live drag motion to **horizontal only**: the node's y is frozen at
+  its generation-row value for the duration of the drag.
+- On release, commit via `commitDragWithRelayout(id, droppedX)`.
+- No `respaceAfterDrag` / couple-block-push logic is needed — the tidy engine
+  handles seating.
 
 ### Retired
 
-Subsumed by the tidy pass and removed, with scenario-specific tests migrated to
-the new functions:
-- `makeRoomForPartner` (block-grouping logic extracted, not lost)
+`src/utils/respacing.ts` is superseded by `treeLayout.ts`. Removed (with their
+tests migrated or replaced by `treeLayout` tests):
+- `respaceRow`, `respaceGeneration`, `respaceGenerationWithSubtrees`
+- `makeRoomForPartner`
 - `computeParentClearanceShift`
 - `centerParentsOverChildren`
-- `respaceGenerationWithSubtrees`
 
-Kept and reused: `collectDescendants`, `respaceRow`, and the extracted
-`groupGenerationIntoBlocks` helper.
+Retained: `collectDescendants` (moves into `treeLayout.ts`, reused by the
+recursion). If nothing else imports `respacing.ts` afterwards, the file is
+deleted.
 
 ## Testing (TDD)
 
 Red → green on the pure helpers first, then store-integration tests, then drag.
 
 **Pure `treeLayout.ts`:**
+- `orderChildrenByX`: returns children sorted by current x; stable for ties.
 - `placeSiblingBlocks`: leaves end exactly `SIBLING_SPACING` apart; subtrees with
   width are separated by their extents + spacing; empty / single inputs.
-- `centerCoupleOver`: two partners, sole parent, preserves partner order, no-op
-  when already centred.
+- `centerCoupleOver`: two partners, sole parent, preserves partner side order,
+  no-op when already centred.
 - `findLayoutRoot`: walks to founder; parentless sibship returns itself;
   married-in branch resolves to the blood founder.
-- `computeTreeLayout`: idempotent (tidy tree in → no moves out); root x
-  preserved; even vs odd child counts; child subtrees carried; centring
-  propagates up two+ generations.
-
-**Pure `respacing.ts`:**
-- `groupGenerationIntoBlocks`: couples grouped, singletons alone.
-- `respaceAfterDrag`: drop-on-top separates to `minSpacing`; drop-in-union pushes
-  whole couple aside (not split); already-clear neighbours untouched; pushed
-  block carries its subtree; pushes both directions.
+- `isLoadBearingInLaw`: true when the in-law has a present parent union; false
+  otherwise.
+- `computeTreeLayout`: **idempotent** (tidy tree in → no moves out); root
+  position preserved; even vs odd child counts; child subtrees carried; centring
+  propagates up two+ generations; y normalised to generation rows; a
+  load-bearing in-law is not relocated.
 
 **Store integration — one per scenario + edges:**
 - S1: sibling added to a partnered person ends outside the union, sibship
@@ -214,16 +234,27 @@ Red → green on the pure helpers first, then store-integration tests, then drag
   overlap; both sibships centred under their own parents.
 - S4: add siblings repeatedly — row stays centred under the parent (single and
   couple), existing siblings shift left; sole-parent case included.
+- Order preservation: after a manual reorder (sibling x's swapped), a subsequent
+  add keeps the new order.
 - Invariants: every add + relayout is a single undo step; relayout of an
   already-tidy family is a no-op.
-- S3 (drag): drop a node onto another → separated; drop into a union → couple
-  parts, node seated; whole drag remains one undo step.
+
+**Drag (S3):**
+- Horizontal-only: a drag that moves y is committed with y back on the row.
+- Drop a node onto another → it reorders to an adjacent slot, no overlap.
+- Drop a node "inside" a couple → it seats beside them in order; the couple is
+  not split.
+- Drop past a sibling → siblings reorder; row re-centres under the parent.
+- The whole drag remains a single undo step.
 
 ## Open risks / notes
 
-- Multi-union (remarriage) layout is best-effort: each union's sibship is laid
-  out and placed adjacently under the shared blood parent, in-laws flanking. Not
-  covered by dedicated scenario tests; documented limitation.
-- Anchoring on the layout root keeps the canvas stable but means a large family
-  re-tidy can move many nodes at once on a single add. Accepted per the
-  "auto-layout wins" decision.
+- **Broad motion (R2).** Re-tidying the whole connected family means one add or
+  drag can shift distant branches. Accepted per "auto-layout wins". A later
+  optimisation could scope the relayout to the edited sibship + its spine.
+- **Multi-union / joined families (R3).** The single-root tidy pass lays out one
+  blood tree; the load-bearing-in-law guard prevents the worst breakage (an
+  in-law torn from its own family), but two deeply-interlinked blood trees are
+  not jointly optimised. Documented best-effort.
+- **No free placement.** Drag cannot park a node off-grid; only order is
+  user-controlled. Accepted consequence of the tidy model.
