@@ -62,17 +62,15 @@ export function ParentChildLine({
     const link = Object.values(parentChildLinks).find(
       (l) => l.parentPartnershipId === partnership.id && l.childId === child.id,
     );
-    // Dash the line of descent when the child is adopted, sourced from either the
-    // link's flag (adoption created via the link popup) or the individual's
-    // `adopted` toggle (properties panel). See NSGC/Bennett adoption notation.
-    const isAdopted = (link?.isAdopted ?? false) || (child.adopted ?? false);
+    // Dash the line of descent only for an adoptive (non-biological) edge, per
+    // NSGC/Bennett. Brackets on the child are handled separately in the symbol.
     lines.push(
       <Line
         key={`drop-${child.id}`}
         points={childDrops[i]}
         stroke={LINE_COLOR}
         strokeWidth={LINE_WIDTH}
-        dash={isAdopted ? DASH_PATTERN : undefined}
+        dash={link?.isAdoptive ? DASH_PATTERN : undefined}
       />,
     );
   });

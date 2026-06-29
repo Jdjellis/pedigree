@@ -71,7 +71,6 @@ describe('exportToPed', () => {
       type: RelationshipType.ParentChild,
       parentPartnershipId: 'p1',
       childId: child.id,
-      isAdopted: false,
     };
 
     const childRow = exportToPed(doc)
@@ -193,7 +192,6 @@ describe('PED round-trip', () => {
       type: RelationshipType.ParentChild,
       parentPartnershipId: 'p1',
       childId: child.id,
-      isAdopted: false,
     };
 
     const reimported = importFromPed(exportToPed(doc));

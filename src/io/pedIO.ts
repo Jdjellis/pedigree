@@ -164,7 +164,6 @@ export function importFromPed(
       type: RelationshipType.ParentChild,
       parentPartnershipId: partnershipUuid,
       childId: childUuid,
-      isAdopted: false,
     };
   }
 

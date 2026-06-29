@@ -49,7 +49,6 @@ function parentChildLink(
     type: RelationshipType.ParentChild,
     parentPartnershipId,
     childId,
-    isAdopted: false,
   };
 }
 

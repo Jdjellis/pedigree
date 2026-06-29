@@ -93,7 +93,6 @@ function makeFixture(): PedigreeDocument {
         type: RelationshipType.ParentChild,
         parentPartnershipId: 'pship-1',
         childId: 'child',
-        isAdopted: false,
       },
     },
     twinGroups: {},
@@ -314,8 +313,8 @@ describe('parentless sibship rendering', () => {
       { a, b },
       { u1: { id: 'u1', type: RelationshipType.Partnership, childrenIds: ['a', 'b'] } },
       {
-        l1: { id: 'l1', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'a', isAdopted: false },
-        l2: { id: 'l2', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'b', isAdopted: false },
+        l1: { id: 'l1', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'a' },
+        l2: { id: 'l2', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'b' },
       },
     );
     const svg = buildPedigreeSvg(doc);
@@ -336,7 +335,7 @@ describe('single-parent union rendering', () => {
     const doc = minimalDoc(
       { p: parent, c: child },
       { u1: { id: 'u1', type: RelationshipType.Partnership, partner1Id: 'p', childrenIds: ['c'] } },
-      { l1: { id: 'l1', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'c', isAdopted: false } },
+      { l1: { id: 'l1', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'c' } },
     );
     const svg = buildPedigreeSvg(doc);
     const midY = 100 + (250 - 100) / 2; // 175

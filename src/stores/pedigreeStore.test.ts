@@ -268,7 +268,6 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
       type: RelationshipType.ParentChild,
       parentPartnershipId,
       childId,
-      isAdopted: false,
     };
   }
 
@@ -553,7 +552,7 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
 });
 
 function parentChildLink(partnershipId: string, childId: string): ParentChildRelationship {
-  return { id: generateId(), type: RelationshipType.ParentChild, parentPartnershipId: partnershipId, childId, isAdopted: false };
+  return { id: generateId(), type: RelationshipType.ParentChild, parentPartnershipId: partnershipId, childId };
 }
 
 describe('addSiblingViaNewUnion', () => {

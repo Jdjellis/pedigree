@@ -133,7 +133,6 @@ export interface PartnershipRelationship {
   partner1Id?: string;
   partner2Id?: string;
   childrenIds: string[];
-  isAdoptive?: boolean;
   /**
    * Free-text degree of relationship for a consanguineous union (e.g.
    * "1st cousins"), rendered above the double partnership line. Only
@@ -144,10 +143,15 @@ export interface PartnershipRelationship {
 
 export interface ParentChildRelationship {
   id: string;
-  type: RelationshipType.ParentChild | RelationshipType.Adoption;
+  type: RelationshipType.ParentChild;
   parentPartnershipId: string;
   childId: string;
-  isAdopted: boolean;
+  /**
+   * Line-of-descent style for this edge, per NSGC/Bennett: `true` → adoptive
+   * parents (dashed line), `false`/absent → biological parents (solid line).
+   * Brackets around the child are separate ({@link Individual.adopted}).
+   */
+  isAdoptive?: boolean;
 }
 
 export interface TwinGroup {
