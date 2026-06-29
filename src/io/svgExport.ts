@@ -550,6 +550,7 @@ function renderParentChildLines(
   partnership: PartnershipRelationship,
   individuals: Record<string, Individual>,
   parentChildLinks: Record<string, ParentChildRelationship>,
+  twinGroups: Record<string, TwinGroup>,
 ): string {
   if (partnership.childrenIds.length === 0) return '';
 
@@ -577,7 +578,14 @@ function renderParentChildLines(
   if (parentDrop) parts.push(line(...parentDrop));
   if (sibship) parts.push(line(...sibship));
 
+  // Twin members are connected by renderTwinConnector — skip their individual
+  // drops to avoid overlaying a plain bracket on top of the converging twin lines.
+  const twinMemberIds = new Set(
+    Object.values(twinGroups).flatMap((tg) => tg.individualIds),
+  );
+
   children.forEach((child, i) => {
+    if (twinMemberIds.has(child.id)) return;
     const link = Object.values(parentChildLinks).find(
       (l) => l.parentPartnershipId === partnership.id && l.childId === child.id,
     );
@@ -897,7 +905,7 @@ export function buildPedigreeSvg(doc: PedigreeDocument, title = ''): string {
   }
   for (const partnership of Object.values(doc.partnerships)) {
     connectionMarkup.push(
-      renderParentChildLines(partnership, doc.individuals, doc.parentChildLinks),
+      renderParentChildLines(partnership, doc.individuals, doc.parentChildLinks, doc.twinGroups),
     );
   }
   for (const twinGroup of Object.values(doc.twinGroups)) {

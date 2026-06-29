@@ -5,6 +5,7 @@ import {
   GenderIdentity,
   VitalStatus,
   RelationshipType,
+  TwinType,
 } from '../types/enums';
 import { PARENTLESS_SIBSHIP_RISE } from '../utils/constants';
 
@@ -326,6 +327,98 @@ describe('parentless sibship rendering', () => {
     expect(svg).toContain(`<line x1="200" y1="${barY}" x2="200" y2="300"`); // drop to b
     // No descent line rises above the bar.
     expect(svg).not.toContain(`y2="${barY - 1}"`);
+  });
+});
+
+describe('twin connector rendering (issue #54)', () => {
+  function makeTwinDoc(twinType: TwinType): PedigreeDocument {
+    // Father + mother at y=100; two twins at y=250.
+    const father = person('father', 100, 100);
+    const mother = person('mother', 220, 100);
+    const twin1 = person('twin1', 130, 250);
+    const twin2 = person('twin2', 190, 250);
+    const sibshipY = 100 + (250 - 100) / 2; // 175
+
+    return {
+      metadata: { id: 'd', title: 'T', createdAt: '2026-06-27T00:00:00.000Z', updatedAt: '2026-06-27T00:00:00.000Z', version: '1.0.0' },
+      individuals: { father, mother, twin1, twin2 },
+      partnerships: {
+        'pship-1': {
+          id: 'pship-1',
+          type: RelationshipType.Partnership,
+          partner1Id: 'father',
+          partner2Id: 'mother',
+          childrenIds: ['twin1', 'twin2'],
+        },
+      },
+      parentChildLinks: {
+        'pc-1': { id: 'pc-1', type: RelationshipType.ParentChild, parentPartnershipId: 'pship-1', childId: 'twin1', isAdopted: false },
+        'pc-2': { id: 'pc-2', type: RelationshipType.ParentChild, parentPartnershipId: 'pship-1', childId: 'twin2', isAdopted: false },
+      },
+      twinGroups: {
+        'tg-1': {
+          id: 'tg-1',
+          twinType,
+          individualIds: ['twin1', 'twin2'],
+          parentPartnershipId: 'pship-1',
+        },
+      },
+      textAnnotations: {},
+      generationOrder: [],
+      legendConfig: { entries: [], position: { x: 0, y: 0 } },
+      // sibshipY exposed for assertions in tests
+      _sibshipY: sibshipY,
+    } as unknown as PedigreeDocument & { _sibshipY: number };
+  }
+
+  it('does not render individual child-drops for MZ twin members', () => {
+    const doc = makeTwinDoc(TwinType.Monozygotic);
+    const svg = buildPedigreeSvg(doc);
+    const sibshipY = 175;
+
+    // The parentDrop and sibship bar must still be drawn (they anchor the TwinConnector).
+    expect(svg).toContain(`y2="${sibshipY}"`); // parentDrop lands at sibshipY
+
+    // Individual straight-down drops from sibshipY to each twin must NOT appear
+    // (that is the bug — they would overlay the TwinConnector V-lines).
+    expect(svg).not.toContain(`<line x1="130" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).not.toContain(`<line x1="190" y1="${sibshipY}" x2="190" y2="250"`);
+
+    // TwinConnector V-lines from the apex (midpoint=160) to each twin must be present.
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="190" y2="250"`);
+  });
+
+  it('does not render individual child-drops for DZ twin members', () => {
+    const doc = makeTwinDoc(TwinType.Dizygotic);
+    const svg = buildPedigreeSvg(doc);
+    const sibshipY = 175;
+
+    expect(svg).not.toContain(`<line x1="130" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).not.toContain(`<line x1="190" y1="${sibshipY}" x2="190" y2="250"`);
+
+    // DZ V-lines from apex (no MZ bar).
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).toContain(`<line x1="160" y1="${sibshipY}" x2="190" y2="250"`);
+  });
+
+  it('still renders a normal drop for a non-twin sibling alongside twins', () => {
+    const doc = makeTwinDoc(TwinType.Monozygotic);
+    // Add a non-twin sibling at x=50, y=250.
+    doc.individuals['sibling'] = person('sibling', 50, 250);
+    doc.partnerships['pship-1'].childrenIds.push('sibling');
+    doc.parentChildLinks['pc-3'] = {
+      id: 'pc-3', type: RelationshipType.ParentChild, parentPartnershipId: 'pship-1', childId: 'sibling', isAdopted: false,
+    };
+
+    const svg = buildPedigreeSvg(doc);
+    const sibshipY = 175;
+
+    // Non-twin sibling still gets a straight drop.
+    expect(svg).toContain(`<line x1="50" y1="${sibshipY}" x2="50" y2="250"`);
+    // Twin members still do NOT.
+    expect(svg).not.toContain(`<line x1="130" y1="${sibshipY}" x2="130" y2="250"`);
+    expect(svg).not.toContain(`<line x1="190" y1="${sibshipY}" x2="190" y2="250"`);
   });
 });
 

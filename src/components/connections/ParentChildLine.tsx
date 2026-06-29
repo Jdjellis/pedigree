@@ -4,6 +4,7 @@ import type {
   Individual,
   PartnershipRelationship,
   ParentChildRelationship,
+  TwinGroup,
 } from '../../types/pedigree';
 import { LINE_COLOR, LINE_WIDTH, DASH_PATTERN } from '../../utils/constants';
 import { getPresentPartners } from '../../utils/graphTraversal';
@@ -16,12 +17,14 @@ interface ParentChildLineProps {
   partnership: PartnershipRelationship;
   individuals: Record<string, Individual>;
   parentChildLinks: Record<string, ParentChildRelationship>;
+  twinGroups: Record<string, TwinGroup>;
 }
 
 export function ParentChildLine({
   partnership,
   individuals,
   parentChildLinks,
+  twinGroups,
 }: ParentChildLineProps) {
   const children = partnership.childrenIds
     .map((id) => individuals[id])
@@ -58,7 +61,14 @@ export function ParentChildLine({
     );
   }
 
+  // Twin members are connected by TwinConnector — skip their individual drops to
+  // avoid overlaying a plain bracket on top of the converging twin lines.
+  const twinMemberIds = new Set(
+    Object.values(twinGroups).flatMap((tg) => tg.individualIds),
+  );
+
   children.forEach((child, i) => {
+    if (twinMemberIds.has(child.id)) return;
     const link = Object.values(parentChildLinks).find(
       (l) => l.parentPartnershipId === partnership.id && l.childId === child.id,
     );
