@@ -40,14 +40,15 @@ function UnknownSymbol() {
 interface GenderOption {
   value: GenderIdentity;
   label: string;
+  initial: string;
   Symbol: () => ReactElement;
 }
 
 const GENDER_OPTIONS: GenderOption[] = [
-  { value: GenderIdentity.Man, label: 'Man', Symbol: SquareSymbol },
-  { value: GenderIdentity.Woman, label: 'Woman', Symbol: CircleSymbol },
-  { value: GenderIdentity.NonBinary, label: 'Non-binary', Symbol: DiamondSymbol },
-  { value: GenderIdentity.Unknown, label: 'Unknown', Symbol: UnknownSymbol },
+  { value: GenderIdentity.Man, label: 'Male', initial: 'M', Symbol: SquareSymbol },
+  { value: GenderIdentity.Woman, label: 'Female', initial: 'F', Symbol: CircleSymbol },
+  { value: GenderIdentity.NonBinary, label: 'Non-binary', initial: 'NB', Symbol: DiamondSymbol },
+  { value: GenderIdentity.Unknown, label: 'Unknown', initial: '', Symbol: UnknownSymbol },
 ];
 
 interface GenderIconButtonsProps {
@@ -58,16 +59,18 @@ interface GenderIconButtonsProps {
 export function GenderIconButtons({ value, onChange }: GenderIconButtonsProps) {
   return (
     <div className={styles.grid} role="group" aria-label="Gender identity">
-      {GENDER_OPTIONS.map(({ value: opt, label, Symbol }) => (
+      {GENDER_OPTIONS.map(({ value: opt, label, initial, Symbol }) => (
         <button
           key={opt}
           type="button"
+          title={label}
           className={`${styles.iconButton} ${opt === value ? styles.iconButtonActive : ''}`}
           aria-pressed={opt === value}
           aria-label={label}
           onClick={() => onChange(opt)}
         >
           <Symbol />
+          {initial && <span className={styles.iconInitial}>{initial}</span>}
         </button>
       ))}
     </div>

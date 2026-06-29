@@ -6,9 +6,11 @@
 
 .iconButton {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 4px;
+  gap: 3px;
+  padding: 7px 4px 5px;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -25,4 +27,11 @@
 .iconButtonActive {
   border-color: var(--color-primary);
   color: var(--color-primary);
+}
+
+.iconInitial {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: 0.03em;
 }
