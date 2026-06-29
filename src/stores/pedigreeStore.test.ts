@@ -884,7 +884,7 @@ describe('setLinkAdoptive', () => {
   });
 
   it('is a no-op for an unknown link id', () => {
-    const linkId = seedLink();
+    seedLink();
     const before = usePedigreeStore.getState().document;
     usePedigreeStore.getState().setLinkAdoptive('does-not-exist', true);
     expect(usePedigreeStore.getState().document).toBe(before);

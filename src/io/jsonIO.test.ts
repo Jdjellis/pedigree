@@ -147,7 +147,7 @@ describe('migrateAdoption', () => {
 
     migrateAdoption(doc);
 
-    const link = doc.parentChildLinks.legacy as Record<string, unknown>;
+    const link = doc.parentChildLinks.legacy as unknown as Record<string, unknown>;
     expect(link.isAdoptive).toBe(true);
     expect(link.type).toBe(RelationshipType.ParentChild);
     expect('isAdopted' in link).toBe(false);
