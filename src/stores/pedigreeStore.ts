@@ -203,6 +203,8 @@ interface PedigreeState {
   updateIndividual: (id: string, patch: Partial<Individual>) => void;
   removeIndividual: (id: string) => void;
   moveIndividual: (id: string, position: Position) => void;
+  /** Commit a drag: set the dropped position, then re-tidy the family (one undo step). */
+  commitDragWithRelayout: (id: string, position: Position) => void;
 
   // Partnership actions
   addPartnership: (partnership: PartnershipRelationship) => void;
@@ -417,6 +419,31 @@ export const usePedigreeStore = create<PedigreeState>()(
                 ...state.document.individuals,
                 [id]: { ...existing, position },
               },
+            },
+          };
+        }),
+
+      commitDragWithRelayout: (id, position) =>
+        set((state) => {
+          const existing = state.document.individuals[id];
+          if (!existing) return state;
+          let individuals: Record<string, Individual> = {
+            ...state.document.individuals,
+            [id]: { ...existing, position },
+          };
+          individuals = relayoutFamily(
+            {
+              individuals,
+              partnerships: state.document.partnerships,
+              parentChildLinks: state.document.parentChildLinks,
+            },
+            id,
+          );
+          return {
+            document: {
+              ...state.document,
+              metadata: { ...state.document.metadata, updatedAt: new Date().toISOString() },
+              individuals,
             },
           };
         }),
