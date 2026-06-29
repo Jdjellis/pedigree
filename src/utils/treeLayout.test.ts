@@ -5,6 +5,7 @@ import {
   findRootUnion,
   coupleAround,
   packBlocks,
+  computeTreeLayout,
   type LayoutDoc,
 } from './treeLayout';
 import type { Individual, PartnershipRelationship, ParentChildRelationship } from '../types/pedigree';
@@ -99,8 +100,6 @@ describe('packBlocks', () => {
   });
 });
 
-import { computeTreeLayout } from './treeLayout';
-
 describe('computeTreeLayout — centring', () => {
   it('centres a sole parent over a fanned-right sibling row (scenario 4)', () => {
     // Parent p (gen 0) at x=0; three children fanned right at 0,80,160 (gen 1).
@@ -161,5 +160,75 @@ describe('computeTreeLayout — centring', () => {
     const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'u');
     // Root p at gen 0, y=0; gen 1 row sits at y = 0 + 1*150 = 150.
     expect(moved.c2?.y).toBe(150);
+  });
+});
+
+describe('computeTreeLayout — clearance & cross-sibship', () => {
+  it('keeps a sibling clear of the target\'s partner (scenario 1)', () => {
+    // Parentless sibship {target, sib}; target also has partner (in-law).
+    // Seeded: target 0, partner 120 (right), sibling 80 (between them — the bug).
+    const individuals = {
+      target: ind('target', 0, 0),
+      partner: ind('partner', 120, 0),
+      sib: ind('sib', 80, 0),
+    };
+    const partnerships = {
+      sibship: union('sibship', undefined, undefined, ['target', 'sib']),
+      mar: union('mar', 'target', 'partner', []),
+    };
+    const parentChildLinks = {
+      a: link('a', 'sibship', 'target'),
+      b: link('b', 'sibship', 'sib'),
+    };
+    const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'sibship');
+    const posOf = (id: string, _fallback: number) => moved[id]?.x ?? individuals[id].position.x;
+    // The sibling must end clear of the partner: at least SIBLING_SPACING (80) past it.
+    expect(posOf('sib', 80)).toBeGreaterThanOrEqual(posOf('partner', 120) + 80);
+  });
+
+  it('separates two cousin sibships under sibling parents (scenario 2)', () => {
+    // Grandparent gp (gen 0). Two children p1,p2 (gen 1), each a parent.
+    // p1's kids and p2's kids (gen 2) must not overlap.
+    const individuals = {
+      gp: ind('gp', 0, 0),
+      p1: ind('p1', 0, 1), p2: ind('p2', 80, 1),
+      a1: ind('a1', 0, 2), a2: ind('a2', 40, 2),       // p1's children, clustered
+      b1: ind('b1', 40, 2), b2: ind('b2', 80, 2),       // p2's children, clustered/overlapping a*
+    };
+    const partnerships = {
+      top: union('top', 'gp', undefined, ['p1', 'p2']),
+      u1: union('u1', 'p1', undefined, ['a1', 'a2']),
+      u2: union('u2', 'p2', undefined, ['b1', 'b2']),
+    };
+    const parentChildLinks = {
+      l1: link('l1', 'top', 'p1'), l2: link('l2', 'top', 'p2'),
+      l3: link('l3', 'u1', 'a1'), l4: link('l4', 'u1', 'a2'),
+      l5: link('l5', 'u2', 'b1'), l6: link('l6', 'u2', 'b2'),
+    };
+    const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'top');
+    const x = (id: string) => moved[id]?.x ?? individuals[id].position.x;
+    const gen2 = ['a1', 'a2', 'b1', 'b2'].map(x).sort((m, n) => m - n);
+    // Every adjacent pair in gen 2 is at least SIBLING_SPACING apart (no overlap).
+    for (let i = 1; i < gen2.length; i++) expect(gen2[i] - gen2[i - 1]).toBeGreaterThanOrEqual(80);
+  });
+
+  it('does not relocate a load-bearing in-law', () => {
+    // p (blood) married to inlaw, who has their own parents (load-bearing).
+    const individuals = {
+      p: ind('p', 0, 1), inlaw: ind('inlaw', 300, 1),
+      ilp: ind('ilp', 300, 0),             // in-law's parent (founder)
+      kid: ind('kid', 0, 2),
+    };
+    const partnerships = {
+      mar: union('mar', 'p', 'inlaw', ['kid']),
+      ilUnion: union('ilUnion', 'ilp', undefined, ['inlaw']),
+    };
+    const parentChildLinks = {
+      a: link('a', 'mar', 'kid'),
+      b: link('b', 'ilUnion', 'inlaw'),
+    };
+    const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'mar');
+    // The in-law keeps its x (not yanked beside p); only p / kid may move.
+    expect(moved.inlaw).toBeUndefined();
   });
 });
