@@ -140,11 +140,10 @@
 }
 
 /* Top-left corner → MenuIsland
-   Path tail at (72,50) = bottom-right of SVG → text to the right, bottom-aligned */
+   SVG left (tip just past island corner), label right at tail (bottom-aligned). */
 .arrowTopLeft {
   top: 72px;
-  left: 64px;
-  flex-direction: row-reverse;
+  left: 162px;
   align-items: flex-end;
 }
 
@@ -156,15 +155,13 @@
 .arrowTopLeft .arrowLabel {
   max-width: 160px;
   white-space: normal;
-  text-align: right;
 }
 
 /* Bottom-left → ZoomIsland + HistoryIsland
-   Path tail at (72,10) = top-right of SVG → text to the right, top-aligned */
+   SVG left (tip just past island right edge), label right at tail (top-aligned). */
 .arrowBottomLeft {
-  bottom: 72px;
-  left: 64px;
-  flex-direction: row-reverse;
+  bottom: 68px;
+  left: 240px;
   align-items: flex-start;
 }
 
@@ -176,7 +173,6 @@
 .arrowBottomLeft .arrowLabel {
   max-width: 140px;
   white-space: normal;
-  text-align: right;
 }
 
 /* Bottom-right → HelpIsland
