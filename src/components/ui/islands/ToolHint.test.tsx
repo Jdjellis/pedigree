@@ -12,25 +12,27 @@ function setTool(tool: ActiveTool): void {
 
 beforeEach(() => {
   act(() => {
-    useUIStore.setState({ activeTool: 'select' });
+    useUIStore.setState({ activeTool: 'select', hoveredId: null });
   });
 });
 
 describe('ToolHint', () => {
-  test('shows the canvas-navigation hint when the select tool is active', () => {
+  test('shows the pan hint by default when the select tool is active', () => {
     setTool('select');
     render(<ToolHint />);
 
-    expect(screen.getByRole('note')).toHaveTextContent(/move the canvas/i);
-    expect(screen.getByText('Scroll wheel')).toBeInTheDocument();
+    expect(screen.getByRole('note')).toHaveTextContent(/while dragging to pan/i);
     expect(screen.getByText('Space')).toBeInTheDocument();
   });
 
-  test('surfaces the alt-drag link gesture on the select tool', () => {
+  test('swaps to the alt-drag link hint when a node is hovered', () => {
     setTool('select');
+    act(() => {
+      useUIStore.setState({ hoveredId: 'person-1' });
+    });
     render(<ToolHint />);
 
-    expect(screen.getByRole('note')).toHaveTextContent(/drag from one person onto another to link/i);
+    expect(screen.getByRole('note')).toHaveTextContent(/drag onto another person to link/i);
     expect(screen.getByText('Alt')).toBeInTheDocument();
   });
 

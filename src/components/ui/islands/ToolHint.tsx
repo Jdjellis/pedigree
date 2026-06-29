@@ -1,36 +1,33 @@
-import type { ReactNode } from 'react';
-import { useUIStore, type ActiveTool } from '../../../stores/uiStore';
+import { useUIStore } from '../../../stores/uiStore';
 import styles from './ToolHint.module.css';
 
 /**
- * Per-tool hint text shown directly under the toolbar. Only tools that benefit
- * from an explicit nudge appear here; every other tool maps to `undefined` and
- * renders nothing.
- *
- * Keep these terse and action-oriented — they sit in the user's eyeline while a
- * tool is active, so they double as lightweight onboarding.
- */
-const HINTS: Partial<Record<ActiveTool, ReactNode>> = {
-  select: (
-    <>
-      Hold <kbd>Alt</kbd> and drag from one person onto another to link them. To
-      move the canvas, hold <kbd>Scroll wheel</kbd> or <kbd>Space</kbd> while
-      dragging, or use the hand tool
-    </>
-  ),
-};
-
-/**
- * Contextual hint rendered beneath the {@link ToolIsland}. Subscribes to the
- * active tool and shows the matching {@link HINTS} entry, or nothing when the
- * active tool has no hint.
- *
- * Lives in the react-dom tree (not inside react-konva), so subscribing to the
- * UI store here is safe.
+ * Per-tool hint shown under the toolbar. Contextual: the select tool swaps
+ * between a pan hint (default) and an Alt+drag linking hint when the pointer
+ * is over a node — teaching the right thing at the right moment.
  */
 export function ToolHint(): React.JSX.Element | null {
   const activeTool = useUIStore((s) => s.activeTool);
-  const hint = HINTS[activeTool];
+  const hoveredId = useUIStore((s) => s.hoveredId);
+
+  let hint: React.ReactNode = null;
+
+  if (activeTool === 'select') {
+    if (hoveredId) {
+      hint = (
+        <>
+          Hold <kbd>Alt</kbd> and drag onto another person to link them
+        </>
+      );
+    } else {
+      hint = (
+        <>
+          Hold <kbd>Space</kbd> while dragging to pan, or use the hand tool
+        </>
+      );
+    }
+  }
+
   if (!hint) return null;
 
   return (
