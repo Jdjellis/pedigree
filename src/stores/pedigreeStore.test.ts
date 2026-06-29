@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { usePedigreeStore, createDefaultIndividual } from './pedigreeStore';
+import { usePedigreeStore, createDefaultIndividual, createDefaultDocument } from './pedigreeStore';
 import { generateId } from '../utils/idGenerator';
 import { RelationshipType } from '../types/enums';
 import { MIN_GENERATION_NODE_SPACING } from '../utils/constants';
@@ -724,5 +724,171 @@ describe('addParentsToParentlessUnion', () => {
     expect(doc.individuals[dad.id]).toBeUndefined();
     expect(doc.partnerships['u1'].partner1Id).toBeUndefined();
     expect(doc.partnerships['u1'].partner2Id).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setAdoption
+// ---------------------------------------------------------------------------
+
+describe('setAdoption', () => {
+  /**
+   * Seed a child individual with one parent-child link via setDocument, then
+   * clear temporal so the setup itself is not an undo step.
+   */
+  function seedChildWithLink(): { childId: string; linkId: string } {
+    const childId = 'child-1';
+    const partnershipId = 'p-1';
+    const linkId = 'link-1';
+
+    usePedigreeStore.getState().setDocument({
+      ...createDefaultDocument(),
+      individuals: {
+        [childId]: createDefaultIndividual({ id: childId }),
+      },
+      partnerships: {
+        [partnershipId]: {
+          id: partnershipId,
+          type: RelationshipType.Partnership,
+          childrenIds: [childId],
+        },
+      },
+      parentChildLinks: {
+        [linkId]: {
+          id: linkId,
+          type: RelationshipType.ParentChild,
+          parentPartnershipId: partnershipId,
+          childId,
+        },
+      },
+    });
+    usePedigreeStore.temporal.getState().clear();
+    return { childId, linkId };
+  }
+
+  it("'in' sets adopted=true and marks the parent link isAdoptive=true", () => {
+    const { childId, linkId } = seedChildWithLink();
+    usePedigreeStore.getState().setAdoption(childId, 'in');
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals[childId].adopted).toBe(true);
+    expect(doc.parentChildLinks[linkId].isAdoptive).toBe(true);
+  });
+
+  it("'out' sets adopted=true and marks the parent link isAdoptive=false", () => {
+    const { childId, linkId } = seedChildWithLink();
+    usePedigreeStore.getState().setAdoption(childId, 'out');
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals[childId].adopted).toBe(true);
+    expect(doc.parentChildLinks[linkId].isAdoptive).toBe(false);
+  });
+
+  it("'none' clears adopted and marks the parent link isAdoptive=false", () => {
+    const { childId, linkId } = seedChildWithLink();
+    usePedigreeStore.getState().setAdoption(childId, 'in');
+    usePedigreeStore.temporal.getState().clear();
+    usePedigreeStore.getState().setAdoption(childId, 'none');
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals[childId].adopted).toBeFalsy();
+    expect(doc.parentChildLinks[linkId].isAdoptive).toBe(false);
+  });
+
+  it("'in' with no parent links only sets adopted=true and leaves parentChildLinks unchanged", () => {
+    const childId = 'child-2';
+    usePedigreeStore.getState().setDocument({
+      ...createDefaultDocument(),
+      individuals: {
+        [childId]: createDefaultIndividual({ id: childId }),
+      },
+    });
+    usePedigreeStore.temporal.getState().clear();
+
+    usePedigreeStore.getState().setAdoption(childId, 'in');
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals[childId].adopted).toBe(true);
+    expect(Object.keys(doc.parentChildLinks)).toHaveLength(0);
+  });
+
+  it('is a single undo step — individual.adopted and link.isAdoptive revert together', () => {
+    const { childId, linkId } = seedChildWithLink();
+    usePedigreeStore.getState().setAdoption(childId, 'in');
+
+    usePedigreeStore.temporal.getState().undo();
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals[childId].adopted).toBeFalsy();
+    expect(doc.parentChildLinks[linkId].isAdoptive).toBeUndefined();
+  });
+
+  it('is a no-op for an unknown individual id', () => {
+    const { childId, linkId } = seedChildWithLink();
+    const before = usePedigreeStore.getState().document;
+    usePedigreeStore.getState().setAdoption('does-not-exist', 'in');
+
+    const after = usePedigreeStore.getState().document;
+    expect(after.individuals[childId].adopted).toBeFalsy();
+    expect(after.parentChildLinks[linkId].isAdoptive).toBeUndefined();
+    expect(after).toBe(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// setLinkAdoptive
+// ---------------------------------------------------------------------------
+
+describe('setLinkAdoptive', () => {
+  function seedLink(): string {
+    const partnershipId = 'p-1';
+    const linkId = 'link-1';
+    usePedigreeStore.getState().setDocument({
+      ...createDefaultDocument(),
+      partnerships: {
+        [partnershipId]: {
+          id: partnershipId,
+          type: RelationshipType.Partnership,
+          childrenIds: ['c1'],
+        },
+      },
+      parentChildLinks: {
+        [linkId]: {
+          id: linkId,
+          type: RelationshipType.ParentChild,
+          parentPartnershipId: partnershipId,
+          childId: 'c1',
+        },
+      },
+    });
+    usePedigreeStore.temporal.getState().clear();
+    return linkId;
+  }
+
+  it('sets isAdoptive=true on the named link', () => {
+    const linkId = seedLink();
+    usePedigreeStore.getState().setLinkAdoptive(linkId, true);
+    expect(usePedigreeStore.getState().document.parentChildLinks[linkId].isAdoptive).toBe(true);
+  });
+
+  it('sets isAdoptive=false on the named link', () => {
+    const linkId = seedLink();
+    usePedigreeStore.getState().setLinkAdoptive(linkId, true);
+    usePedigreeStore.getState().setLinkAdoptive(linkId, false);
+    expect(usePedigreeStore.getState().document.parentChildLinks[linkId].isAdoptive).toBe(false);
+  });
+
+  it('is a no-op for an unknown link id', () => {
+    const linkId = seedLink();
+    const before = usePedigreeStore.getState().document;
+    usePedigreeStore.getState().setLinkAdoptive('does-not-exist', true);
+    expect(usePedigreeStore.getState().document).toBe(before);
+  });
+
+  it('is a single undo step', () => {
+    const linkId = seedLink();
+    usePedigreeStore.getState().setLinkAdoptive(linkId, true);
+    usePedigreeStore.temporal.getState().undo();
+    expect(usePedigreeStore.getState().document.parentChildLinks[linkId].isAdoptive).toBeUndefined();
   });
 });
