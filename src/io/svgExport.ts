@@ -27,12 +27,24 @@ import {
   LABEL_COLOR,
   LABEL_OFFSET_Y,
   DECEASED_SLASH_OVERSHOOT,
+  TWIN_UNKNOWN_FONT_SIZE,
+  RELATIONSHIP_LABEL_OFFSET,
 } from '../utils/constants';
+import { adoptionBracketPolylines } from '../components/canvas/symbols/adoptionBrackets';
 import { getPresentPartners } from '../utils/graphTraversal';
 import {
   computeParentChildSegments,
   computeParentlessSibshipSegments,
 } from '../components/connections/parentChildGeometry';
+import {
+  PADDING as LEGEND_PADDING,
+  SWATCH_SIZE as LEGEND_SWATCH_SIZE,
+  legendSwatchWidth,
+  legendContentWidth,
+  legendContentHeight,
+  legendEntryRowY,
+  legendInvestigationRowY,
+} from '../utils/legendLayout';
 
 // ---------------------------------------------------------------------------
 // Constants mirroring the canvas components (kept self-contained on purpose so
@@ -52,13 +64,6 @@ const LABEL_LINE_HEIGHT = LABEL_FONT_SIZE + 4;
 const NUMBER_CORNER_GAP = 3;
 /** Padding added around the content bounding box for the export viewBox. */
 const VIEWBOX_PADDING = 40;
-
-// Legend box geometry, mirroring `LegendLayer.tsx`.
-const LEGEND_SWATCH_SIZE = 20;
-const LEGEND_PADDING = 12;
-const LEGEND_ROW_HEIGHT = 28;
-const LEGEND_TITLE_HEIGHT = 24;
-const LEGEND_LABEL_WIDTH = 120;
 
 // ---------------------------------------------------------------------------
 // String / numeric helpers
@@ -341,6 +346,19 @@ function renderIndividual(
     ),
   );
 
+  // Adoption brackets enclosing the symbol (mirrors AdoptionBrackets.tsx).
+  if (individual.adopted) {
+    const { left, right } = adoptionBracketPolylines();
+    const toPolyline = (pts: number[]): string => {
+      const points: string[] = [];
+      for (let i = 0; i < pts.length; i += 2) {
+        points.push(`${num(pts[i])},${num(pts[i + 1])}`);
+      }
+      return `<polyline points="${points.join(' ')}" fill="none" stroke="${SYMBOL_COLOR}" stroke-width="${LINE_WIDTH}" />`;
+    };
+    parts.push(toPolyline(left), toPolyline(right));
+  }
+
   // Condition quarter shading, clipped to the symbol outline.
   const activeQuarters = getActiveQuarters(individual, entries);
   if (activeQuarters.length > 0) {
@@ -495,10 +513,23 @@ function renderPartnershipLine(
   const y = (p1.position.y + p2.position.y) / 2;
 
   if (partnership.type === RelationshipType.Consanguinity) {
-    return [
+    const parts = [
       line(p1.position.x, y - CONSANGUINITY_GAP / 2, p2.position.x, y - CONSANGUINITY_GAP / 2),
       line(p1.position.x, y + CONSANGUINITY_GAP / 2, p2.position.x, y + CONSANGUINITY_GAP / 2),
-    ].join('');
+    ];
+    const degree = partnership.consanguinityDegree?.trim();
+    if (degree) {
+      const midX = (p1.position.x + p2.position.x) / 2;
+      const baselineY = y - CONSANGUINITY_GAP / 2 - RELATIONSHIP_LABEL_OFFSET;
+      parts.push(
+        `<text x="${num(midX)}" y="${num(
+          baselineY,
+        )}" text-anchor="middle" font-size="${LABEL_FONT_SIZE}" font-family="${escapeXml(
+          LABEL_FONT_FAMILY,
+        )}" fill="${LABEL_COLOR}">${escapeXml(degree)}</text>`,
+      );
+    }
+    return parts.join('');
   }
 
   if (partnership.type === RelationshipType.Separation) {
@@ -550,7 +581,9 @@ function renderParentChildLines(
     const link = Object.values(parentChildLinks).find(
       (l) => l.parentPartnershipId === partnership.id && l.childId === child.id,
     );
-    const isAdopted = link?.isAdopted ?? false;
+    // Mirror ParentChildLine.tsx: dash when adopted via the link flag OR the
+    // child individual's `adopted` toggle.
+    const isAdopted = (link?.isAdopted ?? false) || (child.adopted ?? false);
     const [x1, y1, x2, y2] = childDrops[i];
     parts.push(line(x1, y1, x2, y2, isAdopted));
   });
@@ -600,6 +633,18 @@ function renderTwinConnector(
     const leftX = Math.min(...projected);
     const rightX = Math.max(...projected);
     parts.push(line(leftX, barY, rightX, barY));
+  }
+
+  // "?" at the convergence point for unknown zygosity.
+  if (twinGroup.twinType === TwinType.Unknown) {
+    const labelY = sibshipY - RELATIONSHIP_LABEL_OFFSET;
+    parts.push(
+      `<text x="${num(twinMidX)}" y="${num(
+        labelY,
+      )}" text-anchor="middle" font-size="${TWIN_UNKNOWN_FONT_SIZE}" font-family="${escapeXml(
+        LABEL_FONT_FAMILY,
+      )}" font-weight="bold" fill="${LINE_COLOR}">?</text>`,
+    );
   }
 
   return parts.join('');
@@ -654,15 +699,11 @@ function renderLegend(
   }
 
   const hasBothGender = entries.some((e) => !e.applicableTo);
-  const swatchWidth = hasBothGender ? LEGEND_SWATCH_SIZE * 2 + 4 : LEGEND_SWATCH_SIZE;
-  const contentWidth = LEGEND_PADDING * 2 + swatchWidth + 8 + LEGEND_LABEL_WIDTH;
+  const swatchWidth = legendSwatchWidth(hasBothGender);
+  const contentWidth = legendContentWidth(hasBothGender);
 
   // Investigations add one self-describing "label = description" row each.
-  const contentHeight =
-    LEGEND_PADDING * 2 +
-    LEGEND_TITLE_HEIGHT +
-    entries.length * LEGEND_ROW_HEIGHT +
-    investigations.length * LEGEND_ROW_HEIGHT;
+  const contentHeight = legendContentHeight(entries.length, investigations.length);
 
   const parts: string[] = [];
 
@@ -682,7 +723,7 @@ function renderLegend(
 
   // Condition entries.
   entries.forEach((entry, idx) => {
-    const rowY = LEGEND_PADDING + LEGEND_TITLE_HEIGHT + idx * LEGEND_ROW_HEIGHT;
+    const rowY = legendEntryRowY(idx);
     const showBoth = !entry.applicableTo;
     const showSquare = entry.applicableTo === 'man' || showBoth;
     const showCircle = entry.applicableTo === 'woman' || showBoth;
@@ -706,12 +747,11 @@ function renderLegend(
 
   // Investigation rows ("label = description"), continuing straight on from the
   // condition entries with no separate subheading.
-  const baseY = LEGEND_PADDING + LEGEND_TITLE_HEIGHT + entries.length * LEGEND_ROW_HEIGHT;
   investigations.forEach((investigation, idx) => {
-    const rowY = baseY + idx * LEGEND_ROW_HEIGHT;
+    const rowY = legendInvestigationRowY(entries.length, idx);
     parts.push(
       `<text x="${LEGEND_PADDING}" y="${num(
-        rowY + 12,
+        rowY + 4 + 12,
       )}" font-size="12" font-family="${escapeXml(
         LABEL_FONT_FAMILY,
       )}" fill="${SYMBOL_COLOR}">${escapeXml(formatInvestigation(investigation))}</text>`,

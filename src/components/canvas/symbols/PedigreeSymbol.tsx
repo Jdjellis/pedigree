@@ -25,6 +25,7 @@ import { TriangleShape } from './TriangleShape';
 import { ConditionOverlay } from './ConditionOverlay';
 import type { ActiveQuarter } from './ConditionOverlay';
 import { DeceasedSlash } from './DeceasedSlash';
+import { AdoptionBrackets } from './AdoptionBrackets';
 import { ProbandArrow } from './ProbandArrow';
 import { SymbolLabel } from './SymbolLabel';
 import { eraseElementById } from '../eraserTool';
@@ -279,8 +280,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         } else {
           select(individual.id);
           if (tool === 'select' && !ui.editingLocked) {
-            const { canvasToScreen } = useViewportStore.getState();
-            ui.showRadialMenu(individual.id, canvasToScreen(individual.position));
+            ui.showRadialMenu(individual.id, individual.position);
             ui.pinRadialMenu();
           }
         }
@@ -416,6 +416,9 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
           fill={SYMBOL_FILL}
           strokeColor={strokeColor}
         />
+
+        {/* Adoption brackets */}
+        {individual.adopted && <AdoptionBrackets strokeColor={SYMBOL_COLOR} />}
 
         {/* Condition quarter overlay */}
         <ConditionOverlay
