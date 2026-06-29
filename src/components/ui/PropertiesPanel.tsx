@@ -7,6 +7,8 @@ import {
   VitalStatus,
   TwinType,
 } from '../../types/enums';
+import { GenderIconButtons } from './GenderIconButtons';
+import { SegmentedControl } from './SegmentedControl';
 import { generateId } from '../../utils/idGenerator';
 import { collectInvestigations } from '../../utils/investigations';
 import {
@@ -35,6 +37,28 @@ const QUARTER_LABELS: Record<QuarterPosition, string> = {
   bottomLeft: 'Bottom-Left',
   bottomRight: 'Bottom-Right',
 };
+
+// Render order matches the 2×2 CSS grid: TL → TR → BL → BR (left-to-right, top-to-bottom)
+const QUARTER_GRID_ORDER: QuarterPosition[] = [
+  'topLeft',
+  'topRight',
+  'bottomLeft',
+  'bottomRight',
+];
+
+const VITAL_STATUS_OPTIONS: { value: VitalStatus; label: string }[] = [
+  { value: VitalStatus.Alive, label: 'Alive' },
+  { value: VitalStatus.Deceased, label: 'Deceased' },
+  { value: VitalStatus.Stillborn, label: 'Stillborn' },
+];
+
+type RoleValue = 'none' | 'proband' | 'consultand';
+
+const ROLE_OPTIONS: { value: RoleValue; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'proband', label: 'Proband' },
+  { value: 'consultand', label: 'Consultand' },
+];
 
 export function PropertiesPanel() {
   const selectedIds = useUIStore((s) => s.selectedIds);
@@ -237,20 +261,10 @@ export function PropertiesPanel() {
 
         <div className={styles.field}>
           <label className={styles.label}>Gender Identity</label>
-          <select
-            className={styles.select}
+          <GenderIconButtons
             value={individual.genderIdentity}
-            onChange={(e) =>
-              update({
-                genderIdentity: e.target.value as GenderIdentity,
-              })
-            }
-          >
-            <option value={GenderIdentity.Unknown}>Unknown</option>
-            <option value={GenderIdentity.Man}>Man</option>
-            <option value={GenderIdentity.Woman}>Woman</option>
-            <option value={GenderIdentity.NonBinary}>Non-binary</option>
-          </select>
+            onChange={(v) => update({ genderIdentity: v })}
+          />
         </div>
 
         <div className={styles.field}>
@@ -319,33 +333,42 @@ export function PropertiesPanel() {
             />
             <div className={styles.field}>
               <label className={styles.label}>Color</label>
-              <select
-                className={styles.select}
-                value={conditionColor}
-                onChange={(e) => setConditionColor(e.target.value)}
-              >
+              <div className={styles.swatchRow}>
                 {COLOR_OPTIONS.map((c) => (
-                  <option key={c.value} value={c.value}>
-                    {c.label}
-                  </option>
+                  <button
+                    key={c.value}
+                    type="button"
+                    className={`${styles.swatch} ${conditionColor === c.value ? styles.swatchActive : ''}`}
+                    style={{ backgroundColor: c.value }}
+                    aria-label={c.label}
+                    aria-pressed={conditionColor === c.value}
+                    onClick={() => setConditionColor(c.value)}
+                  />
                 ))}
-              </select>
+              </div>
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Quarter</label>
-              <select
-                className={styles.select}
-                value={conditionQuarter}
-                onChange={(e) =>
-                  setConditionQuarter(e.target.value as QuarterPosition)
-                }
-              >
-                {QUARTER_OPTIONS.map((q) => (
-                  <option key={q.value} value={q.value}>
-                    {q.label}
-                  </option>
-                ))}
-              </select>
+              <div className={styles.quarterField}>
+                <div className={styles.quarterGrid} role="group" aria-label="Symbol quarter">
+                  {QUARTER_GRID_ORDER.map((q) => {
+                    const option = QUARTER_OPTIONS.find((o) => o.value === q)!;
+                    return (
+                      <button
+                        key={q}
+                        type="button"
+                        className={`${styles.quarterCell} ${conditionQuarter === q ? styles.quarterCellActive : ''}`}
+                        aria-label={option.label}
+                        aria-pressed={conditionQuarter === q}
+                        onClick={() => setConditionQuarter(q)}
+                      />
+                    );
+                  })}
+                </div>
+                <span className={styles.quarterLabel}>
+                  {QUARTER_OPTIONS.find((o) => o.value === conditionQuarter)?.label}
+                </span>
+              </div>
             </div>
             <div className={styles.field}>
               <label className={styles.label}>Pattern</label>
@@ -581,19 +604,12 @@ export function PropertiesPanel() {
 
         <div className={styles.field}>
           <label className={styles.label}>Status</label>
-          <select
-            className={styles.select}
+          <SegmentedControl
+            options={VITAL_STATUS_OPTIONS}
             value={individual.vitalStatus}
-            onChange={(e) =>
-              update({
-                vitalStatus: e.target.value as VitalStatus,
-              })
-            }
-          >
-            <option value={VitalStatus.Alive}>Alive</option>
-            <option value={VitalStatus.Deceased}>Deceased</option>
-            <option value={VitalStatus.Stillborn}>Stillborn</option>
-          </select>
+            onChange={(v) => update({ vitalStatus: v })}
+            ariaLabel="Vital status"
+          />
         </div>
 
         <div className={styles.field}>
@@ -639,8 +655,8 @@ export function PropertiesPanel() {
 
         <div className={styles.field}>
           <label className={styles.label}>Role</label>
-          <select
-            className={styles.select}
+          <SegmentedControl
+            options={ROLE_OPTIONS}
             value={
               individual.isProband
                 ? 'proband'
@@ -648,18 +664,14 @@ export function PropertiesPanel() {
                   ? 'consultand'
                   : 'none'
             }
-            onChange={(e) => {
-              const val = e.target.value;
+            onChange={(v) =>
               update({
-                isProband: val === 'proband',
-                isConsultand: val === 'consultand',
-              });
-            }}
-          >
-            <option value="none">None</option>
-            <option value="proband">Proband</option>
-            <option value="consultand">Consultand</option>
-          </select>
+                isProband: v === 'proband',
+                isConsultand: v === 'consultand',
+              })
+            }
+            ariaLabel="Pedigree role"
+          />
         </div>
 
         <div className={styles.field}>
