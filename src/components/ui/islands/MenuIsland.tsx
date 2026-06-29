@@ -54,6 +54,7 @@ export function MenuIsland(): React.JSX.Element {
   const title = metadata.title;
 
   const lastSavedAt = useUIStore((s) => s.lastSavedAt);
+  const storagePersistent = useUIStore((s) => s.storagePersistent);
 
   const actions = useEditorActions();
 
@@ -213,7 +214,16 @@ export function MenuIsland(): React.JSX.Element {
     const id = setInterval(() => setNow(Date.now()), 15_000);
     return () => clearInterval(id);
   }, []);
-  const saveStatus = formatRelativeSave(lastSavedAt, now);
+  // When storage is blocked the document lives only in memory for this session,
+  // so warn rather than claim a durable save. Storage availability is fixed for
+  // the session, so this is a static branch, not a per-tick computation.
+  const saveStatusText = storagePersistent
+    ? formatRelativeSave(lastSavedAt, now)
+    : '⚠ Not saved — export to keep a copy';
+  const saveStatusTitle = storagePersistent
+    ? 'Your work lives only in this browser. Export → JSON to keep a permanent copy.'
+    : 'This browser is blocking local storage, so your work will be lost when you ' +
+      'close this tab. Use Export → JSON to keep a permanent copy.';
 
   // ── Menu-item handlers ───────────────────────────────────────────────────
   const handleMenuNew = (): void => {
@@ -378,10 +388,13 @@ export function MenuIsland(): React.JSX.Element {
         )}
 
         <span
-          className={styles.saveStatus}
-          title="Your work lives only in this browser. Export → JSON to keep a permanent copy."
+          className={clsx(
+            styles.saveStatus,
+            !storagePersistent && styles.saveStatusWarning,
+          )}
+          title={saveStatusTitle}
         >
-          {saveStatus}
+          {saveStatusText}
         </span>
       </div>
 

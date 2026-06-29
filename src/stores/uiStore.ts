@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { DefaultSex } from '../utils/sex';
 import { ONBOARDED_STORAGE_KEY } from '../components/canvas/onboarding';
+import * as safeStorage from '../utils/safeStorage';
 
 /**
  * The currently active canvas tool. `select`/`hand` are modal helpers
@@ -69,6 +70,15 @@ interface UIState {
    * Drives the "Saved locally" indicator in the toolbar.
    */
   lastSavedAt: number | null;
+
+  /**
+   * Whether this browser actually persists writes across sessions. `false` when
+   * `localStorage` is blocked (e.g. Edge/Chrome enterprise "block site data"
+   * policy or private browsing) — in that case the document lives only in memory
+   * for the session and the toolbar must warn instead of claiming "Saved locally".
+   * Probed once at startup; storage availability does not change mid-session.
+   */
+  storagePersistent: boolean;
 
   select: (id: string) => void;
   selectMultiple: (ids: string[]) => void;
@@ -159,6 +169,7 @@ export const useUIStore = create<UIState>()((set) => ({
   commandPaletteOpen: false,
   editingAnnotationId: null,
   lastSavedAt: null,
+  storagePersistent: safeStorage.isPersistent(),
 
   select: (id) =>
     set((state) => ({
@@ -297,10 +308,10 @@ export const useUIStore = create<UIState>()((set) => ({
 
   stopEditingAnnotation: () => set({ editingAnnotationId: null }),
 
-  onboarded: localStorage.getItem(ONBOARDED_STORAGE_KEY) === '1',
+  onboarded: safeStorage.getItem(ONBOARDED_STORAGE_KEY) === '1',
 
   setOnboarded: () => {
-    localStorage.setItem(ONBOARDED_STORAGE_KEY, '1');
+    safeStorage.setItem(ONBOARDED_STORAGE_KEY, '1');
     set({ onboarded: true });
   },
 }));

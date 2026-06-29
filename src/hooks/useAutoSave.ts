@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { usePedigreeStore, createSeededDocument } from '../stores/pedigreeStore';
 import { useUIStore } from '../stores/uiStore';
+import * as safeStorage from '../utils/safeStorage';
 import type { PedigreeDocument } from '../types/pedigree';
 
 const STORAGE_KEY = 'pedigree-editor-autosave';
@@ -46,7 +47,7 @@ export function parseSavedDocument(raw: string | null): PedigreeDocument | null 
 export function useAutoSave() {
   // Restore on mount
   useEffect(() => {
-    const doc = parseSavedDocument(localStorage.getItem(STORAGE_KEY));
+    const doc = parseSavedDocument(safeStorage.getItem(STORAGE_KEY));
     if (doc) {
       usePedigreeStore.getState().setDocument(doc);
     } else {
@@ -66,12 +67,15 @@ export function useAutoSave() {
     const unsubscribe = usePedigreeStore.subscribe((state) => {
       if (timeoutId) clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
-        try {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(state.document));
-          // Surface a last-saved signal so the toolbar can show "Saved locally".
+        const persisted = safeStorage.setItem(
+          STORAGE_KEY,
+          JSON.stringify(state.document),
+        );
+        // Only claim "Saved locally" when the write actually persisted. When
+        // storage is blocked the document is kept in memory for the session but
+        // would not survive a reload, so we must not signal a durable save.
+        if (persisted) {
           useUIStore.getState().setLastSavedAt(Date.now());
-        } catch {
-          // localStorage full or unavailable — ignore
         }
       }, DEBOUNCE_MS);
     });

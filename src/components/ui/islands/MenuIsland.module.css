@@ -103,6 +103,13 @@
   line-height: 1.3;
 }
 
+/* Storage blocked: the document is memory-only this session and will be lost on
+   close. Amber signals caution (data loss), distinct from the neutral default. */
+.saveStatusWarning {
+  color: var(--color-warning);
+  font-weight: 600;
+}
+
 /* ── Dropdown panel ──────────────────────────────────────────────────────── */
 
 .dropdown {
