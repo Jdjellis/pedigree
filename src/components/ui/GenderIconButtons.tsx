@@ -68,7 +68,6 @@ export function GenderIconButtons({ value, onChange }: GenderIconButtonsProps) {
           onClick={() => onChange(opt)}
         >
           <Symbol />
-          <span className={styles.iconLabel}>{label}</span>
         </button>
       ))}
     </div>

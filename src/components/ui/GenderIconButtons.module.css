@@ -1,15 +1,14 @@
 .grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 
 .iconButton {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 6px;
+  justify-content: center;
+  padding: 8px 4px;
   border: 2px solid var(--color-border);
   border-radius: var(--radius-sm);
   background: var(--color-surface);
@@ -26,9 +25,4 @@
 .iconButtonActive {
   border-color: var(--color-primary);
   color: var(--color-primary);
-}
-
-.iconLabel {
-  font-size: 11px;
-  font-weight: 500;
 }
