@@ -58,12 +58,6 @@ interface UIState {
     screenPosition: { x: number; y: number };
   };
 
-  relationshipPopup: {
-    visible: boolean;
-    partnershipId: string | null;
-    screenPosition: { x: number; y: number };
-  };
-
   propertiesPanelOpen: boolean;
   activeModal: ActiveModal;
   activeTool: ActiveTool;
@@ -119,11 +113,6 @@ interface UIState {
   endDragLink: () => void;
   showLinkPopup: (sourceId: string, targetId: string, screenPos: { x: number; y: number }) => void;
   hideLinkPopup: () => void;
-  showRelationshipPopup: (
-    partnershipId: string,
-    screenPos: { x: number; y: number }
-  ) => void;
-  hideRelationshipPopup: () => void;
   setActiveTool: (tool: ActiveTool) => void;
   /** Set the default sex used for singly-added people. */
   setDefaultSex: (sex: DefaultSex) => void;
@@ -176,12 +165,6 @@ export const useUIStore = create<UIState>()((set) => ({
     visible: false,
     sourceId: null,
     targetId: null,
-    screenPosition: { x: 0, y: 0 },
-  },
-
-  relationshipPopup: {
-    visible: false,
-    partnershipId: null,
     screenPosition: { x: 0, y: 0 },
   },
 
@@ -288,20 +271,6 @@ export const useUIStore = create<UIState>()((set) => ({
   hideLinkPopup: () =>
     set({
       linkPopup: { visible: false, sourceId: null, targetId: null, screenPosition: { x: 0, y: 0 } },
-    }),
-
-  showRelationshipPopup: (partnershipId, screenPosition) =>
-    set({
-      relationshipPopup: { visible: true, partnershipId, screenPosition },
-    }),
-
-  hideRelationshipPopup: () =>
-    set({
-      relationshipPopup: {
-        visible: false,
-        partnershipId: null,
-        screenPosition: { x: 0, y: 0 },
-      },
     }),
 
   setActiveTool: (activeTool) => set({ activeTool }),
