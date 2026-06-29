@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { usePedigreeStore, createSeededDocument } from '../stores/pedigreeStore';
 import { useUIStore } from '../stores/uiStore';
 import type { PedigreeDocument } from '../types/pedigree';
+import { migrateAdoption } from '../io/jsonIO';
 
 const STORAGE_KEY = 'pedigree-editor-autosave';
 const DEBOUNCE_MS = 2000;
@@ -30,7 +31,7 @@ export function parseSavedDocument(raw: string | null): PedigreeDocument | null 
       const individual = ind as Record<string, unknown>;
       if (!individual.conditionIds) individual.conditionIds = [];
     }
-    return doc as PedigreeDocument;
+    return migrateAdoption(doc as PedigreeDocument);
   } catch {
     return null;
   }
