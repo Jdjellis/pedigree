@@ -6,8 +6,8 @@ import {
   createDefaultIndividual,
 } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
-import { GenderIdentity, VitalStatus } from '../../types/enums';
-import type { LegendEntry } from '../../types/pedigree';
+import { GenderIdentity, VitalStatus, RelationshipType, TwinType } from '../../types/enums';
+import type { LegendEntry, ParentChildRelationship, PartnershipRelationship } from '../../types/pedigree';
 import { PropertiesPanel } from './PropertiesPanel';
 
 function selectPeople(ids: string[]) {
@@ -203,5 +203,85 @@ describe('MultiSelectProperties — conditions', () => {
     const after = usePedigreeStore.getState().document;
     expect(after.individuals.w.conditionIds).toContain('brca');
     expect(after.individuals.m.conditionIds).not.toContain('brca');
+  });
+});
+
+function siblingDoc(childIds: string[]) {
+  const doc = createDefaultDocument();
+  const union: PartnershipRelationship = {
+    id: 'union1',
+    type: RelationshipType.Partnership,
+    partner1Id: 'p1',
+    partner2Id: 'p2',
+    childrenIds: childIds,
+  };
+  doc.partnerships['union1'] = union;
+  for (const id of childIds) {
+    doc.individuals[id] = createDefaultIndividual({ id });
+    const link: ParentChildRelationship = {
+      id: `link-${id}`,
+      type: RelationshipType.ParentChild,
+      parentPartnershipId: 'union1',
+      childId: id,
+      isAdoptive: false,
+    };
+    doc.parentChildLinks[link.id] = link;
+  }
+  return doc;
+}
+
+describe('MultiSelectProperties — twins', () => {
+  it('hides the twins section when the selection is not one sibship', () => {
+    const doc = createDefaultDocument();
+    doc.individuals['a'] = createDefaultIndividual({ id: 'a' });
+    doc.individuals['b'] = createDefaultIndividual({ id: 'b' }); // founders, no shared sibship
+    act(() => usePedigreeStore.getState().setDocument(doc));
+    selectPeople(['a', 'b']);
+
+    render(<PropertiesPanel />);
+    expect(screen.queryByText('Twins')).not.toBeInTheDocument();
+  });
+
+  it('offers the three zygosity buttons for two ungrouped siblings', () => {
+    act(() => usePedigreeStore.getState().setDocument(siblingDoc(['a', 'b'])));
+    selectPeople(['a', 'b']);
+
+    render(<PropertiesPanel />);
+    expect(screen.getByRole('button', { name: /Group as MZ/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Group as DZ/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Group as Unknown/ })).toBeInTheDocument();
+  });
+
+  it('creates a twin group when a zygosity button is clicked', () => {
+    act(() => usePedigreeStore.getState().setDocument(siblingDoc(['a', 'b'])));
+    selectPeople(['a', 'b']);
+
+    render(<PropertiesPanel />);
+    act(() => fireEvent.click(screen.getByRole('button', { name: /Group as DZ/ })));
+
+    const groups = Object.values(usePedigreeStore.getState().document.twinGroups);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].twinType).toBe(TwinType.Dizygotic);
+    expect([...groups[0].individualIds].sort()).toEqual(['a', 'b']);
+  });
+
+  it('offers add-to-existing when one selected sibling is already grouped, and merges', () => {
+    const doc = siblingDoc(['a', 'b', 'c']);
+    doc.twinGroups['tg1'] = {
+      id: 'tg1',
+      twinType: TwinType.Monozygotic,
+      individualIds: ['a', 'b'],
+      parentPartnershipId: 'union1',
+    };
+    act(() => usePedigreeStore.getState().setDocument(doc));
+    selectPeople(['b', 'c']);
+
+    render(<PropertiesPanel />);
+    const addButton = screen.getByRole('button', { name: /Add to existing twin group/ });
+    act(() => fireEvent.click(addButton));
+
+    const tg = usePedigreeStore.getState().document.twinGroups['tg1'];
+    expect([...tg.individualIds].sort()).toEqual(['a', 'b', 'c']);
+    expect(tg.twinType).toBe(TwinType.Monozygotic);
   });
 });

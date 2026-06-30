@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
-import { GenderIdentity, SexAssignedAtBirth, VitalStatus } from '../../types/enums';
+import { GenderIdentity, SexAssignedAtBirth, VitalStatus, TwinType } from '../../types/enums';
+import { commonSibshipId } from '../../utils/sibship';
 import type { Individual, LegendEntry } from '../../types/pedigree';
 import { GenderIconButtons } from './GenderIconButtons';
 import { SegmentedControl } from './SegmentedControl';
@@ -12,6 +13,12 @@ const VITAL_STATUS_OPTIONS: { value: VitalStatus; label: string }[] = [
   { value: VitalStatus.Deceased, label: 'Deceased' },
   { value: VitalStatus.Stillborn, label: 'Stillborn' },
 ];
+
+const ZYGOSITY_LABELS: Record<TwinType, string> = {
+  [TwinType.Monozygotic]: 'MZ',
+  [TwinType.Dizygotic]: 'DZ',
+  [TwinType.Unknown]: 'Unknown',
+};
 
 /**
  * Returns the value shared by every element, or `undefined` when the array is
@@ -43,6 +50,9 @@ export function MultiSelectProperties() {
   const updateIndividuals = usePedigreeStore((s) => s.updateIndividuals);
   const legendConfig = usePedigreeStore((s) => s.document.legendConfig);
   const setConditionForIndividuals = usePedigreeStore((s) => s.setConditionForIndividuals);
+  const parentChildLinks = usePedigreeStore((s) => s.document.parentChildLinks);
+  const twinGroups = usePedigreeStore((s) => s.document.twinGroups);
+  const groupTwins = usePedigreeStore((s) => s.groupTwins);
 
   const ids = useMemo(
     () => Array.from(selectedIds).filter((id) => individuals[id]),
@@ -71,6 +81,18 @@ export function MultiSelectProperties() {
     people.some((p) => conditionAppliesTo(entry, p)),
   );
 
+  const sibshipId = commonSibshipId({ parentChildLinks }, ids);
+  const touchedGroups = Object.values(twinGroups).filter((g) =>
+    g.individualIds.some((m) => ids.includes(m)),
+  );
+  // Existing group whose zygosity would survive a merge (largest, stable tiebreak).
+  const survivingGroup = touchedGroups
+    .slice()
+    .sort(
+      (a, b) =>
+        b.individualIds.length - a.individualIds.length || (a.id < b.id ? -1 : 1),
+    )[0];
+
   return (
     <div className={styles.panel}>
       <fieldset
@@ -80,6 +102,49 @@ export function MultiSelectProperties() {
         <div className={styles.section}>
           <div className={styles.sectionTitle}>{people.length} people selected</div>
         </div>
+
+        {sibshipId && (
+          <>
+            <div className={styles.divider} />
+            <div className={styles.section}>
+              <div className={styles.sectionTitle}>Twins</div>
+              {survivingGroup ? (
+                <>
+                  <p className={styles.hint}>
+                    Existing group zygosity: {ZYGOSITY_LABELS[survivingGroup.twinType]}
+                  </p>
+                  <button
+                    className={styles.addButton}
+                    onClick={() => groupTwins(ids, survivingGroup.twinType)}
+                  >
+                    Add to existing twin group
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    className={styles.addButton}
+                    onClick={() => groupTwins(ids, TwinType.Monozygotic)}
+                  >
+                    Group as MZ twins
+                  </button>
+                  <button
+                    className={styles.addButton}
+                    onClick={() => groupTwins(ids, TwinType.Dizygotic)}
+                  >
+                    Group as DZ twins
+                  </button>
+                  <button
+                    className={styles.addButton}
+                    onClick={() => groupTwins(ids, TwinType.Unknown)}
+                  >
+                    Group as Unknown twins
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
 
         <div className={styles.divider} />
 
