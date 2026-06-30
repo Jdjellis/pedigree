@@ -24,7 +24,7 @@ const ZYGOSITY_LABELS: Record<TwinType, string> = {
  * Returns the value shared by every element, or `undefined` when the array is
  * empty or its elements disagree (a "mixed" selection).
  */
-export function sharedValue<T>(values: T[]): T | undefined {
+function sharedValue<T>(values: T[]): T | undefined {
   if (values.length === 0) return undefined;
   const [first, ...rest] = values;
   return rest.every((v) => v === first) ? first : undefined;
