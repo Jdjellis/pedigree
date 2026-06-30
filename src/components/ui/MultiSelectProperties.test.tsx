@@ -284,4 +284,23 @@ describe('MultiSelectProperties — twins', () => {
     expect([...tg.individualIds].sort()).toEqual(['a', 'b', 'c']);
     expect(tg.twinType).toBe(TwinType.Monozygotic);
   });
+
+  it('hides the twins section when selected siblings are in different sibships', () => {
+    const doc = createDefaultDocument();
+    doc.partnerships['u1'] = { id: 'u1', type: RelationshipType.Partnership, childrenIds: ['a'] };
+    doc.individuals['a'] = createDefaultIndividual({ id: 'a' });
+    doc.parentChildLinks['la'] = {
+      id: 'la', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'a', isAdoptive: false,
+    };
+    doc.partnerships['u2'] = { id: 'u2', type: RelationshipType.Partnership, childrenIds: ['c'] };
+    doc.individuals['c'] = createDefaultIndividual({ id: 'c' });
+    doc.parentChildLinks['lc'] = {
+      id: 'lc', type: RelationshipType.ParentChild, parentPartnershipId: 'u2', childId: 'c', isAdoptive: false,
+    };
+    act(() => usePedigreeStore.getState().setDocument(doc));
+    selectPeople(['a', 'c']);
+
+    render(<PropertiesPanel />);
+    expect(screen.queryByText('Twins')).not.toBeInTheDocument();
+  });
 });
