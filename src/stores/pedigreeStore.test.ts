@@ -6,7 +6,7 @@ import {
   createSeededDocument,
 } from './pedigreeStore';
 import { generateId } from '../utils/idGenerator';
-import { GenderIdentity, RelationshipType } from '../types/enums';
+import { RelationshipType, GenderIdentity, VitalStatus, TwinType } from '../types/enums';
 import { MIN_GENERATION_NODE_SPACING, GENERATION_SPACING, PARTNER_SPACING } from '../utils/constants';
 import type {
   TextAnnotation,
@@ -1577,6 +1577,190 @@ describe('setLinkAdoptive', () => {
     usePedigreeStore.getState().setLinkAdoptive(linkId, true);
     usePedigreeStore.temporal.getState().undo();
     expect(usePedigreeStore.getState().document.parentChildLinks[linkId].isAdoptive).toBeUndefined();
+  });
+});
+
+describe('updateIndividuals (bulk)', () => {
+  it('applies the patch to every listed individual and leaves others untouched', () => {
+    const store = usePedigreeStore.getState();
+    store.addIndividual(createDefaultIndividual({ id: 'a' }));
+    store.addIndividual(createDefaultIndividual({ id: 'b' }));
+    store.addIndividual(createDefaultIndividual({ id: 'c' }));
+
+    store.updateIndividuals(['a', 'b'], { vitalStatus: VitalStatus.Deceased });
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals.a.vitalStatus).toBe(VitalStatus.Deceased);
+    expect(doc.individuals.b.vitalStatus).toBe(VitalStatus.Deceased);
+    expect(doc.individuals.c.vitalStatus).toBe(VitalStatus.Alive);
+  });
+
+  it('ignores unknown ids', () => {
+    const store = usePedigreeStore.getState();
+    store.addIndividual(createDefaultIndividual({ id: 'a' }));
+    store.updateIndividuals(['a', 'missing'], { genderIdentity: GenderIdentity.Woman });
+    expect(usePedigreeStore.getState().document.individuals.a.genderIdentity).toBe(
+      GenderIdentity.Woman,
+    );
+  });
+
+  it('records a single undoable step for the whole batch', () => {
+    const store = usePedigreeStore.getState();
+    store.addIndividual(createDefaultIndividual({ id: 'a' }));
+    store.addIndividual(createDefaultIndividual({ id: 'b' }));
+
+    store.updateIndividuals(['a', 'b'], { adopted: true });
+    usePedigreeStore.temporal.getState().undo();
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals.a.adopted).toBeUndefined();
+    expect(doc.individuals.b.adopted).toBeUndefined();
+  });
+});
+
+describe('setConditionForIndividuals (bulk)', () => {
+  it('adds the condition to every individual that lacks it (idempotent for those that have it)', () => {
+    const store = usePedigreeStore.getState();
+    store.addIndividual(createDefaultIndividual({ id: 'a', conditionIds: [] }));
+    store.addIndividual(createDefaultIndividual({ id: 'b', conditionIds: ['x'] }));
+
+    store.setConditionForIndividuals(['a', 'b'], 'x', true);
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals.a.conditionIds).toEqual(['x']);
+    expect(doc.individuals.b.conditionIds).toEqual(['x']); // not duplicated
+  });
+
+  it('removes the condition from every individual that has it', () => {
+    const store = usePedigreeStore.getState();
+    store.addIndividual(createDefaultIndividual({ id: 'a', conditionIds: ['x', 'y'] }));
+    store.addIndividual(createDefaultIndividual({ id: 'b', conditionIds: ['x'] }));
+
+    store.setConditionForIndividuals(['a', 'b'], 'x', false);
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals.a.conditionIds).toEqual(['y']);
+    expect(doc.individuals.b.conditionIds).toEqual([]);
+  });
+
+  it('records a single undoable step', () => {
+    const store = usePedigreeStore.getState();
+    store.addIndividual(createDefaultIndividual({ id: 'a', conditionIds: [] }));
+    store.addIndividual(createDefaultIndividual({ id: 'b', conditionIds: [] }));
+
+    store.setConditionForIndividuals(['a', 'b'], 'x', true);
+    usePedigreeStore.temporal.getState().undo();
+
+    const doc = usePedigreeStore.getState().document;
+    expect(doc.individuals.a.conditionIds).toEqual([]);
+    expect(doc.individuals.b.conditionIds).toEqual([]);
+  });
+});
+
+describe('groupTwins', () => {
+  // Build a sibship: union1 with N children, each wired by a parent-child link.
+  function seedSibship(childIds: string[]) {
+    const store = usePedigreeStore.getState();
+    store.addPartnership({
+      id: 'union1',
+      type: RelationshipType.Partnership,
+      partner1Id: 'p1',
+      partner2Id: 'p2',
+      childrenIds: childIds,
+    });
+    for (const id of childIds) {
+      store.addIndividual(createDefaultIndividual({ id }));
+      store.addParentChildLink({
+        id: `link-${id}`,
+        type: RelationshipType.ParentChild,
+        parentPartnershipId: 'union1',
+        childId: id,
+        isAdoptive: false,
+      });
+    }
+  }
+
+  it('creates a new twin group from two ungrouped siblings', () => {
+    seedSibship(['a', 'b']);
+    const id = usePedigreeStore.getState().groupTwins(['a', 'b'], TwinType.Dizygotic);
+    expect(id).not.toBeNull();
+    const tg = usePedigreeStore.getState().document.twinGroups[id as string];
+    expect(tg.twinType).toBe(TwinType.Dizygotic);
+    expect([...tg.individualIds].sort()).toEqual(['a', 'b']);
+    expect(tg.parentPartnershipId).toBe('union1');
+  });
+
+  it('groups three siblings as triplets', () => {
+    seedSibship(['a', 'b', 'c']);
+    const id = usePedigreeStore.getState().groupTwins(['a', 'b', 'c'], TwinType.Monozygotic);
+    const tg = usePedigreeStore.getState().document.twinGroups[id as string];
+    expect([...tg.individualIds].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('extends an existing pair to a triplet, keeping the existing zygosity', () => {
+    seedSibship(['a', 'b', 'c']);
+    const store = usePedigreeStore.getState();
+    store.addTwinGroup({
+      id: 'tg1',
+      twinType: TwinType.Monozygotic,
+      individualIds: ['a', 'b'],
+      parentPartnershipId: 'union1',
+    });
+
+    const id = store.groupTwins(['b', 'c'], TwinType.Dizygotic);
+
+    expect(id).toBe('tg1'); // merged into existing group
+    const tg = usePedigreeStore.getState().document.twinGroups['tg1'];
+    expect([...tg.individualIds].sort()).toEqual(['a', 'b', 'c']);
+    expect(tg.twinType).toBe(TwinType.Monozygotic); // existing type kept
+  });
+
+  it('merges two existing groups into the larger one and removes the smaller', () => {
+    seedSibship(['a', 'b', 'c', 'd', 'e']);
+    const store = usePedigreeStore.getState();
+    store.addTwinGroup({
+      id: 'big',
+      twinType: TwinType.Monozygotic,
+      individualIds: ['a', 'b', 'c'],
+      parentPartnershipId: 'union1',
+    });
+    store.addTwinGroup({
+      id: 'small',
+      twinType: TwinType.Dizygotic,
+      individualIds: ['d', 'e'],
+      parentPartnershipId: 'union1',
+    });
+
+    const id = store.groupTwins(['a', 'd'], TwinType.Unknown);
+
+    expect(id).toBe('big');
+    const groups = usePedigreeStore.getState().document.twinGroups;
+    expect(groups['small']).toBeUndefined();
+    expect([...groups['big'].individualIds].sort()).toEqual(['a', 'b', 'c', 'd', 'e']);
+    expect(groups['big'].twinType).toBe(TwinType.Monozygotic); // larger group's type wins
+  });
+
+  it('returns null and changes nothing when ids span different sibships', () => {
+    const store = usePedigreeStore.getState();
+    store.addPartnership({ id: 'u1', type: RelationshipType.Partnership, childrenIds: ['a'] });
+    store.addPartnership({ id: 'u2', type: RelationshipType.Partnership, childrenIds: ['b'] });
+    store.addIndividual(createDefaultIndividual({ id: 'a' }));
+    store.addIndividual(createDefaultIndividual({ id: 'b' }));
+    store.addParentChildLink({ id: 'la', type: RelationshipType.ParentChild, parentPartnershipId: 'u1', childId: 'a', isAdoptive: false });
+    store.addParentChildLink({ id: 'lb', type: RelationshipType.ParentChild, parentPartnershipId: 'u2', childId: 'b', isAdoptive: false });
+
+    const id = store.groupTwins(['a', 'b'], TwinType.Dizygotic);
+
+    expect(id).toBeNull();
+    expect(Object.keys(usePedigreeStore.getState().document.twinGroups)).toHaveLength(0);
+  });
+
+  it('records a single undoable step', () => {
+    seedSibship(['a', 'b']);
+    const store = usePedigreeStore.getState();
+    store.groupTwins(['a', 'b'], TwinType.Dizygotic);
+    usePedigreeStore.temporal.getState().undo();
+    expect(Object.keys(usePedigreeStore.getState().document.twinGroups)).toHaveLength(0);
   });
 });
 

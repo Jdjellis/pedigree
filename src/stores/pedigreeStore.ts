@@ -14,6 +14,7 @@ import type {
 import {
   GenderIdentity,
   VitalStatus,
+  TwinType,
 } from '../types/enums';
 import { generateId } from '../utils/idGenerator';
 import {
@@ -22,6 +23,8 @@ import {
   DEFAULT_LAYOUT_SPACING,
   type LayoutDoc,
 } from '../utils/treeLayout';
+import { commonSibshipId } from '../utils/sibship';
+import { twinGroupsTouching, pickSurvivingTwinGroup } from '../utils/twinGrouping';
 
 /**
  * Apply id -> {x,y} position changes immutably; untouched individuals are kept.
@@ -126,6 +129,21 @@ interface PedigreeState {
   // Individual actions
   addIndividual: (individual: Individual) => void;
   updateIndividual: (id: string, patch: Partial<Individual>) => void;
+  /**
+   * Apply the same patch to several individuals in one `set` call so the whole
+   * bulk edit is a single undo step. Unknown ids are skipped.
+   */
+  updateIndividuals: (ids: string[], patch: Partial<Individual>) => void;
+  /**
+   * Add or remove a single condition id across several individuals in one `set`
+   * call (one undo step). `applied` true adds it to those lacking it; false
+   * removes it from those that have it. Unknown ids are skipped.
+   */
+  setConditionForIndividuals: (
+    ids: string[],
+    entryId: string,
+    applied: boolean,
+  ) => void;
   removeIndividual: (id: string) => void;
   moveIndividual: (id: string, position: Position) => void;
   /** Commit a drag: set the dropped position, then re-tidy the family (one undo step). */
@@ -175,6 +193,20 @@ interface PedigreeState {
   addTwinGroup: (tg: TwinGroup) => void;
   updateTwinGroup: (id: string, patch: Partial<TwinGroup>) => void;
   removeTwinGroup: (id: string) => void;
+  /**
+   * Unite the given individuals into a single twin group, in one undo step.
+   * All ids must belong to the same sibship (see {@link commonSibshipId}),
+   * otherwise this is a no-op returning `null`.
+   *
+   * - No selected id is already grouped → create a new group with `twinType`.
+   * - Some are already grouped → merge all selected ids (and the members of any
+   *   touched groups) into one group. The surviving group's zygosity is kept
+   *   (the largest touched group wins; ties resolve to the lexicographically-
+   *   first group id); `twinType` is used only when creating a fresh group.
+   *
+   * @returns the resulting twin-group id, or `null` if not grouping-eligible.
+   */
+  groupTwins: (ids: string[], twinType: TwinType) => string | null;
 
   // Text annotation actions
   addTextAnnotation: (annotation: TextAnnotation) => void;
@@ -267,6 +299,62 @@ export const usePedigreeStore = create<PedigreeState>()(
                 ...state.document.individuals,
                 [id]: { ...existing, ...patch },
               },
+            },
+          };
+        }),
+
+      updateIndividuals: (ids, patch) =>
+        set((state) => {
+          const individuals = { ...state.document.individuals };
+          let changed = false;
+          for (const id of ids) {
+            const existing = individuals[id];
+            if (!existing) continue;
+            individuals[id] = { ...existing, ...patch };
+            changed = true;
+          }
+          if (!changed) return state;
+          return {
+            document: {
+              ...state.document,
+              metadata: {
+                ...state.document.metadata,
+                updatedAt: new Date().toISOString(),
+              },
+              individuals,
+            },
+          };
+        }),
+
+      setConditionForIndividuals: (ids, entryId, applied) =>
+        set((state) => {
+          const individuals = { ...state.document.individuals };
+          let changed = false;
+          for (const id of ids) {
+            const existing = individuals[id];
+            if (!existing) continue;
+            const current = existing.conditionIds ?? [];
+            const has = current.includes(entryId);
+            if (applied && !has) {
+              individuals[id] = { ...existing, conditionIds: [...current, entryId] };
+              changed = true;
+            } else if (!applied && has) {
+              individuals[id] = {
+                ...existing,
+                conditionIds: current.filter((c) => c !== entryId),
+              };
+              changed = true;
+            }
+          }
+          if (!changed) return state;
+          return {
+            document: {
+              ...state.document,
+              metadata: {
+                ...state.document.metadata,
+                updatedAt: new Date().toISOString(),
+              },
+              individuals,
             },
           };
         }),
@@ -635,6 +723,58 @@ export const usePedigreeStore = create<PedigreeState>()(
             },
           };
         }),
+
+      groupTwins: (ids, twinType) => {
+        // groupTwins must return the resulting group id, so the set() updater
+        // (which returns the new state, not a value) writes it to this closure var.
+        let resultId: string | null = null;
+        set((state) => {
+          const sibshipId = commonSibshipId(state.document, ids);
+          if (!sibshipId) return state;
+
+          const groups = { ...state.document.twinGroups };
+          const touched = twinGroupsTouching(groups, ids);
+
+          const members = new Set<string>(ids);
+          for (const g of touched) g.individualIds.forEach((m) => members.add(m));
+
+          // Largest touched group wins; ties resolve to the lexicographically-smallest id.
+          const target = pickSurvivingTwinGroup(touched);
+
+          if (target) {
+            for (const g of touched) {
+              if (g.id !== target.id) delete groups[g.id];
+            }
+            groups[target.id] = {
+              ...target,
+              individualIds: [...members],
+              parentPartnershipId: sibshipId,
+            };
+            resultId = target.id;
+          } else {
+            const id = generateId();
+            groups[id] = {
+              id,
+              twinType,
+              individualIds: [...members],
+              parentPartnershipId: sibshipId,
+            };
+            resultId = id;
+          }
+
+          return {
+            document: {
+              ...state.document,
+              metadata: {
+                ...state.document.metadata,
+                updatedAt: new Date().toISOString(),
+              },
+              twinGroups: groups,
+            },
+          };
+        });
+        return resultId;
+      },
 
       addTextAnnotation: (annotation) =>
         set((state) => ({

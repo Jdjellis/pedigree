@@ -9,6 +9,7 @@ import {
 import { GenderIconButtons } from './GenderIconButtons';
 import { SegmentedControl } from './SegmentedControl';
 import { ConnectionProperties } from './ConnectionProperties';
+import { MultiSelectProperties } from './MultiSelectProperties';
 import { TwinZygosityFields } from './TwinZygosityFields';
 import { generateId } from '../../utils/idGenerator';
 import { collectInvestigations } from '../../utils/investigations';
@@ -210,6 +211,10 @@ export function PropertiesPanel() {
 
   if (selectedConnection) {
     return <ConnectionProperties />;
+  }
+
+  if (selectedIds.size > 1) {
+    return <MultiSelectProperties />;
   }
 
   if (!propertiesPanelOpen || !individual) {
