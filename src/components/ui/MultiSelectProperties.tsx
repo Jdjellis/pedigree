@@ -1,9 +1,16 @@
 import { useMemo } from 'react';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
-import { GenderIdentity, SexAssignedAtBirth } from '../../types/enums';
+import { GenderIdentity, SexAssignedAtBirth, VitalStatus } from '../../types/enums';
 import { GenderIconButtons } from './GenderIconButtons';
+import { SegmentedControl } from './SegmentedControl';
 import styles from './PropertiesPanel.module.css';
+
+const VITAL_STATUS_OPTIONS: { value: VitalStatus; label: string }[] = [
+  { value: VitalStatus.Alive, label: 'Alive' },
+  { value: VitalStatus.Deceased, label: 'Deceased' },
+  { value: VitalStatus.Stillborn, label: 'Stillborn' },
+];
 
 /**
  * Returns the value shared by every element, or `undefined` when the array is
@@ -43,6 +50,12 @@ export function MultiSelectProperties() {
 
   const genderValue = sharedValue(people.map((p) => p.genderIdentity));
   const saabValue = sharedValue(people.map((p) => p.sexAssignedAtBirth ?? ''));
+  const vitalValue = sharedValue(people.map((p) => p.vitalStatus));
+  const allDeceased = people.every((p) => p.vitalStatus === VitalStatus.Deceased);
+  const causeShared = sharedValue(people.map((p) => p.causeOfDeath ?? ''));
+  const allAdopted = people.every((p) => p.adopted === true);
+  const anyAdopted = people.some((p) => p.adopted === true);
+  const adoptedMixed = anyAdopted && !allAdopted;
 
   return (
     <div className={styles.panel}>
@@ -86,6 +99,57 @@ export function MultiSelectProperties() {
               <option value={SexAssignedAtBirth.AFAB}>AFAB</option>
               <option value={SexAssignedAtBirth.UAAB}>UAAB</option>
             </select>
+          </div>
+        </div>
+
+        <div className={styles.divider} />
+
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Vital Status</div>
+          <div className={styles.field}>
+            <label className={styles.label}>Status</label>
+            {/* A value not in the options renders no active segment — "Mixed". */}
+            <SegmentedControl
+              options={VITAL_STATUS_OPTIONS}
+              value={vitalValue ?? ('' as VitalStatus)}
+              onChange={(v) => updateIndividuals(ids, { vitalStatus: v })}
+              ariaLabel="Vital status"
+            />
+          </div>
+          {allDeceased && (
+            <div className={styles.field}>
+              <label className={styles.label} htmlFor="bulk-cause-of-death">
+                Cause of Death
+              </label>
+              <input
+                id="bulk-cause-of-death"
+                className={styles.input}
+                value={causeShared ?? ''}
+                onChange={(e) =>
+                  updateIndividuals(ids, { causeOfDeath: e.target.value || undefined })
+                }
+                placeholder={causeShared === undefined ? 'Mixed — type to set all' : 'Cause of death'}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className={styles.divider} />
+
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Adoption</div>
+          <div className={styles.field}>
+            <label className={styles.checkbox}>
+              <input
+                type="checkbox"
+                checked={allAdopted}
+                ref={(el) => {
+                  if (el) el.indeterminate = adoptedMixed;
+                }}
+                onChange={() => updateIndividuals(ids, { adopted: allAdopted ? undefined : true })}
+              />
+              Adopted
+            </label>
           </div>
         </div>
       </fieldset>
