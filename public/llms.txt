@@ -1,0 +1,23 @@
+# Pedigree Canvas
+
+> Pedigree Canvas is a local-first clinical pedigree drawing tool for geneticists and genetic counsellors. Build standardised family pedigrees with clinical genetics symbols, condition shading, test-result annotations, and export to PDF, PNG, SVG, JSON and .ped. It runs entirely in the browser — no account, no server, and all data stays on the user's device.
+
+Pedigree Canvas is purpose-built for clinical genetics, not a general diagramming tool. Symbols follow the Bennett/NSGC standardized pedigree nomenclature (including the 2022 sex/gender revision): square / circle / diamond by gender identity, sex-assigned-at-birth annotations, deceased slash, proband arrow, consanguinity, twins (MZ/DZ), adoption, and sibship lines. Conditions are recorded with quarter-shading and a configurable legend.
+
+It is a documentation and educational tool. It is **not a medical device** and is **not intended for diagnostic decisions or patient management**.
+
+## Key links
+
+- [GitHub repository](https://github.com/Jdjellis/pedigree-canvas): source, issues, and roadmap
+- [README](https://github.com/Jdjellis/pedigree-canvas/blob/main/README.md): features, tech stack, and usage
+- [Changelog](https://github.com/Jdjellis/pedigree-canvas/blob/main/CHANGELOG.md): release notes
+
+## For
+
+- Genetic counsellors and clinical geneticists building family pedigrees
+- Clinical genetics education and teaching
+- Anyone needing standardised pedigree symbols exported to PDF, PNG, SVG, or .ped
+
+<!-- TODO(launch): once the production domain is live, add it as the canonical link
+     (e.g. "- [Pedigree Canvas app](https://<domain>): open the editor") and update
+     the GitHub links above if the repo is renamed or moved. -->
