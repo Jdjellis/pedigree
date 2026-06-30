@@ -316,6 +316,7 @@ export function RadialMenu() {
       addTwinGroup(twinGroup);
       hideRadialMenu();
       select(twin.id);
+      showGenderPicker(twin.id);
       return;
     }
 
@@ -346,7 +347,8 @@ export function RadialMenu() {
     addTwinGroup(twinGroup);
     hideRadialMenu();
     select(twin.id);
-  }, [target, targetId, doc, addChildToFamily, addSiblingViaNewUnion, addTwinGroup, hideRadialMenu, select]);
+    showGenderPicker(twin.id);
+  }, [target, targetId, doc, showGenderPicker, addChildToFamily, addSiblingViaNewUnion, addTwinGroup, hideRadialMenu, select]);
 
   if (!visible || !target || editingLocked || genderPicker.targetId) return null;
 
