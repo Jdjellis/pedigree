@@ -471,16 +471,19 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
     );
 
     const individuals = usePedigreeStore.getState().document.individuals;
-    // Centred: new parents' midpoint equals child's x.
+    // New parents stay centred over their child, keeping the descent line vertical.
     const newParentsCenter =
       (individuals.newdad.position.x + individuals.newmum.position.x) / 2;
     expect(newParentsCenter).toBe(individuals.child.position.x);
-    // Child is not displaced (anchor family lays out at dx=0).
-    expect(individuals.child.position.x).toBe(0);
-    // Spouse is a load-bearing in-law — pinned, not moved by this family's layout.
+    // The child's family slides left to clear the spouse's pinned parents — the
+    // couple-both-have-parents overlap — so the child no longer stays at x=0.
+    expect(individuals.child.position.x).toBe(-80);
+    // Spouse and its parents are a load-bearing in-law family — pinned, unmoved.
     expect(individuals.spouse.position.x).toBe(120);
     expect(individuals.spdad.position.x).toBe(60);
     expect(individuals.spmum.position.x).toBe(180);
+    // Grandparent row clears: spouse's left parent vs child's right parent ≥ 80.
+    expect(individuals.spdad.position.x - individuals.newmum.position.x).toBeGreaterThanOrEqual(80);
   });
 
   it('a single undo reverts an add-parents reflow', () => {
@@ -549,16 +552,16 @@ describe('pedigreeStore layout reflow on add (issue #30)', () => {
       'child',
       0,
     );
-    // With tidy layout the new parents lay out at dx=0 (symmetrically placed
-    // over the child already), so the child stays at x=0.
+    // The child's family slides left to clear the spouse's pinned parents.
     expect(
       usePedigreeStore.getState().document.individuals.child.position.x,
-    ).toBe(0);
+    ).toBe(-80);
 
     usePedigreeStore.temporal.getState().undo();
 
     const individuals = usePedigreeStore.getState().document.individuals;
-    // One undo removes the new parents AND restores the child's original x.
+    // One undo removes the new parents AND restores the child's original x — the
+    // clearance shift reverts as part of the same single step.
     expect(individuals.newdad).toBeUndefined();
     expect(individuals.newmum).toBeUndefined();
     expect(individuals.child.position.x).toBe(0);

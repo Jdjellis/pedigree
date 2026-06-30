@@ -212,6 +212,37 @@ describe('computeTreeLayout — clearance & cross-sibship', () => {
     for (let i = 1; i < gen2.length; i++) expect(gen2[i] - gen2[i - 1]).toBeGreaterThanOrEqual(80);
   });
 
+  it('separates the two parent couples when a married pair both have parents', () => {
+    // Reproduces the overlap bug: a couple s1 (864) — s2 (984), 120 apart, where
+    // BOTH partners have their own parents. Each parent couple is 120 wide and
+    // centred over its child, so s1's mother (924) and s2's father (924) collide.
+    // Adding s2's parents roots the relayout at s2's union and pins s1 (a
+    // load-bearing in-law), so the packer never sees s1's parents. The layout
+    // must shift s2's family clear so the grandparent row no longer overlaps.
+    const individuals = {
+      s1: ind('s1', 864, 0), s2: ind('s2', 984, 0),
+      d1: ind('d1', 804, -1), m1: ind('m1', 924, -1),   // s1's parents
+      d2: ind('d2', 924, -1), m2: ind('m2', 1044, -1),  // s2's parents (d2 overlaps m1)
+    };
+    const partnerships = {
+      couple: union('couple', 's1', 's2', []),
+      left: union('left', 'd1', 'm1', ['s1']),
+      right: union('right', 'd2', 'm2', ['s2']),
+    };
+    const parentChildLinks = {
+      ls1: link('ls1', 'left', 's1'),
+      ls2: link('ls2', 'right', 's2'),
+    };
+    const moved = computeTreeLayout({ individuals, partnerships, parentChildLinks }, 'right');
+    const x = (id: keyof typeof individuals) => moved[id]?.x ?? individuals[id].position.x;
+    // Grandparent row has no overlap: every adjacent pair ≥ SIBLING_SPACING apart.
+    const gp = (['d1', 'm1', 'd2', 'm2'] as const).map(x).sort((a, b) => a - b);
+    for (let i = 1; i < gp.length; i++) expect(gp[i] - gp[i - 1]).toBeGreaterThanOrEqual(80);
+    // Descent lines stay vertical: each parent couple stays centred over its child.
+    expect((x('d2') + x('m2')) / 2).toBe(x('s2'));
+    expect((x('d1') + x('m1')) / 2).toBe(x('s1'));
+  });
+
   it('does not relocate a load-bearing in-law', () => {
     // p (blood) married to inlaw, who has their own parents (load-bearing).
     const individuals = {

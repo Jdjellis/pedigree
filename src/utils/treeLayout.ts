@@ -298,10 +298,116 @@ function layoutUnionFrame(
 }
 
 /**
+ * Collect a married-in partner's own family: everyone reachable from an "in-law"
+ * (a partner of a frame node that is not itself in the frame) by walking
+ * partnerships and parent-child links while staying outside the frame.
+ *
+ * @remarks
+ * These nodes are pinned during this relayout — the packer never sees them — so
+ * when both members of a couple carry their own parents, the parents this layout
+ * places can land on top of the in-law's parents. {@link inLawClearanceShift}
+ * uses the returned positions to translate the laid-out family clear of them.
+ */
+function collectInLawFamilies(doc: LayoutDoc, frameIds: Set<string>): Set<string> {
+  const external = new Set<string>();
+  const queue: string[] = [];
+  const enqueue = (id: string | undefined | null): void => {
+    if (id && !frameIds.has(id) && doc.individuals[id] && !external.has(id)) {
+      external.add(id);
+      queue.push(id);
+    }
+  };
+  // Seed from in-laws: the non-frame partner of any union with a frame member.
+  for (const p of Object.values(doc.partnerships)) {
+    const partners = [p.partner1Id, p.partner2Id].filter((id): id is string => !!id);
+    if (partners.some((id) => frameIds.has(id))) {
+      for (const id of partners) if (!frameIds.has(id)) enqueue(id);
+    }
+  }
+  // Walk outward over partnerships (partners + children) and parent links
+  // (parents), so the in-law's whole blood family is gathered.
+  while (queue.length) {
+    const cur = queue.pop() as string;
+    for (const p of Object.values(doc.partnerships)) {
+      const partners = [p.partner1Id, p.partner2Id].filter((id): id is string => !!id);
+      if (partners.includes(cur)) {
+        partners.forEach(enqueue);
+        p.childrenIds.forEach(enqueue);
+      }
+    }
+    for (const l of Object.values(doc.parentChildLinks)) {
+      if (l.childId === cur) {
+        const u = doc.partnerships[l.parentPartnershipId];
+        if (u) [u.partner1Id, u.partner2Id].forEach(enqueue);
+      }
+    }
+  }
+  return external;
+}
+
+/**
+ * Horizontal translation (added to the anchor `dx`) that slides the whole
+ * laid-out family clear of every connected in-law family it was pinned beside.
+ * For each generation row both families occupy, the laid-out nodes must clear the
+ * pinned nodes by at least `minGap`; the family shifts away from the side the
+ * in-laws sit on. A uniform translation keeps every descent line vertical.
+ *
+ * @remarks
+ * Handles the common single-sided case (the reported couple-both-have-parents
+ * overlap). In-laws on opposite sides of the same family can't both be cleared by
+ * one translation — that would need the family to widen internally — so only the
+ * dominant side is resolved.
+ */
+function inLawClearanceShift(
+  doc: LayoutDoc,
+  framePositions: Record<string, number>,
+  dx: number,
+  genOf: (id: string) => number,
+  minGap: number,
+): number {
+  const frameIds = new Set(Object.keys(framePositions));
+  const external = collectInLawFamilies(doc, frameIds);
+  if (external.size === 0) return 0;
+
+  const bucket = (map: Map<number, number[]>, gen: number, x: number): void => {
+    const arr = map.get(gen);
+    if (arr) arr.push(x);
+    else map.set(gen, [x]);
+  };
+  const frameByGen = new Map<number, number[]>();
+  for (const [id, fx] of Object.entries(framePositions)) bucket(frameByGen, genOf(id), fx + dx);
+  const extByGen = new Map<number, number[]>();
+  for (const id of external) bucket(extByGen, genOf(id), doc.individuals[id].position.x);
+
+  const flat = (m: Map<number, number[]>): number[] => [...m.values()].flat();
+  const frameXs = flat(frameByGen);
+  const extXs = flat(extByGen);
+  if (!frameXs.length || !extXs.length) return 0;
+  const mean = (xs: number[]): number => xs.reduce((s, v) => s + v, 0) / xs.length;
+  const frameIsRight = mean(frameXs) >= mean(extXs);
+
+  let shift = 0;
+  for (const [gen, fxs] of frameByGen) {
+    const exs = extByGen.get(gen);
+    if (!exs) continue;
+    if (frameIsRight) {
+      const need = Math.max(...exs) + minGap - Math.min(...fxs);
+      if (need > shift) shift = need;
+    } else {
+      const need = Math.min(...exs) - minGap - Math.max(...fxs);
+      if (need < shift) shift = need;
+    }
+  }
+  return shift;
+}
+
+/**
  * Compute tidy x and per-generation-row y for every node in the blood family
  * rooted at `rootUnionId`, plus its married-in partners. Anchored so the root
- * union's centre keeps its current x (the canvas does not jump). Returns only
- * the nodes whose position changes, so a tidy family yields an empty map.
+ * union's centre keeps its current x (the canvas does not jump), then shifted if
+ * needed to clear a married-in partner's own family (see
+ * {@link inLawClearanceShift}). Returns only the nodes whose position changes, so
+ * a tidy family yields an empty map.
  */
 export function computeTreeLayout(
   doc: LayoutDoc,
@@ -338,11 +444,18 @@ export function computeTreeLayout(
   const rootGen = ref?.generation ?? 0;
   const rootY = ref?.position.y ?? 0;
 
+  // A married-in partner that carries its own parents is pinned and invisible to
+  // the packer, so the parents placed here can collide with it in a shared row.
+  // Slide the whole laid-out family clear of those pinned in-law families.
+  const genOf = (id: string): number => doc.individuals[id]?.generation ?? rootGen;
+  const dxFinal =
+    dx + inLawClearanceShift(doc, frame.positions, dx, genOf, spacing.siblingSpacing);
+
   const result: Record<string, { x: number; y: number }> = {};
   for (const [id, fx] of Object.entries(frame.positions)) {
     const node = doc.individuals[id];
     if (!node) continue;
-    const x = fx + dx;
+    const x = fx + dxFinal;
     const gen = node.generation ?? rootGen;
     const y = rootY + (gen - rootGen) * spacing.generationSpacing;
     if (node.position.x !== x || node.position.y !== y) result[id] = { x, y };
