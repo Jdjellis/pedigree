@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
 import { GenderIdentity, SexAssignedAtBirth, VitalStatus } from '../../types/enums';
+import type { Individual, LegendEntry } from '../../types/pedigree';
 import { GenderIconButtons } from './GenderIconButtons';
 import { SegmentedControl } from './SegmentedControl';
 import styles from './PropertiesPanel.module.css';
@@ -22,6 +23,13 @@ export function sharedValue<T>(values: T[]): T | undefined {
   return rest.every((v) => v === first) ? first : undefined;
 }
 
+/** Whether a legend entry applies to a person, honouring its gender restriction. */
+function conditionAppliesTo(entry: LegendEntry, person: Individual): boolean {
+  if (!entry.applicableTo) return true;
+  if (entry.applicableTo === 'man') return person.genderIdentity === GenderIdentity.Man;
+  return person.genderIdentity === GenderIdentity.Woman;
+}
+
 /**
  * Properties editor shown when more than one individual is selected. Edits the
  * agreed bulk-eligible fields across the whole selection; controls whose people
@@ -33,6 +41,8 @@ export function MultiSelectProperties() {
   const editingLocked = useUIStore((s) => s.editingLocked);
   const individuals = usePedigreeStore((s) => s.document.individuals);
   const updateIndividuals = usePedigreeStore((s) => s.updateIndividuals);
+  const legendConfig = usePedigreeStore((s) => s.document.legendConfig);
+  const setConditionForIndividuals = usePedigreeStore((s) => s.setConditionForIndividuals);
 
   const ids = useMemo(
     () => Array.from(selectedIds).filter((id) => individuals[id]),
@@ -56,6 +66,10 @@ export function MultiSelectProperties() {
   const allAdopted = people.every((p) => p.adopted === true);
   const anyAdopted = people.some((p) => p.adopted === true);
   const adoptedMixed = anyAdopted && !allAdopted;
+
+  const applicableEntries = legendConfig.entries.filter((entry) =>
+    people.some((p) => conditionAppliesTo(entry, p)),
+  );
 
   return (
     <div className={styles.panel}>
@@ -151,6 +165,55 @@ export function MultiSelectProperties() {
               Adopted
             </label>
           </div>
+        </div>
+
+        <div className={styles.divider} />
+
+        <div className={styles.section}>
+          <div className={styles.sectionTitle}>Conditions</div>
+          {applicableEntries.length === 0 ? (
+            <p className={styles.hint}>
+              {legendConfig.entries.length === 0
+                ? 'No conditions defined. Use the Legend editor to add conditions.'
+                : 'No conditions apply to the selected people.'}
+            </p>
+          ) : (
+            applicableEntries.map((entry) => {
+              const applicableIds = ids.filter((id) =>
+                conditionAppliesTo(entry, individuals[id]),
+              );
+              const allHave =
+                applicableIds.length > 0 &&
+                applicableIds.every((id) =>
+                  (individuals[id].conditionIds ?? []).includes(entry.id),
+                );
+              const anyHave = applicableIds.some((id) =>
+                (individuals[id].conditionIds ?? []).includes(entry.id),
+              );
+              const mixed = anyHave && !allHave;
+              return (
+                <div key={entry.id} className={styles.field}>
+                  <label className={styles.checkbox}>
+                    <input
+                      type="checkbox"
+                      checked={allHave}
+                      ref={(el) => {
+                        if (el) el.indeterminate = mixed;
+                      }}
+                      onChange={() =>
+                        setConditionForIndividuals(applicableIds, entry.id, !allHave)
+                      }
+                    />
+                    <span
+                      className={styles.conditionSwatch}
+                      style={{ backgroundColor: entry.fillColor }}
+                    />
+                    {entry.name}
+                  </label>
+                </div>
+              );
+            })
+          )}
         </div>
       </fieldset>
     </div>

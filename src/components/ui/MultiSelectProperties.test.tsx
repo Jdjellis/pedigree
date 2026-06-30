@@ -7,6 +7,7 @@ import {
 } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
 import { GenderIdentity, VitalStatus } from '../../types/enums';
+import type { LegendEntry } from '../../types/pedigree';
 import { PropertiesPanel } from './PropertiesPanel';
 
 function selectPeople(ids: string[]) {
@@ -140,5 +141,67 @@ describe('MultiSelectProperties — vital status & adoption', () => {
     const after = usePedigreeStore.getState().document;
     expect(after.individuals.a.adopted).toBe(true);
     expect(after.individuals.b.adopted).toBe(true);
+  });
+});
+
+function entry(id: string, name: string, applicableTo?: 'man' | 'woman'): LegendEntry {
+  return { id, quarter: 'topLeft', fillColor: '#c00', fillPattern: 'solid', name, applicableTo };
+}
+
+describe('MultiSelectProperties — conditions', () => {
+  it('checks the condition when all selected people have it', () => {
+    const doc = createDefaultDocument();
+    doc.legendConfig.entries = [entry('x', 'Cancer')];
+    doc.individuals['a'] = createDefaultIndividual({ id: 'a', conditionIds: ['x'] });
+    doc.individuals['b'] = createDefaultIndividual({ id: 'b', conditionIds: ['x'] });
+    act(() => usePedigreeStore.getState().setDocument(doc));
+    selectPeople(['a', 'b']);
+
+    render(<PropertiesPanel />);
+    expect(screen.getByRole('checkbox', { name: /Cancer/ })).toBeChecked();
+  });
+
+  it('shows an indeterminate condition checkbox when only some have it', () => {
+    const doc = createDefaultDocument();
+    doc.legendConfig.entries = [entry('x', 'Cancer')];
+    doc.individuals['a'] = createDefaultIndividual({ id: 'a', conditionIds: ['x'] });
+    doc.individuals['b'] = createDefaultIndividual({ id: 'b', conditionIds: [] });
+    act(() => usePedigreeStore.getState().setDocument(doc));
+    selectPeople(['a', 'b']);
+
+    render(<PropertiesPanel />);
+    expect(screen.getByRole('checkbox', { name: /Cancer/ })).toBePartiallyChecked();
+  });
+
+  it('applies the condition to all when toggled from indeterminate', () => {
+    const doc = createDefaultDocument();
+    doc.legendConfig.entries = [entry('x', 'Cancer')];
+    doc.individuals['a'] = createDefaultIndividual({ id: 'a', conditionIds: ['x'] });
+    doc.individuals['b'] = createDefaultIndividual({ id: 'b', conditionIds: [] });
+    act(() => usePedigreeStore.getState().setDocument(doc));
+    selectPeople(['a', 'b']);
+
+    render(<PropertiesPanel />);
+    act(() => fireEvent.click(screen.getByRole('checkbox', { name: /Cancer/ })));
+
+    const after = usePedigreeStore.getState().document;
+    expect(after.individuals.a.conditionIds).toContain('x');
+    expect(after.individuals.b.conditionIds).toContain('x');
+  });
+
+  it('only writes a gender-specific condition to applicable people', () => {
+    const doc = createDefaultDocument();
+    doc.legendConfig.entries = [entry('brca', 'BRCA (women)', 'woman')];
+    doc.individuals['w'] = createDefaultIndividual({ id: 'w', genderIdentity: GenderIdentity.Woman, conditionIds: [] });
+    doc.individuals['m'] = createDefaultIndividual({ id: 'm', genderIdentity: GenderIdentity.Man, conditionIds: [] });
+    act(() => usePedigreeStore.getState().setDocument(doc));
+    selectPeople(['w', 'm']);
+
+    render(<PropertiesPanel />);
+    act(() => fireEvent.click(screen.getByRole('checkbox', { name: /BRCA/ })));
+
+    const after = usePedigreeStore.getState().document;
+    expect(after.individuals.w.conditionIds).toContain('brca');
+    expect(after.individuals.m.conditionIds).not.toContain('brca');
   });
 });
