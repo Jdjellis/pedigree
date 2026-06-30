@@ -48,7 +48,7 @@ Per `docs/bennett-pedigree-standards.md` (NSGC/Bennett 2022, PMID 36106433): **s
 
 A small **HTML overlay** (react-dom), *not* a Konva node — same rendering class as `RadialMenu`, for the same reason (sidesteps the canvas testing constraint, and obeys the project rule of lifting Zustand subscriptions out of the Konva tree).
 
-- **Location & subscriptions:** rendered at `CanvasContainer` level alongside `RadialMenu`. Subscribes to the viewport primitives (`scale`, `position.x`, `position.y`) so it tracks pan/zoom, and to the target individual in `document` so it tracks the node if respacing nudges it after insert.
+- **Location & subscriptions:** rendered in `App.tsx` inside `.canvasArea`, immediately after `<RadialMenu />` (both are react-dom HTML overlays, siblings of `<CanvasContainer />`). Subscribes to the viewport primitives (`scale`, `position.x`, `position.y`) so it tracks pan/zoom, and to the target individual in `document` so it tracks the node if respacing nudges it after insert.
 - **Position:** anchored directly **above** the node — `x = node.position.x · scale + viewportX`, `y = node.position.y · scale + viewportY − (pickerHeight + gap)`. (`RadialMenu` centres on the node; this offsets upward.)
 - **Contents:** renders `GenderIconButtons` (`value` = the node's current `genderIdentity`, `onChange` = commit, see §4). Zero new symbol artwork.
 - **Visibility:** shown when `uiStore.genderPicker.targetId` is set and the target exists; suppressed when `editingLocked` (mirrors the radial gate).
@@ -143,7 +143,7 @@ Net: the feature **deletes more than it adds** — the picker reuses `GenderIcon
 | `src/components/ui/InlineGenderPicker.test.tsx` (new) | keyboard / dismiss / selection |
 | `src/components/ui/commitGenderPick.ts` (new) + test | the pause/resume amendment, unit-tested |
 | `src/stores/uiStore.ts` | add `genderPicker` + actions; remove `defaultSex`/`setDefaultSex` |
-| `src/components/canvas/CanvasContainer.tsx` | render `InlineGenderPicker` |
+| `src/App.tsx` | render `<InlineGenderPicker />` after `<RadialMenu />` |
 | `src/components/ui/RadialMenu.tsx` | 3 handlers create Unknown + `showGenderPicker`; `handleAddTwin` drops `createRelativeIndividual` (Unknown, no picker); add `&& !genderPicker.targetId` to the visibility gate |
 | `src/components/canvas/OnboardingHints.tsx` | first-run radial is gated behind the proband picker (no code change beyond verifying the transition; see §3) |
 | `src/commands/useEditorActions.ts` | `newDocument` re-seed: drop `defaultSex`; seed Unknown; open picker on the new seed |
@@ -161,7 +161,7 @@ The picker and commit logic are react-dom / store-level, so both are **jsdom-tes
 
 - **`InlineGenderPicker`** — renders for a target; `M`/`F`/`N`/`U` commit the right `genderIdentity` and close; `Esc`/`Enter`/click-away close keeping current; hidden when `editingLocked`; keydown does not leak to global shortcuts.
 - **`commitGenderPick`** (store-level) — pick amends in place (node count unchanged, gender set); **undo after pick removes the node**; **undo after dismiss removes the node**; **redo restores node + gender together**; pick of `null` (dismiss) leaves Unknown and adds no history entry.
-- **Creation paths** — radial Partner/Child/Sibling and click-to-place each create Unknown and set `genderPicker.targetId`; the *existing-parents* sibling/child branch now also opens the picker (regression guard for the latent inconsistency).
+- **Creation paths** — radial Partner/Child/Sibling and both seed paths (`newDocument`, first-run seed) each create Unknown and set `genderPicker.targetId`; the *existing-parents* sibling/child branch now also opens the picker (regression guard for the latent inconsistency).
 - **`svgExport` untouched** — symbol rendering is unchanged (shape still derives from `genderIdentity`), so the parallel SVG renderer needs no mirror work.
 
 ---
