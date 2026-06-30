@@ -733,6 +733,8 @@ export const usePedigreeStore = create<PedigreeState>()(
         }),
 
       groupTwins: (ids, twinType) => {
+        // groupTwins must return the resulting group id, so the set() updater
+        // (which returns the new state, not a value) writes it to this closure var.
         let resultId: string | null = null;
         set((state) => {
           const sibshipId = commonSibshipId(state.document, ids);

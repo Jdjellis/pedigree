@@ -114,6 +114,7 @@ export function MultiSelectProperties() {
                     Existing group zygosity: {ZYGOSITY_LABELS[survivingGroup.twinType]}
                   </p>
                   <button
+                    type="button"
                     className={styles.addButton}
                     onClick={() => groupTwins(ids, survivingGroup.twinType)}
                   >
@@ -123,18 +124,21 @@ export function MultiSelectProperties() {
               ) : (
                 <>
                   <button
+                    type="button"
                     className={styles.addButton}
                     onClick={() => groupTwins(ids, TwinType.Monozygotic)}
                   >
                     Group as MZ twins
                   </button>
                   <button
+                    type="button"
                     className={styles.addButton}
                     onClick={() => groupTwins(ids, TwinType.Dizygotic)}
                   >
                     Group as DZ twins
                   </button>
                   <button
+                    type="button"
                     className={styles.addButton}
                     onClick={() => groupTwins(ids, TwinType.Unknown)}
                   >
