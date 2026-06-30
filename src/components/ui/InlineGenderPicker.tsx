@@ -42,6 +42,12 @@ export function InlineGenderPicker(): React.JSX.Element | null {
     if (targetId) commitGenderPick(targetId, null);
   }, [targetId]);
 
+  // Self-clear: if the picker's target disappears (undo, delete, import) while
+  // the picker is open, dismiss it so the radial menu gate is not left stuck.
+  useEffect(() => {
+    if (targetId && !target) useUIStore.getState().hideGenderPicker();
+  }, [targetId, target]);
+
   // Capture-phase listener so M/F/N/U/Esc/Enter resolve the picker before any
   // global shortcut sees them.
   useEffect(() => {
@@ -49,6 +55,8 @@ export function InlineGenderPicker(): React.JSX.Element | null {
     const onKeyDown = (e: KeyboardEvent): void => {
       const gender = KEY_TO_GENDER[e.key.toLowerCase()];
       if (gender !== undefined) {
+        // Don't hijack system / app modified shortcuts (Cmd+F, Ctrl+N, etc.).
+        if (e.metaKey || e.ctrlKey || e.altKey) return;
         e.preventDefault();
         e.stopPropagation();
         commitGenderPick(targetId, gender);

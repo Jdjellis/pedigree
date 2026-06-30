@@ -1,5 +1,5 @@
 // src/components/ui/InlineGenderPicker.test.tsx
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent, act } from '@testing-library/react';
 import { InlineGenderPicker } from './InlineGenderPicker';
 import { useUIStore } from '../../stores/uiStore';
@@ -70,7 +70,7 @@ describe('InlineGenderPicker', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('tears down the keydown listener when the target individual is removed', () => {
+  it('self-clears when the target individual is removed (radial menu gate is not left stuck)', () => {
     useUIStore.getState().showGenderPicker(TARGET);
     render(<InlineGenderPicker />);
 
@@ -79,10 +79,29 @@ describe('InlineGenderPicker', () => {
       usePedigreeStore.getState().removeIndividual(TARGET);
     });
 
-    // M keystroke must NOT trigger commitGenderPick / hideGenderPicker.
-    fireEvent.keyDown(window, { key: 'm' });
+    // The self-clear effect must fire: targetId becomes null so the radial
+    // menu gate (which suppresses the menu while targetId is set) is released.
+    expect(useUIStore.getState().genderPicker.targetId).toBeNull();
+  });
 
-    // genderPicker.targetId is still TARGET — the stale listener didn't fire.
-    expect(useUIStore.getState().genderPicker.targetId).toBe(TARGET);
+  it('Enter dismisses without changing the shape', () => {
+    useUIStore.getState().showGenderPicker(TARGET);
+    render(<InlineGenderPicker />);
+    fireEvent.keyDown(window, { key: 'Enter' });
+    expect(genderOf(TARGET)).toBe(GenderIdentity.Unknown);
+    expect(useUIStore.getState().genderPicker.targetId).toBeNull();
+  });
+
+  it('does not leak to bubble-phase listeners (capture + stopPropagation)', () => {
+    useUIStore.getState().showGenderPicker(TARGET);
+    render(<InlineGenderPicker />);
+
+    const spy = vi.fn();
+    window.addEventListener('keydown', spy); // bubble phase
+    fireEvent.keyDown(window, { key: 'm' });
+    window.removeEventListener('keydown', spy);
+
+    // The capture-phase handler called stopPropagation; the bubble spy must not fire.
+    expect(spy).not.toHaveBeenCalled();
   });
 });
