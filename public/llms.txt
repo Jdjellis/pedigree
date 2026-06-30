@@ -8,6 +8,7 @@ It is a documentation and educational tool. It is **not a medical device** and i
 
 ## Key links
 
+- [Pedigree Canvas app](https://www.pedigree.clintech.com.au): open the editor
 - [GitHub repository](https://github.com/Jdjellis/pedigree-canvas): source, issues, and roadmap
 - [README](https://github.com/Jdjellis/pedigree-canvas/blob/main/README.md): features, tech stack, and usage
 - [Changelog](https://github.com/Jdjellis/pedigree-canvas/blob/main/CHANGELOG.md): release notes
@@ -17,7 +18,3 @@ It is a documentation and educational tool. It is **not a medical device** and i
 - Genetic counsellors and clinical geneticists building family pedigrees
 - Clinical genetics education and teaching
 - Anyone needing standardised pedigree symbols exported to PDF, PNG, SVG, or .ped
-
-<!-- TODO(launch): once the production domain is live, add it as the canonical link
-     (e.g. "- [Pedigree Canvas app](https://<domain>): open the editor") and update
-     the GitHub links above if the repo is renamed or moved. -->
