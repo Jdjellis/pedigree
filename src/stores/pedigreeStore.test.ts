@@ -1344,7 +1344,7 @@ describe('seed → add partner → add parents to partner (regression)', () => {
   // in-laws' row while the partner dropped a generation.
   it('keeps the founder and partner on one row with parents directly above', () => {
     const store = usePedigreeStore.getState();
-    store.setDocument(createSeededDocument('unknown', { x: 800, y: 500 }));
+    store.setDocument(createSeededDocument({ x: 800, y: 500 }));
 
     const seed = Object.values(usePedigreeStore.getState().document.individuals)[0];
 
@@ -1761,5 +1761,19 @@ describe('groupTwins', () => {
     store.groupTwins(['a', 'b'], TwinType.Dizygotic);
     usePedigreeStore.temporal.getState().undo();
     expect(Object.keys(usePedigreeStore.getState().document.twinGroups)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createSeededDocument
+// ---------------------------------------------------------------------------
+
+describe('createSeededDocument', () => {
+  it('createSeededDocument seeds a single Unknown individual at the given position', () => {
+    const doc = createSeededDocument({ x: 5, y: 7 });
+    const people = Object.values(doc.individuals);
+    expect(people).toHaveLength(1);
+    expect(people[0].genderIdentity).toBe(GenderIdentity.Unknown);
+    expect(people[0].position).toEqual({ x: 5, y: 7 });
   });
 });
