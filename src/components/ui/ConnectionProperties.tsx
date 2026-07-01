@@ -21,6 +21,22 @@ const DESCENT_OPTIONS: { value: 'biological' | 'adoptive'; label: string }[] = [
   { value: 'adoptive', label: 'Adoptive' },
 ];
 
+type ChildlessValue = 'none' | 'noChildren' | 'infertility';
+
+const CHILDLESS_OPTIONS: { value: ChildlessValue; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'noChildren', label: 'No children' },
+  { value: 'infertility', label: 'Infertility' },
+];
+
+/** Plain-language description of the marker each childless status draws. */
+const CHILDLESS_HINT: Record<'noChildren' | 'infertility', string> = {
+  noChildren:
+    'Draws a single cross-bar below the couple’s line — no children by choice or reason unknown.',
+  infertility:
+    'Draws a double cross-bar below the couple’s line (with the cause, if given), per standard.',
+};
+
 /**
  * Properties editor for a selected connection (line of descent, partnership, or
  * twin connector). Rendered by {@link PropertiesPanel} when
@@ -83,6 +99,51 @@ export function ConnectionProperties() {
               />
             </div>
           )}
+          <div className={styles.field}>
+            <label className={styles.label}>Childlessness</label>
+            <SegmentedControl
+              options={CHILDLESS_OPTIONS}
+              value={p.childlessStatus ?? 'none'}
+              disabled={p.childrenIds.length > 0}
+              onChange={(v) =>
+                updatePartnership(p.id, {
+                  childlessStatus: v === 'none' ? undefined : v,
+                  // Drop any stale cause when leaving the infertility state.
+                  childlessReason: v === 'infertility' ? p.childlessReason : undefined,
+                })
+              }
+              ariaLabel="Childless status"
+            />
+            {p.childrenIds.length > 0 ? (
+              <p className={styles.hint}>
+                A childless marker doesn’t apply — this union has{' '}
+                {p.childrenIds.length === 1 ? 'a child' : 'children'}. Detach{' '}
+                {p.childrenIds.length === 1 ? 'them' : 'all of them'} first to mark
+                it infertile or childless.
+              </p>
+            ) : (
+              <>
+                {p.childlessStatus && (
+                  <p className={styles.hint}>{CHILDLESS_HINT[p.childlessStatus]}</p>
+                )}
+                {p.childlessStatus === 'infertility' && (
+                  <>
+                    <label className={styles.label}>Cause</label>
+                    <input
+                      className={styles.input}
+                      value={p.childlessReason ?? ''}
+                      onChange={(e) =>
+                        updatePartnership(p.id, {
+                          childlessReason: e.target.value || undefined,
+                        })
+                      }
+                      placeholder="e.g. azoospermia"
+                    />
+                  </>
+                )}
+              </>
+            )}
+          </div>
           {p.childrenIds.length > 0 && (
             <p className={styles.hint}>
               Removing this relationship also detaches its{' '}

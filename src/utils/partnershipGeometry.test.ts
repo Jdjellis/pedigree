@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { consanguinityLines, partnershipMidpoint } from './partnershipGeometry';
+import {
+  childlessMarks,
+  consanguinityLines,
+  partnershipMidpoint,
+} from './partnershipGeometry';
 
 describe('consanguinityLines', () => {
   it('offsets vertically for a same-generation (horizontal) union', () => {
@@ -30,5 +34,27 @@ describe('consanguinityLines', () => {
 describe('partnershipMidpoint', () => {
   it('returns the average of the two points', () => {
     expect(partnershipMidpoint({ x: 0, y: 0 }, { x: 10, y: 20 })).toEqual({ x: 5, y: 10 });
+  });
+});
+
+describe('childlessMarks', () => {
+  const opts = { stub: 18, barHalf: 8, barGap: 5 };
+
+  it('drops a stub and a single bar for no children by choice', () => {
+    const { stub, bars } = childlessMarks({ x: 100, y: 50 }, 'noChildren', opts);
+    // Stub descends from the midpoint by `stub`.
+    expect(stub).toEqual([100, 50, 100, 68]);
+    // One horizontal bar at the stub's end, centred on the midpoint x.
+    expect(bars).toEqual([[92, 68, 108, 68]]);
+  });
+
+  it('draws two parallel bars for infertility', () => {
+    const { stub, bars } = childlessMarks({ x: 100, y: 50 }, 'infertility', opts);
+    expect(stub).toEqual([100, 50, 100, 68]);
+    // Upper bar sits `barGap` above the lower one; both span 2*barHalf.
+    expect(bars).toEqual([
+      [92, 63, 108, 63],
+      [92, 68, 108, 68],
+    ]);
   });
 });

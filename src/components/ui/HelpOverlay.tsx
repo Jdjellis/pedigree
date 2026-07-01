@@ -79,6 +79,10 @@ export function HelpOverlay(): React.JSX.Element {
                   person to another to link them, then pick the relationship type.
                 </li>
                 <li>
+                  Click a person <em>or a line</em> to edit it in the properties
+                  panel — line type, consanguinity, and infertility live there.
+                </li>
+                <li>
                   Press <kbd className={styles.kbd}>⌘K</kbd> for all commands.
                 </li>
                 <li>Open, import, and export from the top-left menu.</li>

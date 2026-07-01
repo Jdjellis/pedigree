@@ -26,11 +26,15 @@ export enum VitalStatus {
   Stillborn = 'stillborn',
 }
 
+/**
+ * Pregnancy loss not carried to term — rendered as a triangle per NSGC/Bennett.
+ * Note: a stillbirth is NOT one of these; it is a later-gestation loss drawn
+ * with the sex-specific symbol and a deceased slash (see {@link VitalStatus}).
+ */
 export enum PregnancyOutcome {
   SAB = 'SAB',
   TOP = 'TOP',
   ECT = 'ECT',
-  SB = 'SB',
 }
 
 export enum RelationshipType {

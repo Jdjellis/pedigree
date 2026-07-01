@@ -1,3 +1,4 @@
+import type { JSX } from 'react';
 import { useCallback } from 'react';
 import { Line, Text } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
@@ -9,13 +10,79 @@ import {
   LINE_COLOR,
   LINE_WIDTH,
   CONSANGUINITY_GAP,
+  CHILDLESS_STUB,
+  CHILDLESS_BAR_HALF,
+  CHILDLESS_BAR_GAP,
   LABEL_FONT_SIZE,
   LABEL_FONT_FAMILY,
   LABEL_COLOR,
   RELATIONSHIP_LABEL_OFFSET,
   SELECTION_COLOR,
 } from '../../utils/constants';
-import { consanguinityLines, partnershipMidpoint } from '../../utils/partnershipGeometry';
+import {
+  childlessMarks,
+  consanguinityLines,
+  partnershipMidpoint,
+} from '../../utils/partnershipGeometry';
+
+/**
+ * Marks for a childless union (infertility / no children by choice), hung below
+ * the relationship-line midpoint. Rendered for any relationship type, so it is
+ * computed once and appended after the base line. Non-interactive: selection is
+ * driven by the base line's hit area.
+ *
+ * Suppressed once the union has children on the canvas: a childless marker would
+ * contradict the sibship it hangs over, and the panel control is disabled there,
+ * so a stale marker would otherwise be unremovable (mirrors svgExport.ts).
+ */
+function childlessMarkElements(
+  partnership: PartnershipRelationship,
+  mid: { x: number; y: number },
+  stroke: string,
+): JSX.Element[] {
+  if (!partnership.childlessStatus || partnership.childrenIds.length > 0) return [];
+  const { stub, bars } = childlessMarks(mid, partnership.childlessStatus, {
+    stub: CHILDLESS_STUB,
+    barHalf: CHILDLESS_BAR_HALF,
+    barGap: CHILDLESS_BAR_GAP,
+  });
+  const els: JSX.Element[] = [
+    <Line
+      key={`cl-stub-${partnership.id}`}
+      points={stub}
+      stroke={stroke}
+      strokeWidth={LINE_WIDTH}
+      listening={false}
+    />,
+    ...bars.map((b, i) => (
+      <Line
+        key={`cl-bar-${partnership.id}-${i}`}
+        points={b}
+        stroke={stroke}
+        strokeWidth={LINE_WIDTH}
+        listening={false}
+      />
+    )),
+  ];
+  const reason = partnership.childlessReason?.trim();
+  if (partnership.childlessStatus === 'infertility' && reason) {
+    els.push(
+      <Text
+        key={`cl-reason-${partnership.id}`}
+        text={reason}
+        x={mid.x - 100}
+        y={mid.y + CHILDLESS_STUB + RELATIONSHIP_LABEL_OFFSET}
+        width={200}
+        align="center"
+        fontSize={LABEL_FONT_SIZE}
+        fontFamily={LABEL_FONT_FAMILY}
+        fill={LABEL_COLOR}
+        listening={false}
+      />,
+    );
+  }
+  return els;
+}
 
 interface PartnershipLineProps {
   partnership: PartnershipRelationship;
@@ -57,6 +124,9 @@ export function PartnershipLine({ partnership, individuals, selectedConnection }
     onMouseLeave: () => setCursor('default'),
   };
 
+  const markStroke = isSelected ? SELECTION_COLOR : LINE_COLOR;
+  const childless = childlessMarkElements(partnership, mid, markStroke);
+
   if (partnership.type === RelationshipType.Consanguinity) {
     const degree = partnership.consanguinityDegree?.trim();
     const { a, b } = consanguinityLines(p1.position, p2.position, CONSANGUINITY_GAP);
@@ -78,6 +148,7 @@ export function PartnershipLine({ partnership, individuals, selectedConnection }
             listening={false}
           />
         )}
+        {childless}
       </>
     );
   }
@@ -98,15 +169,19 @@ export function PartnershipLine({ partnership, individuals, selectedConnection }
           points={[mid.x + 2, mid.y - hashSize, mid.x + 10, mid.y + hashSize]}
           {...lineProps}
         />
+        {childless}
       </>
     );
   }
 
   // Standard partnership - solid line
   return (
-    <Line
-      points={[p1.position.x, p1.position.y, p2.position.x, p2.position.y]}
-      {...lineProps}
-    />
+    <>
+      <Line
+        points={[p1.position.x, p1.position.y, p2.position.x, p2.position.y]}
+        {...lineProps}
+      />
+      {childless}
+    </>
   );
 }

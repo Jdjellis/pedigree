@@ -71,24 +71,34 @@ The app uses a **legend-driven quarter system** (`QuarterPosition` × `LegendEnt
 |--------|--------|----------|
 | Alive | Normal symbol | `VitalStatus.Alive` |
 | Deceased | Diagonal slash through symbol (lower-left → upper-right) | `VitalStatus.Deceased` |
-| Stillborn | Symbol + slash + "SB" label | `VitalStatus.Stillborn` |
+| Stillborn | **Sex-specific symbol** (□/○/◇) + deceased slash + "SB" label + gestational age. **Not a triangle** — the triangle is reserved for earlier pregnancy loss (§5). | `VitalStatus.Stillborn` (+ `Individual.gestationalAge`) |
 
 ---
 
 ## 5. Pregnancy Outcomes (Triangle Symbols)
 
-Pregnancies not carried to term render as a small **triangle** symbol:
+Pregnancies **not carried to term** render as a small **triangle** symbol:
 
 | Outcome | Abbreviation | Convention |
 |---------|-------------|-----------|
 | Spontaneous abortion / miscarriage | SAB | Open triangle; gestational age noted if known |
 | Termination of pregnancy (elective) | TOP | Open triangle; filled if affected fetus |
 | Ectopic pregnancy | ECT | Triangle + "ECT" annotation |
-| Stillbirth | SB | Treated as `VitalStatus.Stillborn`; symbol with deceased slash |
 
-App enums: `PregnancyOutcome.SAB`, `.TOP`, `.ECT`, `.SB`.
+App enums: `PregnancyOutcome.SAB`, `.TOP`, `.ECT`.
+
+> **Stillbirth is *not* a triangle.** A stillbirth (SB) is a later-gestation loss
+> where the sex is usually known, so per Bennett/NSGC it is drawn with the
+> sex-specific symbol and a deceased slash — see §4 (`VitalStatus.Stillborn`).
+> The triangle here is reserved for pregnancies where the fetus was not carried
+> to term (SAB/TOP/ECT). Modelling a stillbirth as a triangle is a common
+> conflation but is contrary to the standard.
 
 Ongoing / live pregnancy: diamond symbol (sex unknown) or sex-specific symbol when known, with gestational age annotated (e.g. "GA: 22 wk").
+
+> **Not yet in the app:** there is no UI to mark a pregnancy or set SAB/TOP/ECT,
+> so triangle rendering is currently reachable only via imported data. Tracked
+> as a follow-on to the stillbirth work (issue #106).
 
 ---
 
@@ -103,7 +113,7 @@ Ongoing / live pregnancy: diamond symbol (sex unknown) or sex-specific symbol wh
 | Sibship line | Horizontal line from which siblings drop vertically | — (computed from partnership children) |
 | Parent-child | Vertical from sibship line down to child's symbol | `RelationshipType.ParentChild` |
 | Adoption | **Brackets** enclose the adoptee for *all* adoptions; line of descent is **dashed** from adoptive parents and **solid** from biological parents (no arrow — see §9) | `Individual.adopted` + `ParentChildRelationship.isAdoptive` |
-| Infertility / no offspring | Two vertical tick-marks through the mating line | *(not yet modelled as a relationship type)* |
+| Infertility / no offspring | A short vertical stub hangs from the mating-line midpoint, ended by a **single** cross-bar ("no children by choice or reason unknown") or **two** parallel cross-bars (infertility, with an optional cause annotated below) | `PartnershipRelationship.childlessStatus` (`'noChildren'` \| `'infertility'`) + `childlessReason` |
 
 ---
 
@@ -217,13 +227,14 @@ App: `LegendConfig` with `LegendEntry[]` (id, quarter, fillColor, fillPattern, n
 - Consanguinity double line with optional degree-of-relationship annotation (`PartnershipRelationship.consanguinityDegree`)
 - Parent-child and adoption links; adopted individuals are drawn in square brackets (`Individual.adopted`, `AdoptionBrackets`), and each line of descent is **dashed for adoptive** parents / **solid for biological** parents via `ParentChildRelationship.isAdoptive` (adopted-in vs adopted-out). Showing both families for one child at once is deferred to multi-parentage (#64).
 - MZ / DZ / unknown twin groups (with the `?` rendered for unknown zygosity); created via the "Mark selected as twins" command, zygosity editable in the properties panel
-- Pregnancy outcomes: SAB, TOP, ECT, SB
-- Vital status: alive, deceased, stillborn
+- Pregnancy outcomes: SAB, TOP, ECT (triangle; data model only — no UI yet)
+- Vital status: alive, deceased, stillborn (stillborn drawn with the sex symbol + deceased slash + "SB" + gestational age)
+- Childless unions: infertility (double cross-bar + optional cause) and no children by choice (single cross-bar) via `PartnershipRelationship.childlessStatus`
 - Individual numbering within generations (`generationOrder`)
 - Investigations (genetic test label + result)
 - Text annotations (free-form canvas text)
 
 ### Gaps / Not yet modelled
 - **Carrier notation**: No dedicated `isCarrier` or `carrierStatus` field; must be approximated with a condition quarter fill + legend entry.
-- **Infertility / no-offspring line**: No `RelationshipType` value for a couple with documented infertility.
+- **Pregnancy-loss UI**: SAB/TOP/ECT triangles exist in the data model but have no editing UI yet (follow-on to #106).
 - **Individual diagnosis uncertainty**: No structured `diagnosisUncertain` flag; convention is to use a notes field.
