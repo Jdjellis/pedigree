@@ -174,6 +174,35 @@ test('menu contains a "Command palette" item that opens the command palette', ()
   expect(useUIStore.getState().commandPaletteOpen).toBe(true);
 });
 
+test('menu contains a "Keyboard shortcuts" item that opens the shortcuts overlay', () => {
+  render(<MenuIsland />);
+
+  fireEvent.click(screen.getByRole('button', { name: /open document menu/i }));
+
+  const helpItem = screen.getByRole('menuitem', { name: /keyboard shortcuts/i });
+  expect(helpItem).toBeInTheDocument();
+
+  fireEvent.click(helpItem);
+
+  expect(useUIStore.getState().activeModal).toBe('shortcuts');
+  // Clicking a menu item closes the dropdown.
+  expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+});
+
+test('menu items expose their keyboard shortcut without polluting the accessible name', () => {
+  render(<MenuIsland />);
+
+  fireEvent.click(screen.getByRole('button', { name: /open document menu/i }));
+
+  // Accessible name stays the bare label (name-anchored queries still match)…
+  const openItem = screen.getByRole('menuitem', { name: /^open$/i });
+  // …while the shortcut is surfaced via aria-keyshortcuts for assistive tech.
+  expect(openItem).toHaveAttribute('aria-keyshortcuts', '⌘O');
+
+  const exportItem = screen.getByRole('menuitem', { name: /^export$/i });
+  expect(exportItem).toHaveAttribute('aria-keyshortcuts', '⌘E');
+});
+
 test('menu closes after clicking the "Command palette" item', () => {
   render(<MenuIsland />);
 
