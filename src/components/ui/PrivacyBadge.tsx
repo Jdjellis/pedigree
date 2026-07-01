@@ -58,7 +58,6 @@ export function PrivacyBadge(): React.JSX.Element {
         onClick={() => setOpen((prev) => !prev)}
         aria-label="Privacy information"
         aria-expanded={open}
-        title="None of your data leaves your device"
       >
         <ShieldCheck size={20} aria-hidden="true" />
       </button>

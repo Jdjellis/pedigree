@@ -4,6 +4,7 @@
 }
 
 .badge {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -22,6 +23,33 @@
 
 .badge:active {
   opacity: 0.55;
+}
+
+/* Instant CSS tooltip — avoids the browser's ~500 ms native title delay. */
+.badge::after {
+  content: 'None of your data leaves your device';
+  position: absolute;
+  bottom: calc(100% + 6px);
+  right: 0;
+  white-space: nowrap;
+  background: rgba(30, 30, 30, 0.9);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.4;
+  padding: 4px 8px;
+  border-radius: 5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0s;
+}
+
+.badge:hover::after {
+  opacity: 1;
+}
+
+/* Hide tooltip when the detail popover is already open. */
+.badge[aria-expanded='true']::after {
+  opacity: 0;
 }
 
 .popover {

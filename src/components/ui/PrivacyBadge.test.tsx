@@ -8,11 +8,12 @@ test('renders a button with accessible name "Privacy information"', () => {
   ).toBeInTheDocument();
 });
 
-test('carries a tooltip describing the privacy guarantee', () => {
+test('tooltip text is embedded in CSS content (no native title delay)', () => {
   render(<PrivacyBadge />);
-  expect(
-    screen.getByTitle(/none of your data leaves your device/i),
-  ).toBeInTheDocument();
+  // The tooltip is a CSS ::after pseudo-element; verify the button itself
+  // has no title attribute that would trigger the slow native browser tooltip.
+  const btn = screen.getByRole('button', { name: 'Privacy information' });
+  expect(btn).not.toHaveAttribute('title');
 });
 
 test('popover is not visible on initial render', () => {
