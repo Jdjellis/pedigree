@@ -14,7 +14,8 @@ import styles from './islands.module.css';
  * Zustand subscriptions are safe here because ActionsIsland renders in the
  * react-dom tree (not inside a react-konva Stage).
  *
- * Hidden entirely in zen mode (distraction-free canvas) — it's edit chrome.
+ * Hidden entirely in zen mode (distraction-free canvas) and in view (read-only)
+ * mode — it's edit chrome. Export stays reachable in view mode via the ☰ menu.
  *
  * @example
  * ```tsx
@@ -31,7 +32,7 @@ export function ActionsIsland(): React.JSX.Element | null {
     useUIStore.getState().togglePropertiesPanel();
   };
 
-  if (zenMode) return null;
+  if (zenMode || editingLocked) return null;
 
   return (
     <Island aria-label="Actions">
@@ -45,21 +46,16 @@ export function ActionsIsland(): React.JSX.Element | null {
         Export
       </button>
 
-      {/* The properties panel is an editing surface and is suppressed in view
-          mode, so its toggle is tucked away there too. Export stays — a
-          read-only pedigree is exactly what you'd want to share/export. */}
-      {!editingLocked && (
-        <button
-          type="button"
-          className={`${styles.button} ${propertiesPanelOpen ? styles.buttonActive : ''}`}
-          onClick={handleToggleProperties}
-          aria-pressed={propertiesPanelOpen}
-          aria-label="Toggle properties panel"
-          title="Toggle properties panel"
-        >
-          &#x25A5;
-        </button>
-      )}
+      <button
+        type="button"
+        className={`${styles.button} ${propertiesPanelOpen ? styles.buttonActive : ''}`}
+        onClick={handleToggleProperties}
+        aria-pressed={propertiesPanelOpen}
+        aria-label="Toggle properties panel"
+        title="Toggle properties panel"
+      >
+        &#x25A5;
+      </button>
     </Island>
   );
 }
