@@ -23,6 +23,7 @@ import { ActionsIsland } from './components/ui/islands/ActionsIsland';
 import { ZoomIsland } from './components/ui/islands/ZoomIsland';
 import { HistoryIsland } from './components/ui/islands/HistoryIsland';
 import { HelpIsland } from './components/ui/islands/HelpIsland';
+import { ZenModeExit } from './components/ui/islands/ZenModeExit';
 import { PrivacyBadge } from './components/ui/PrivacyBadge';
 import { useUIStore } from './stores/uiStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -33,6 +34,7 @@ import styles from './App.module.css';
 function App() {
   const canvasRef = useRef<CanvasContainerHandle>(null);
   const propertiesPanelOpen = useUIStore((s) => s.propertiesPanelOpen);
+  const zenMode = useUIStore((s) => s.zenMode);
 
   useKeyboardShortcuts();
   useAutoSave();
@@ -79,8 +81,12 @@ function App() {
         <HelpIsland />
       </div>
 
-      {/* Floating properties panel — overlays the canvas, does not reflow it */}
-      {propertiesPanelOpen && <PropertiesPanel />}
+      {/* Floating properties panel — overlays the canvas, does not reflow it.
+          Suppressed in zen mode along with the rest of the editing chrome. */}
+      {propertiesPanelOpen && !zenMode && <PropertiesPanel />}
+
+      {/* Zen-mode exit affordance — renders only while zen mode is active */}
+      <ZenModeExit />
 
       {/* Modal/overlay components */}
       <ImportExportModal getStage={getStage} />

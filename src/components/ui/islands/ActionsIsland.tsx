@@ -14,18 +14,23 @@ import styles from './islands.module.css';
  * Zustand subscriptions are safe here because ActionsIsland renders in the
  * react-dom tree (not inside a react-konva Stage).
  *
+ * Hidden entirely in zen mode (distraction-free canvas) — it's edit chrome.
+ *
  * @example
  * ```tsx
  * <ActionsIsland />
  * ```
  */
-export function ActionsIsland(): React.JSX.Element {
+export function ActionsIsland(): React.JSX.Element | null {
   const { exportDocument } = useEditorActions();
   const propertiesPanelOpen = useUIStore((s) => s.propertiesPanelOpen);
+  const zenMode = useUIStore((s) => s.zenMode);
 
   const handleToggleProperties = (): void => {
     useUIStore.getState().togglePropertiesPanel();
   };
+
+  if (zenMode) return null;
 
   return (
     <Island aria-label="Actions">

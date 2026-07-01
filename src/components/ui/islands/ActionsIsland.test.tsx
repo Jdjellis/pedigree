@@ -7,7 +7,16 @@ beforeEach(() => {
   useUIStore.setState({
     activeModal: null,
     propertiesPanelOpen: false,
+    zenMode: false,
   });
+});
+
+test('renders nothing while zen mode is active', () => {
+  useUIStore.setState({ zenMode: true });
+  const { container } = render(<ActionsIsland />);
+
+  expect(container).toBeEmptyDOMElement();
+  expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument();
 });
 
 test('renders Export and Toggle properties panel buttons', () => {

@@ -9,11 +9,16 @@ import styles from './islands.module.css';
  * Floating tool island: edit-lock and hand helpers, then Select, then Text and
  * Eraser. Reads `activeTool`/`editingLocked` reactively — safe here because
  * this lives in the react-dom tree.
+ *
+ * Hidden entirely in zen mode (distraction-free canvas) — it's edit chrome.
  */
-export function ToolIsland(): React.JSX.Element {
+export function ToolIsland(): React.JSX.Element | null {
   const activeTool = useUIStore((s) => s.activeTool);
   const editingLocked = useUIStore((s) => s.editingLocked);
+  const zenMode = useUIStore((s) => s.zenMode);
   const actions = useEditorActions();
+
+  if (zenMode) return null;
 
   return (
     <Island aria-label="Tools">

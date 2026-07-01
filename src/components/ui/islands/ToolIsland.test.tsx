@@ -6,7 +6,14 @@ import { useUIStore } from '../../../stores/uiStore';
 describe('ToolIsland', () => {
   beforeEach(() => {
     cleanup();
-    useUIStore.setState({ activeTool: 'select', editingLocked: false });
+    useUIStore.setState({ activeTool: 'select', editingLocked: false, zenMode: false });
+  });
+
+  it('renders nothing while zen mode is active', () => {
+    useUIStore.setState({ zenMode: true });
+    const { container } = render(<ToolIsland />);
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
   });
 
   it('renders a button for each tool plus lock and hand', () => {

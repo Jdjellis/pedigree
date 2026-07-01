@@ -91,6 +91,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     const updateDragLinkCursor = useUIStore((s) => s.updateDragLinkCursor);
     const endDragLink = useUIStore((s) => s.endDragLink);
     const editingLocked = useUIStore((s) => s.editingLocked);
+    const showGrid = useUIStore((s) => s.showGrid);
     // Resolve the active theme's canvas palette here (react-dom), then pass the
     // colours down to the Konva layers as props — react-konva's reconciler does
     // not reliably propagate store subscriptions into canvas children.
@@ -536,14 +537,16 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
               <BoundsLayer bounds={bounds} individuals={individualsList} />
             </Layer>
 
-            <GridLayer
-              width={dimensions.width}
-              height={dimensions.height}
-              scale={scale}
-              position={position}
-              gridColor={canvasPalette.gridColor}
-              generationLineColor={canvasPalette.generationLineColor}
-            />
+            {showGrid && (
+              <GridLayer
+                width={dimensions.width}
+                height={dimensions.height}
+                scale={scale}
+                position={position}
+                gridColor={canvasPalette.gridColor}
+                generationLineColor={canvasPalette.generationLineColor}
+              />
+            )}
 
             <ConnectionsLayer
               partnerships={partnerships}
