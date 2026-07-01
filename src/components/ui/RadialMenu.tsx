@@ -3,6 +3,7 @@ import { useUIStore } from '../../stores/uiStore';
 import { useViewportStore } from '../../stores/viewportStore';
 import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
 import { getPresentPartners, findPartnerships } from '../../utils/graphTraversal';
+import { addChildToUnion } from './addChild';
 import { generateId } from '../../utils/idGenerator';
 import { RelationshipType, GenderIdentity, TwinType } from '../../types/enums';
 import { PARTNER_SPACING, GENERATION_SPACING, SIBLING_SPACING } from '../../utils/constants';
@@ -15,6 +16,7 @@ export function RadialMenu() {
   const hideRadialMenu = useUIStore((s) => s.hideRadialMenu);
   const select = useUIStore((s) => s.select);
   const showGenderPicker = useUIStore((s) => s.showGenderPicker);
+  const showUnionPicker = useUIStore((s) => s.showUnionPicker);
   const genderPicker = useUIStore((s) => s.genderPicker);
   const editingLocked = useUIStore((s) => s.editingLocked);
 
@@ -212,30 +214,21 @@ export function RadialMenu() {
       return;
     }
 
+    // Multiple unions: which one the child belongs to is ambiguous, so prompt
+    // the user to pick rather than silently defaulting to the first in iteration
+    // order (issue #97). The union picker adds the child via addChildToUnion.
+    if (partnershipIds.length > 1) {
+      hideRadialMenu();
+      showUnionPicker(targetId);
+      return;
+    }
+
     const partnership = doc.partnerships[partnershipIds[0]];
     if (!partnership) return;
 
-    // Anchor under the average of whichever partners are present (1 or 2).
-    const partners = getPresentPartners(doc.individuals, partnership);
-    const midX = partners.length
-      ? partners.reduce((s, p) => s + p.position.x, 0) / partners.length
-      : target.position.x;
-    const existingChildren = partnership.childrenIds.length;
-
-    const child = createDefaultIndividual({
-      genderIdentity: GenderIdentity.Unknown,
-      generation: (target.generation ?? 0) + 1,
-      position: { x: midX + existingChildren * SIBLING_SPACING, y: target.position.y + GENERATION_SPACING },
-    });
-    const link: ParentChildRelationship = {
-      id: generateId(), type: RelationshipType.ParentChild,
-      parentPartnershipId: partnership.id, childId: child.id,
-    };
-    addChildToFamily(child, partnership.id, link);
     hideRadialMenu();
-    select(child.id);
-    showGenderPicker(child.id);
-  }, [target, targetId, doc, showGenderPicker, addChildToFamily, addChildViaNewUnion, hideRadialMenu, select]);
+    addChildToUnion(doc, target, partnership);
+  }, [target, targetId, doc, showGenderPicker, showUnionPicker, addChildViaNewUnion, hideRadialMenu, select]);
 
   const handleAddSibling = useCallback(() => {
     if (!target || !targetId) return;

@@ -1,0 +1,63 @@
+/* src/components/ui/UnionPicker.module.css */
+/* Transparent catch-all: a click anywhere outside the picker dismisses it. */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+}
+
+/* `left`/`top` are the node's screen centre; translate up-and-centred so the
+   picker floats directly above the symbol. */
+.picker {
+  position: absolute;
+  z-index: 100;
+  transform: translate(-50%, -100%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 160px;
+  padding: 8px;
+  background: #ffffff;
+  border: 1px solid #d4d4d8;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.18);
+}
+
+.title {
+  margin: 0 2px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #71717a;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  padding: 6px 10px;
+  background: #fafafa;
+  border: 1px solid #e4e4e7;
+  border-radius: 6px;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.option:hover {
+  background: #eef2ff;
+  border-color: #a5b4fc;
+}
+
+.optionLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: #18181b;
+}
+
+.optionHint {
+  font-size: 11px;
+  color: #71717a;
+}
