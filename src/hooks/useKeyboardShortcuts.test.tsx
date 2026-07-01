@@ -268,6 +268,96 @@ describe('edit-lock gate on text and eraser shortcuts', () => {
 });
 
 // ---------------------------------------------------------------------------
+// contentEditable guard — plain-letter shortcuts silenced in editable regions
+// ---------------------------------------------------------------------------
+
+describe('contentEditable input-guard', () => {
+  test('pressing v in a contentEditable element does not change the active tool', () => {
+    render(<TestHarness />);
+
+    act(() => {
+      useUIStore.setState({ activeTool: 'hand' });
+    });
+
+    const editable = document.createElement('div');
+    editable.contentEditable = 'true';
+    // jsdom does not compute isContentEditable from the attribute, so force it.
+    Object.defineProperty(editable, 'isContentEditable', { value: true });
+    document.body.appendChild(editable);
+
+    fireEvent.keyDown(editable, { key: 'v' });
+
+    expect(useUIStore.getState().activeTool).toBe('hand');
+
+    document.body.removeChild(editable);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Escape — clears selection / closes modal / hides radial menu (priority order)
+// ---------------------------------------------------------------------------
+
+describe('Escape key', () => {
+  test('closes an open modal (highest priority)', () => {
+    render(<TestHarness />);
+
+    act(() => {
+      useUIStore.getState().openModal('export');
+      useUIStore.getState().showRadialMenu('id-1', { x: 0, y: 0 });
+      useUIStore.getState().select('id-1');
+    });
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    // Modal closed; radial menu + selection untouched because modal took priority.
+    expect(useUIStore.getState().activeModal).toBeNull();
+    expect(useUIStore.getState().radialMenu.visible).toBe(true);
+    expect(useUIStore.getState().selectedIds.size).toBe(1);
+  });
+
+  test('hides the radial menu when no modal is open', () => {
+    render(<TestHarness />);
+
+    act(() => {
+      useUIStore.getState().showRadialMenu('id-1', { x: 0, y: 0 });
+      useUIStore.getState().select('id-1');
+    });
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(useUIStore.getState().radialMenu.visible).toBe(false);
+    // Selection preserved because the radial menu took priority over it.
+    expect(useUIStore.getState().selectedIds.size).toBe(1);
+  });
+
+  test('clears the selection when no modal and no radial menu are open', () => {
+    render(<TestHarness />);
+
+    act(() => {
+      useUIStore.getState().select('id-1');
+    });
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(useUIStore.getState().selectedIds.size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Cmd/Ctrl+E — opens the export modal
+// ---------------------------------------------------------------------------
+
+describe('Cmd/Ctrl+E opens the export modal', () => {
+  test('Ctrl+E opens the export modal', () => {
+    render(<TestHarness />);
+
+    fireEvent.keyDown(document.body, { key: 'e', ctrlKey: true });
+
+    expect(useUIStore.getState().activeModal).toBe('export');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Delete / Backspace — removes selected individuals via deleteSelectedAction
 // ---------------------------------------------------------------------------
 

@@ -45,6 +45,15 @@ export function InlineGenderPicker(): React.JSX.Element | null {
   const alreadyTwin = usePedigreeStore((s) =>
     targetId ? isTwin(s.document, targetId) : false,
   );
+  // During first-run onboarding the document holds just the seed person and the
+  // picker pops on it to choose a sex. Offering "make twins" there would spawn a
+  // floating co-twin before the user has built any family, so suppress the twin
+  // section until the pedigree has grown past the lone seed. Mirrors
+  // shouldShowOnboarding's `individualCount <= 1` definition. Every other
+  // gender-picker trigger (radial child/sibling/partner) already has >= 2 people.
+  const isSeedPerson = usePedigreeStore(
+    (s) => Object.keys(s.document.individuals).length <= 1,
+  );
 
   const dismiss = useCallback(() => {
     if (targetId) commitGenderPick(targetId, null);
@@ -108,7 +117,7 @@ export function InlineGenderPicker(): React.JSX.Element | null {
             value={target.genderIdentity}
             onChange={(gender) => commitGenderPick(targetId, gender)}
           />
-          {featureFlags.twinsInGenderPopup && !alreadyTwin && (
+          {featureFlags.twinsInGenderPopup && !alreadyTwin && !isSeedPerson && (
             <>
               <div className={styles.divider} aria-hidden="true" />
               <TwinIconButtons onPick={makeTwin} />

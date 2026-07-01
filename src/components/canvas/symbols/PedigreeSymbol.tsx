@@ -59,6 +59,12 @@ export interface PedigreeSymbolProps {
    * stay dark in every theme — only this surface follows the theme.
    */
   symbolFill?: string;
+  /**
+   * True when this individual's childless marks are drawn (status set and not
+   * suppressed by children). Forwarded to {@link SymbolLabel} so the label block
+   * clears the marks. Computed by the parent, which has the partnerships.
+   */
+  childlessActive?: boolean;
 }
 
 const SELECTION_STROKE_WIDTH = 2;
@@ -252,6 +258,7 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
     eraseOnHover = false,
     editingLocked = false,
     symbolFill = SYMBOL_FILL,
+    childlessActive = false,
   }) => {
     // Position of the symbol when a drag began. Captured so the whole drag can
     // be committed as a single undo step on drag end (see handleDragEnd).
@@ -281,7 +288,22 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
 
         const { select, toggleSelection, hideRadialMenu } = ui;
         const evt = e.evt;
-        if ('shiftKey' in evt && (evt.shiftKey || evt.metaKey || evt.ctrlKey)) {
+        if (
+          'altKey' in evt &&
+          evt.altKey &&
+          tool === 'select' &&
+          !ui.editingLocked
+        ) {
+          // Alt-click jumps straight to the gender picker, skipping the radial
+          // menu. (Alt-drag-start is a separate gesture — the drag-link — but a
+          // click is a mouseup with no movement, so the two don't collide.)
+          hideRadialMenu();
+          select(individual.id);
+          ui.showGenderPicker(individual.id);
+        } else if (
+          'shiftKey' in evt &&
+          (evt.shiftKey || evt.metaKey || evt.ctrlKey)
+        ) {
           hideRadialMenu();
           toggleSelection(individual.id);
         } else {
@@ -451,7 +473,11 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
         />
 
         {/* Text label */}
-        <SymbolLabel individual={individual} individualNumber={individualNumber} />
+        <SymbolLabel
+          individual={individual}
+          individualNumber={individualNumber}
+          childlessActive={childlessActive}
+        />
       </Group>
     );
   }

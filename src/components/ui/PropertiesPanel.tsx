@@ -3,6 +3,7 @@ import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
 import {
   GenderIdentity,
+  PregnancyOutcome,
   SexAssignedAtBirth,
   VitalStatus,
 } from '../../types/enums';
@@ -29,6 +30,7 @@ import {
   parentCoupleLabel,
   type AdoptionMode,
 } from '../../utils/adoption';
+import { individualHasChildren } from '../../utils/childlessness';
 import type {
   FillPatternType,
   Individual,
@@ -60,6 +62,21 @@ const VITAL_STATUS_OPTIONS: { value: VitalStatus; label: string }[] = [
   { value: VitalStatus.Stillborn, label: 'Stillborn' },
 ];
 
+const PREGNANCY_OUTCOME_OPTIONS: { value: PregnancyOutcome; label: string }[] = [
+  { value: PregnancyOutcome.SAB, label: 'SAB' },
+  { value: PregnancyOutcome.TOP, label: 'TOP' },
+  { value: PregnancyOutcome.ECT, label: 'ECT' },
+];
+
+// One-line clinical reminder per outcome, shown under the outcome control.
+const PREGNANCY_OUTCOME_HINT: Record<PregnancyOutcome, string> = {
+  [PregnancyOutcome.SAB]:
+    'Spontaneous abortion / miscarriage — open triangle; note gestational age if known.',
+  [PregnancyOutcome.TOP]:
+    'Termination of pregnancy — open triangle; shaded if the fetus is affected (add a condition).',
+  [PregnancyOutcome.ECT]: 'Ectopic pregnancy — triangle with an “ECT” annotation.',
+};
+
 type RoleValue = 'none' | 'proband' | 'consultand';
 
 const ROLE_OPTIONS: { value: RoleValue; label: string }[] = [
@@ -73,6 +90,28 @@ const ADOPTION_OPTIONS: { value: AdoptionMode; label: string }[] = [
   { value: 'in', label: 'Adopted in' },
   { value: 'out', label: 'Adopted out' },
 ];
+
+type ChildlessValue = 'none' | 'noChildren' | 'infertility';
+
+const CHILDLESS_OPTIONS: { value: ChildlessValue; label: string }[] = [
+  { value: 'none', label: 'None' },
+  { value: 'noChildren', label: 'No children' },
+  { value: 'infertility', label: 'Infertility' },
+];
+
+/** Plain-language description of the marker each childless status draws. */
+const CHILDLESS_HINT: Record<'noChildren' | 'infertility', string> = {
+  noChildren:
+    'Draws a single cross-bar below the individual (with the cause, if given) — no children by choice or reason unknown.',
+  infertility:
+    'Draws a double cross-bar below the individual (with the cause, if given), per standard.',
+};
+
+/** Placeholder for the free-text cause, tuned to the childless status. */
+const CHILDLESS_CAUSE_PLACEHOLDER: Record<'noChildren' | 'infertility', string> = {
+  noChildren: 'e.g. vasectomy',
+  infertility: 'e.g. azoospermia',
+};
 
 export function PropertiesPanel() {
   const selectedIds = useUIStore((s) => s.selectedIds);
@@ -231,6 +270,8 @@ export function PropertiesPanel() {
   const twinGroup = Object.values(twinGroups).find((tg) =>
     tg.individualIds.includes(individual.id),
   );
+
+  const hasChildren = individualHasChildren(partnerships, individual.id);
 
   const toggleCondition = (entryId: string) => {
     const current = individual.conditionIds ?? [];
@@ -711,6 +752,76 @@ export function PropertiesPanel() {
 
       <div className={styles.divider} />
 
+      {/* Pregnancy Section */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>Pregnancy</div>
+
+        <div className={styles.field}>
+          <label className={styles.checkbox}>
+            <input
+              type="checkbox"
+              checked={individual.isPregnancy}
+              onChange={(e) =>
+                update(
+                  e.target.checked
+                    ? {
+                        isPregnancy: true,
+                        // A triangle only renders once an outcome is set, so
+                        // default to SAB when first marking the pregnancy.
+                        pregnancyOutcome:
+                          individual.pregnancyOutcome ?? PregnancyOutcome.SAB,
+                      }
+                    : {
+                        isPregnancy: false,
+                        pregnancyOutcome: undefined,
+                        gestationalAge: undefined,
+                      },
+                )
+              }
+            />
+            Pregnancy not carried to term
+          </label>
+          <p className={styles.hint}>
+            Draws a triangle (SAB / TOP / ECT) in place of the sex symbol, per
+            NSGC/Bennett. For a later-gestation stillbirth use Vital Status →
+            Stillborn instead — that stays a sex symbol with a slash.
+          </p>
+        </div>
+
+        {individual.isPregnancy && (
+          <>
+            <div className={styles.field}>
+              <label className={styles.label}>Outcome</label>
+              <SegmentedControl
+                options={PREGNANCY_OUTCOME_OPTIONS}
+                value={individual.pregnancyOutcome ?? PregnancyOutcome.SAB}
+                onChange={(v) => update({ pregnancyOutcome: v })}
+                ariaLabel="Pregnancy outcome"
+              />
+              <p className={styles.hint}>
+                {PREGNANCY_OUTCOME_HINT[
+                  individual.pregnancyOutcome ?? PregnancyOutcome.SAB
+                ]}
+              </p>
+            </div>
+
+            <div className={styles.field}>
+              <label className={styles.label}>Gestational age</label>
+              <input
+                className={styles.input}
+                value={individual.gestationalAge ?? ''}
+                onChange={(e) =>
+                  update({ gestationalAge: e.target.value || undefined })
+                }
+                placeholder="e.g. 12 wk"
+              />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className={styles.divider} />
+
       {/* Pedigree Role Section */}
       <div className={styles.section}>
         <div className={styles.sectionTitle}>Pedigree Role</div>
@@ -805,6 +916,54 @@ export function PropertiesPanel() {
             </div>
           );
         })()}
+      </div>
+
+      <div className={styles.divider} />
+
+      {/* Childlessness Section — no-partner analogue of the partnership marker */}
+      <div className={styles.section}>
+        <div className={styles.sectionTitle}>Childlessness</div>
+        <div className={styles.field}>
+          <SegmentedControl
+            options={CHILDLESS_OPTIONS}
+            value={individual.childlessStatus ?? 'none'}
+            disabled={hasChildren}
+            onChange={(v) =>
+              update({
+                childlessStatus: v === 'none' ? undefined : v,
+                // Keep the cause across no-children/infertility; drop it only
+                // when clearing the childless status entirely.
+                childlessReason: v === 'none' ? undefined : individual.childlessReason,
+              })
+            }
+            ariaLabel="Individual childless status"
+          />
+          {hasChildren ? (
+            <p className={styles.hint}>
+              A childless marker doesn’t apply — this person has children on the
+              canvas. Detach them first to mark this individual childless.
+            </p>
+          ) : (
+            <>
+              {individual.childlessStatus && (
+                <p className={styles.hint}>{CHILDLESS_HINT[individual.childlessStatus]}</p>
+              )}
+              {individual.childlessStatus && (
+                <>
+                  <label className={styles.label}>Cause</label>
+                  <input
+                    className={styles.input}
+                    value={individual.childlessReason ?? ''}
+                    onChange={(e) =>
+                      update({ childlessReason: e.target.value || undefined })
+                    }
+                    placeholder={CHILDLESS_CAUSE_PLACEHOLDER[individual.childlessStatus]}
+                  />
+                </>
+              )}
+            </>
+          )}
+        </div>
       </div>
 
       {twinGroup && (

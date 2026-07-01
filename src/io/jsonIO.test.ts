@@ -133,6 +133,145 @@ describe('jsonIO text annotation round-trip', () => {
   });
 });
 
+describe('deserializeDocument validation', () => {
+  it('throws on a non-object JSON payload (null / number / string)', () => {
+    for (const payload of ['null', '42', '"a string"']) {
+      expect(() => deserializeDocument(payload)).toThrow(
+        'Invalid file: expected a JSON object at the top level.',
+      );
+    }
+  });
+
+  it('throws on malformed JSON', () => {
+    expect(() => deserializeDocument('{not json')).toThrow(
+      'Invalid JSON: the file does not contain valid JSON.',
+    );
+  });
+
+  it.each([
+    'metadata',
+    'individuals',
+    'partnerships',
+    'parentChildLinks',
+    'twinGroups',
+    'generationOrder',
+  ])('throws when required top-level field "%s" is missing', (key) => {
+    const doc = makeDocument() as unknown as Record<string, unknown>;
+    delete doc[key];
+    expect(() => deserializeDocument(JSON.stringify(doc))).toThrow(
+      `Invalid pedigree document: missing required field "${key}".`,
+    );
+  });
+
+  it('throws when metadata is not an object', () => {
+    const doc = makeDocument() as unknown as Record<string, unknown>;
+    doc.metadata = 'not-an-object';
+    expect(() => deserializeDocument(JSON.stringify(doc))).toThrow(
+      'Invalid pedigree document: "metadata" must be an object.',
+    );
+  });
+
+  it.each(['id', 'title', 'createdAt', 'updatedAt', 'version'])(
+    'throws when metadata is missing required sub-field "%s"',
+    (key) => {
+      const doc = makeDocument();
+      delete (doc.metadata as unknown as Record<string, unknown>)[key];
+      expect(() => deserializeDocument(JSON.stringify(doc))).toThrow(
+        `Invalid pedigree document: metadata is missing required field "${key}".`,
+      );
+    },
+  );
+
+  it('unwraps the { app, document } envelope form', () => {
+    const doc = makeDocument();
+    const wrapped = { app: 'PedigreeCanvas', formatVersion: '2.0', document: doc };
+    const loaded = deserializeDocument(JSON.stringify(wrapped));
+    expect(loaded.metadata.id).toBe('doc-1');
+  });
+
+  it('accepts a bare (unwrapped) document', () => {
+    const doc = makeDocument();
+    const loaded = deserializeDocument(JSON.stringify(doc));
+    expect(loaded.metadata.id).toBe('doc-1');
+  });
+});
+
+describe('deserializeDocument legacy migrations', () => {
+  it('migrates affectedStatus="affected" to a legend entry + conditionIds, and deletes affectedStatus', () => {
+    const doc = makeDocument();
+    doc.metadata.referenceCondition = 'BRCA';
+    // Legacy individual carrying the old affectedStatus field.
+    (doc.individuals['kid-1'] as unknown as Record<string, unknown>).affectedStatus =
+      'affected';
+
+    const loaded = deserializeDocument(JSON.stringify(doc));
+
+    // A single legend entry was created from the reference condition.
+    expect(loaded.legendConfig!.entries).toHaveLength(1);
+    const entry = loaded.legendConfig!.entries[0];
+    expect(entry.name).toBe('BRCA');
+    expect(entry.quarter).toBe('topRight');
+
+    // Its id was pushed onto the individual's conditionIds.
+    expect(loaded.individuals['kid-1'].conditionIds).toContain(entry.id);
+
+    // The old field is gone.
+    expect(
+      'affectedStatus' in
+        (loaded.individuals['kid-1'] as unknown as Record<string, unknown>),
+    ).toBe(false);
+  });
+
+  it('defaults the legend entry name to "Affected" when no referenceCondition is set', () => {
+    const doc = makeDocument();
+    (doc.individuals['kid-1'] as unknown as Record<string, unknown>).affectedStatus =
+      'affected';
+
+    const loaded = deserializeDocument(JSON.stringify(doc));
+
+    expect(loaded.legendConfig!.entries[0].name).toBe('Affected');
+  });
+
+  it('reuses a single migration legend entry across multiple affected individuals', () => {
+    const doc = makeDocument();
+    doc.individuals['kid-2'] = createDefaultIndividual({ id: 'kid-2' });
+    (doc.individuals['kid-1'] as unknown as Record<string, unknown>).affectedStatus =
+      'affected';
+    (doc.individuals['kid-2'] as unknown as Record<string, unknown>).affectedStatus =
+      'affected';
+
+    const loaded = deserializeDocument(JSON.stringify(doc));
+
+    expect(loaded.legendConfig!.entries).toHaveLength(1);
+    const entryId = loaded.legendConfig!.entries[0].id;
+    expect(loaded.individuals['kid-1'].conditionIds).toContain(entryId);
+    expect(loaded.individuals['kid-2'].conditionIds).toContain(entryId);
+  });
+
+  it('migrates a legacy legend entry conditionNames.default to name', () => {
+    const doc = makeDocument();
+    doc.legendConfig = {
+      entries: [
+        // Legacy entry shape: conditionNames instead of name.
+        {
+          id: 'legend-legacy',
+          quarter: 'topRight',
+          fillColor: '#1a1a1a',
+          fillPattern: 'solid',
+          conditionNames: { default: 'Diabetes' },
+        } as unknown as (typeof doc.legendConfig.entries)[number],
+      ],
+      position: { x: 50, y: 50 },
+    };
+
+    const loaded = deserializeDocument(JSON.stringify(doc));
+
+    const entry = loaded.legendConfig!.entries[0] as unknown as Record<string, unknown>;
+    expect(entry.name).toBe('Diabetes');
+    expect('conditionNames' in entry).toBe(false);
+  });
+});
+
 describe('migrateAdoption', () => {
   it('maps legacy link.isAdopted and type=Adoption to isAdoptive', () => {
     const doc = makeDocument();
