@@ -595,7 +595,7 @@ describe('childless-union rendering', () => {
     expect(svg).toContain('>azoospermia</text>');
   });
 
-  it('draws a single bar and no cause for no children by choice', () => {
+  it('draws a single bar and the cause for no children by choice', () => {
     const a = person('a', 100, 100);
     const b = person('b', 220, 100);
     const doc = minimalDoc(
@@ -608,6 +608,7 @@ describe('childless-union rendering', () => {
           partner2Id: 'b',
           childrenIds: [],
           childlessStatus: 'noChildren',
+          childlessReason: 'vasectomy',
         },
       },
       {},
@@ -617,6 +618,8 @@ describe('childless-union rendering', () => {
     expect(svg).toContain('<line x1="152" y1="118" x2="168" y2="118"');
     // Only the single lower bar — no upper (y=113) bar for the by-choice marker.
     expect(svg).not.toContain('<line x1="152" y1="113" x2="168" y2="113"');
+    // "No children" now carries a free-text cause, rendered like infertility.
+    expect(svg).toContain('>vasectomy</text>');
   });
 
   it('suppresses the childless marks once the union has a child', () => {
@@ -650,6 +653,64 @@ describe('childless-union rendering', () => {
     // No cross-bars and no cause — the marker would contradict the sibship.
     expect(svg).not.toContain('<line x1="152" y1="113" x2="168" y2="113"');
     expect(svg).not.toContain('<line x1="152" y1="118" x2="168" y2="118"');
+    expect(svg).not.toContain('>azoospermia</text>');
+  });
+});
+
+describe('individual childless rendering', () => {
+  // Anchor is the symbol's bottom edge: person at (100,100), SYMBOL_SIZE 40 →
+  // anchor (100,120); stub down to y=138; bars at y=133 and y=138.
+  it('draws two parallel bars and the cause for an infertile individual', () => {
+    const p = person('p', 100, 100);
+    p.childlessStatus = 'infertility';
+    p.childlessReason = 'azoospermia';
+    const svg = buildPedigreeSvg(minimalDoc({ p }, {}, {}));
+    expect(svg).toContain('<line x1="100" y1="120" x2="100" y2="138"');
+    expect(svg).toContain('<line x1="92" y1="133" x2="108" y2="133"');
+    expect(svg).toContain('<line x1="92" y1="138" x2="108" y2="138"');
+    expect(svg).toContain('>azoospermia</text>');
+  });
+
+  it('draws a single bar and the cause for an individual with no children', () => {
+    const p = person('p', 100, 100);
+    p.childlessStatus = 'noChildren';
+    p.childlessReason = 'vasectomy';
+    const svg = buildPedigreeSvg(minimalDoc({ p }, {}, {}));
+    expect(svg).toContain('<line x1="100" y1="120" x2="100" y2="138"');
+    expect(svg).toContain('<line x1="92" y1="138" x2="108" y2="138"');
+    expect(svg).not.toContain('<line x1="92" y1="133" x2="108" y2="133"');
+    expect(svg).toContain('>vasectomy</text>');
+  });
+
+  it('suppresses the individual marker once the person has children', () => {
+    const a = person('a', 100, 100);
+    a.childlessStatus = 'infertility';
+    a.childlessReason = 'azoospermia';
+    const b = person('b', 220, 100);
+    const c = person('c', 160, 250);
+    const doc = minimalDoc(
+      { a, b, c },
+      {
+        u1: {
+          id: 'u1',
+          type: RelationshipType.Partnership,
+          partner1Id: 'a',
+          partner2Id: 'b',
+          childrenIds: ['c'],
+        },
+      },
+      {
+        pc1: {
+          id: 'pc1',
+          type: RelationshipType.ParentChild,
+          parentPartnershipId: 'u1',
+          childId: 'c',
+        },
+      },
+    );
+    const svg = buildPedigreeSvg(doc);
+    // No stub / bars hanging from 'a' — the marker would contradict the descent.
+    expect(svg).not.toContain('<line x1="100" y1="120" x2="100" y2="138"');
     expect(svg).not.toContain('>azoospermia</text>');
   });
 });

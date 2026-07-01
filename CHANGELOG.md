@@ -7,6 +7,10 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Individual-level childlessness: a person can be marked infertile or childless
+  (no partner drawn) from their properties panel, drawn as a stub below the
+  symbol ended by a double or single cross-bar — identical to the partnership
+  marker, per NSGC/Bennett. Suppressed once the person has children.
 - Help/shortcuts hint that a relationship line can be clicked to edit it
   (relationship type, consanguinity, infertility), so those line-level editors
   are discoverable.
@@ -24,6 +28,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Clinical-use disclaimer in the README and in the in-app privacy popover.
 
 ### Changed
+- The “no children by choice” partnership marker now also carries an optional
+  free-text cause/description (e.g. “vasectomy”), matching the infertility
+  marker’s cause field and rendered below the bar.
 - Stillbirth is now drawn to standard: the sex-specific symbol with a deceased
   slash plus an “SB” label and gestational age — never a triangle. The unused
   `PregnancyOutcome.SB` (which would have rendered a triangle) was removed; the

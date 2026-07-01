@@ -47,6 +47,10 @@ import {
   partnershipMidpoint,
 } from '../utils/partnershipGeometry';
 import {
+  individualChildlessAnchor,
+  individualHasChildren,
+} from '../utils/childlessness';
+import {
   PADDING as LEGEND_PADDING,
   SWATCH_SIZE as LEGEND_SWATCH_SIZE,
   legendSwatchWidth,
@@ -553,7 +557,7 @@ function renderPartnershipLine(
       ...bars.map((b) => line(b[0], b[1], b[2], b[3])),
     ];
     const reason = partnership.childlessReason?.trim();
-    if (partnership.childlessStatus === 'infertility' && reason) {
+    if (reason) {
       const baselineY = mid.y + CHILDLESS_STUB + RELATIONSHIP_LABEL_OFFSET + LABEL_FONT_SIZE;
       parts.push(
         `<text x="${num(mid.x)}" y="${num(
@@ -593,6 +597,42 @@ function renderPartnershipLine(
   }
 
   return line(p1.position.x, p1.position.y, p2.position.x, p2.position.y) + childless;
+}
+
+/**
+ * Render an individual's childless marks (no-partner analogue of a childless
+ * union), matching `IndividualChildlessLine.tsx`. Suppressed once the individual
+ * has children on the canvas.
+ */
+function renderIndividualChildlessLine(
+  individual: Individual,
+  partnerships: Record<string, PartnershipRelationship>,
+): string {
+  if (!individual.childlessStatus) return '';
+  if (individualHasChildren(partnerships, individual.id)) return '';
+
+  const anchor = individualChildlessAnchor(individual);
+  const { stub, bars } = childlessMarks(anchor, individual.childlessStatus, {
+    stub: CHILDLESS_STUB,
+    barHalf: CHILDLESS_BAR_HALF,
+    barGap: CHILDLESS_BAR_GAP,
+  });
+  const parts = [
+    line(stub[0], stub[1], stub[2], stub[3]),
+    ...bars.map((b) => line(b[0], b[1], b[2], b[3])),
+  ];
+  const reason = individual.childlessReason?.trim();
+  if (reason) {
+    const baselineY = anchor.y + CHILDLESS_STUB + RELATIONSHIP_LABEL_OFFSET + LABEL_FONT_SIZE;
+    parts.push(
+      `<text x="${num(anchor.x)}" y="${num(
+        baselineY,
+      )}" text-anchor="middle" font-size="${LABEL_FONT_SIZE}" font-family="${escapeXml(
+        LABEL_FONT_FAMILY,
+      )}" fill="${LABEL_COLOR}">${escapeXml(reason)}</text>`,
+    );
+  }
+  return parts.join('');
 }
 
 /** Render parent-child / sibship lines, matching `ParentChildLine.tsx`. */
@@ -976,6 +1016,9 @@ export function buildPedigreeSvg(doc: PedigreeDocument, title = ''): string {
       renderTwinConnector(twinGroup, doc.individuals, doc.partnerships),
     );
   }
+  for (const ind of individuals) {
+    connectionMarkup.push(renderIndividualChildlessLine(ind, doc.partnerships));
+  }
 
   const symbolMarkup: string[] = [];
   for (const ind of individuals) {
@@ -1033,6 +1076,15 @@ export function buildPedigreeSvg(doc: PedigreeDocument, title = ''): string {
         LABEL_FONT_SIZE;
       expand(extent, ind.position.x - 60, labelBottom);
       expand(extent, ind.position.x + 60, labelBottom);
+    }
+    // Individual childless marks (and their cause text) hang below the symbol.
+    if (ind.childlessStatus && !individualHasChildren(doc.partnerships, ind.id)) {
+      const anchor = individualChildlessAnchor(ind);
+      const markBottom = ind.childlessReason?.trim()
+        ? anchor.y + CHILDLESS_STUB + RELATIONSHIP_LABEL_OFFSET + LABEL_FONT_SIZE
+        : anchor.y + CHILDLESS_STUB;
+      expand(extent, ind.position.x - 60, markBottom);
+      expand(extent, ind.position.x + 60, markBottom);
     }
   }
 
