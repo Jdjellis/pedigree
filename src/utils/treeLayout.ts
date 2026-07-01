@@ -453,10 +453,20 @@ function collectUnionDescendants(
  * between the couple's final positions, keeping the descent vertical.
  *
  * @remarks
- * Mutates `finalX` in place. Unions are processed top-down so a shifted blood
- * partner is already in its final spot before a lower wide couple re-centres
- * against it. A no-op for ordinary couples (both partners placed), where the
- * sibship centre already equals the couple midpoint.
+ * Mutates `finalX` in place. Unions are processed top-down (by generation) so a
+ * shifted blood partner is already in its final spot before a lower wide couple
+ * re-centres against it — this ordering is a correctness requirement, not a
+ * heuristic: shifting a lower couple first and letting the higher shift translate
+ * it would double-count half the upper shift. A no-op for ordinary couples (both
+ * partners placed), where the sibship centre already equals the couple midpoint.
+ *
+ * KNOWN LIMITATION (tracked in #115): the sub-block is translated *after*
+ * `packBlocks` and {@link inLawClearanceShift} have run, with no re-separation
+ * and no collision check. When a wide couple sits next to an ordinary sibling
+ * whose sibship stays put, the shift can drive the two cousin sibships on top of
+ * each other — an exact node-on-node overlap in the coincident case, or crossed
+ * descent lines in the general case. Resolving it needs a per-row separation pass
+ * (or a constraint-based layout) after the recenter; see #115.
  */
 function centerChildrenUnderWideCouples(
   doc: LayoutDoc,
