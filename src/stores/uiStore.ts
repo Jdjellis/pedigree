@@ -46,6 +46,13 @@ interface UIState {
   /** The individual whose gender is being chosen via the inline picker, or `null`. */
   genderPicker: { targetId: string | null };
 
+  /**
+   * The individual for whom Add Child must disambiguate between multiple unions,
+   * or `null`. Set when the target belongs to 2+ partnerships so the union picker
+   * can prompt for which union the new child belongs to.
+   */
+  unionPicker: { targetId: string | null };
+
   dragLink: {
     active: boolean;
     sourceId: string | null;
@@ -107,6 +114,10 @@ interface UIState {
   showGenderPicker: (id: string) => void;
   /** Close the inline gender picker (keeps the individual's current shape). */
   hideGenderPicker: () => void;
+  /** Open the union picker to choose which of the target's unions gets the new child. */
+  showUnionPicker: (id: string) => void;
+  /** Close the union picker (no child is added). */
+  hideUnionPicker: () => void;
   /** Pin the radial menu open so it survives the pointer leaving the hot-zone. */
   pinRadialMenu: () => void;
   /** Release a pinned radial menu (it then follows hover rules again). */
@@ -157,6 +168,7 @@ export const useUIStore = create<UIState>()((set) => ({
   },
 
   genderPicker: { targetId: null },
+  unionPicker: { targetId: null },
 
   dragLink: {
     active: false,
@@ -242,6 +254,10 @@ export const useUIStore = create<UIState>()((set) => ({
   showGenderPicker: (id) => set({ genderPicker: { targetId: id } }),
 
   hideGenderPicker: () => set({ genderPicker: { targetId: null } }),
+
+  showUnionPicker: (id) => set({ unionPicker: { targetId: id } }),
+
+  hideUnionPicker: () => set({ unionPicker: { targetId: null } }),
 
   pinRadialMenu: () =>
     set((state) => ({ radialMenu: { ...state.radialMenu, pinned: true } })),

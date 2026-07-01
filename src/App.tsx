@@ -7,6 +7,7 @@ import { OnboardingHints } from './components/canvas/OnboardingHints';
 import { PropertiesPanel } from './components/ui/PropertiesPanel';
 import { RadialMenu } from './components/ui/RadialMenu';
 import { InlineGenderPicker } from './components/ui/InlineGenderPicker';
+import { UnionPicker } from './components/ui/UnionPicker';
 import { ImportExportModal } from './components/ui/ImportExportModal';
 import { LegendEditor } from './components/ui/LegendEditor';
 import { LinkTypePopup } from './components/ui/LinkTypePopup';
@@ -46,6 +47,7 @@ function App() {
         <OnboardingHints />
         <RadialMenu />
         <InlineGenderPicker />
+        <UnionPicker />
         <LegendOverlay />
         <AnnotationEditor />
       </div>
