@@ -131,6 +131,7 @@
 .menuItem {
   display: flex;
   align-items: center;
+  gap: 10px;
   width: 100%;
   padding: 7px 12px;
   border-radius: var(--radius-sm);
@@ -141,6 +142,21 @@
   border: none;
   cursor: pointer;
   transition: background-color 0.1s;
+}
+
+/** Leading icon column. Muted so it reads as a glyph, not a control. */
+.menuItemIcon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+}
+
+/** Label fills the row so any shortcut hint is pushed to the right edge. */
+.menuItemLabel {
+  flex: 1 1 auto;
+  text-align: left;
+  white-space: nowrap;
 }
 
 .menuItem:hover {
@@ -157,18 +173,7 @@
   margin: 4px 0;
 }
 
-/**
- * Menu item variant that contains both a label and a right-aligned hint
- * (e.g. a keyboard shortcut badge). Use alongside `.menuItem`.
- */
-.menuItemWithHint {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-/** Keyboard shortcut badge rendered inside `.menuItemWithHint`. */
+/** Right-aligned keyboard-shortcut badge inside a `.menuItem`. */
 .menuItemKbd {
   font-size: 11px;
   font-family: inherit;
