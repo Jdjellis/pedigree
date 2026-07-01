@@ -1,20 +1,67 @@
+import { useState, useEffect, useRef } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import styles from './PrivacyBadge.module.css';
 
 /**
- * Non-interactive badge indicating local-first data privacy.
+ * Clickable privacy badge indicating local-first data storage.
  *
- * Renders a shield-check icon in the bottom-right chrome. A native tooltip
- * on hover explains that pedigree data never leaves the browser.
+ * Renders a shield-check icon in the bottom-right chrome. Hovering shows a
+ * native tooltip; clicking opens an inline popover with more detail.
+ * Dismissed by clicking outside, pressing Escape, or clicking the badge again.
  */
 export function PrivacyBadge(): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+
+    const handleMouseDown = (e: MouseEvent): void => {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+
+    document.addEventListener('mousedown', handleMouseDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleMouseDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open]);
+
   return (
-    <span
-      className={styles.badge}
-      aria-label="Privacy information"
-      title="None of your data leaves your device"
-    >
-      <ShieldCheck size={20} aria-hidden="true" />
-    </span>
+    <div ref={wrapperRef} className={styles.wrapper}>
+      {open && (
+        <div className={styles.popover} role="status" aria-live="polite">
+          <p className={styles.heading}>Your data stays on your device.</p>
+          <p className={styles.body}>
+            Nothing is ever sent to a server — all pedigree data is stored
+            locally in your browser only.
+          </p>
+          <p className={styles.disclaimer}>
+            For documentation and educational use. Not a medical device and not
+            for diagnostic decisions — verify every pedigree against the source
+            record.
+          </p>
+        </div>
+      )}
+      <button
+        type="button"
+        className={styles.badge}
+        onClick={() => setOpen((prev) => !prev)}
+        aria-label="Privacy information"
+        aria-expanded={open}
+        title="None of your data leaves your device"
+      >
+        <ShieldCheck size={20} aria-hidden="true" />
+      </button>
+    </div>
   );
 }

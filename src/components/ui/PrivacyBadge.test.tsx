@@ -1,14 +1,58 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { PrivacyBadge } from './PrivacyBadge';
 
-test('renders with accessible label "Privacy information"', () => {
+test('renders a button with accessible name "Privacy information"', () => {
   render(<PrivacyBadge />);
   expect(
-    screen.getByLabelText('Privacy information'),
+    screen.getByRole('button', { name: 'Privacy information' }),
   ).toBeInTheDocument();
 });
 
 test('carries a tooltip describing the privacy guarantee', () => {
   render(<PrivacyBadge />);
-  expect(screen.getByTitle(/none of your data leaves your device/i)).toBeInTheDocument();
+  expect(
+    screen.getByTitle(/none of your data leaves your device/i),
+  ).toBeInTheDocument();
+});
+
+test('popover is not visible on initial render', () => {
+  render(<PrivacyBadge />);
+  expect(
+    screen.queryByText(/your data stays on your device/i),
+  ).not.toBeInTheDocument();
+});
+
+test('clicking the badge opens the privacy popover', () => {
+  render(<PrivacyBadge />);
+  fireEvent.click(screen.getByRole('button', { name: 'Privacy information' }));
+  expect(
+    screen.getByText(/your data stays on your device/i),
+  ).toBeInTheDocument();
+});
+
+test('clicking the badge a second time closes the popover', () => {
+  render(<PrivacyBadge />);
+  const btn = screen.getByRole('button', { name: 'Privacy information' });
+  fireEvent.click(btn);
+  fireEvent.click(btn);
+  expect(
+    screen.queryByText(/your data stays on your device/i),
+  ).not.toBeInTheDocument();
+});
+
+test('pressing Escape while popover is open closes it', () => {
+  render(<PrivacyBadge />);
+  fireEvent.click(screen.getByRole('button', { name: 'Privacy information' }));
+  fireEvent.keyDown(document, { key: 'Escape' });
+  expect(
+    screen.queryByText(/your data stays on your device/i),
+  ).not.toBeInTheDocument();
+});
+
+test('aria-expanded reflects popover open/closed state', () => {
+  render(<PrivacyBadge />);
+  const btn = screen.getByRole('button', { name: 'Privacy information' });
+  expect(btn).toHaveAttribute('aria-expanded', 'false');
+  fireEvent.click(btn);
+  expect(btn).toHaveAttribute('aria-expanded', 'true');
 });
