@@ -22,6 +22,8 @@ describe('eraseElementById respects the edit lock', () => {
   test('erases when unlocked', () => {
     const ind = createDefaultIndividual({});
     usePedigreeStore.getState().addIndividual(ind);
+    // A second individual so `ind` is not the last one (which is never erased).
+    usePedigreeStore.getState().addIndividual(createDefaultIndividual({}));
 
     eraseElementById(ind.id);
 
