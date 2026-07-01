@@ -24,6 +24,7 @@ import { ZoomIsland } from './components/ui/islands/ZoomIsland';
 import { HistoryIsland } from './components/ui/islands/HistoryIsland';
 import { HelpIsland } from './components/ui/islands/HelpIsland';
 import { ViewModeBadge } from './components/ui/islands/ViewModeBadge';
+import { ZenModeExit } from './components/ui/islands/ZenModeExit';
 import { PrivacyBadge } from './components/ui/PrivacyBadge';
 import { useUIStore } from './stores/uiStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
@@ -81,6 +82,8 @@ function App() {
       <div className={styles.slotBottomRight}>
         <PrivacyBadge />
         <HelpIsland />
+        {/* Replaces the (now-hidden) help/privacy chrome while zen mode is on */}
+        <ZenModeExit />
       </div>
 
       {/* Floating properties panel — overlays the canvas, does not reflow it.

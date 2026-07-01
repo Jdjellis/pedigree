@@ -9,11 +9,11 @@ describe('ToolIsland', () => {
     useUIStore.setState({ activeTool: 'select', editingLocked: false, zenMode: false });
   });
 
-  it('renders nothing while zen mode is active', () => {
+  it('stays visible in zen mode (a focus mode keeps the drawing tools)', () => {
     useUIStore.setState({ zenMode: true });
-    const { container } = render(<ToolIsland />);
-    expect(container).toBeEmptyDOMElement();
-    expect(screen.queryByRole('button', { name: 'Select' })).not.toBeInTheDocument();
+    render(<ToolIsland />);
+    expect(screen.getByRole('button', { name: 'Select' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Text' })).toBeInTheDocument();
   });
 
   it('renders a button for each tool plus lock and hand', () => {

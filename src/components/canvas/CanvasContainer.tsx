@@ -278,15 +278,18 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
       const el = stageRef.current?.container();
       if (!el) return;
       const panning = isDragging || isMiddlePanning;
-      el.style.cursor = panning ? 'grabbing' : isSpaceHeld ? 'grab' : '';
+      // View mode makes plain drag pan everywhere, so advertise it with a grab
+      // cursor just like the space-to-pan mode.
+      const grabReady = isSpaceHeld || editingLocked;
+      el.style.cursor = panning ? 'grabbing' : grabReady ? 'grab' : '';
       // While panning, clear any inline cursor the symbols set on the canvases
       // so the container's grab/grabbing cursor is what shows.
-      if (panning || isSpaceHeld) {
+      if (panning || grabReady) {
         el.querySelectorAll('canvas').forEach((c) => {
           (c as HTMLElement).style.cursor = '';
         });
       }
-    }, [isDragging, isMiddlePanning, isSpaceHeld]);
+    }, [isDragging, isMiddlePanning, isSpaceHeld, editingLocked]);
 
     // --------------- Wheel: pan, or zoom with Ctrl/Cmd (and trackpad pinch) ---------------
     const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
@@ -402,6 +405,8 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     const handleMarqueeDown = useCallback(
       (e: KonvaEventObject<MouseEvent>) => {
         didMarqueeRef.current = false;
+        // In view mode the stage is draggable and plain drag pans, so no marquee.
+        if (useUIStore.getState().editingLocked) return;
         if (useUIStore.getState().activeTool !== 'select') return;
         if (e.target !== e.target.getStage()) return; // only on empty canvas
         const stage = stageRef.current;
@@ -452,9 +457,11 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
       else ui.clearSelection();
     }, []);
 
-    // Pan by dragging only when the hand tool is active or space is held. In
-    // every other tool, dragging empty canvas is free for marquee / placement.
-    const isDraggable = activeTool === 'hand' || isSpaceHeld;
+    // Pan by dragging when the hand tool is active, space is held, or the canvas
+    // is read-only (view mode) — there, plain drag anywhere pans, mirroring
+    // Excalidraw's view mode. In editable tools, dragging empty canvas is free
+    // for marquee / placement instead.
+    const isDraggable = activeTool === 'hand' || isSpaceHeld || editingLocked;
 
     const individualsList = Object.values(individuals);
 

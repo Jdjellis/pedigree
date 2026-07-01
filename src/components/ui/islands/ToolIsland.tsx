@@ -10,17 +10,17 @@ import styles from './islands.module.css';
  * Eraser. Reads `activeTool`/`editingLocked` reactively — safe here because
  * this lives in the react-dom tree.
  *
- * Hidden entirely in zen mode (distraction-free canvas) and in view (read-only)
- * mode — it's all edit chrome. In view mode navigation happens via pan/zoom and
- * the exit is the "View only" badge, mirroring Excalidraw's read-only view.
+ * Hidden in view (read-only) mode — the drawing tools are useless there, so
+ * their absence is what signals read-only (mirroring Excalidraw's view mode).
+ * KEPT in zen mode: zen is a focus mode for editing without distractions, so
+ * the tools stay while the peripheral chrome is what's stripped.
  */
 export function ToolIsland(): React.JSX.Element | null {
   const activeTool = useUIStore((s) => s.activeTool);
   const editingLocked = useUIStore((s) => s.editingLocked);
-  const zenMode = useUIStore((s) => s.zenMode);
   const actions = useEditorActions();
 
-  if (zenMode || editingLocked) return null;
+  if (editingLocked) return null;
 
   return (
     <Island aria-label="Tools">
