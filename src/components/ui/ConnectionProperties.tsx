@@ -40,6 +40,8 @@ export function ConnectionProperties() {
   const setLinkAdoptive = usePedigreeStore((s) => s.setLinkAdoptive);
   const updateTwinGroup = usePedigreeStore((s) => s.updateTwinGroup);
   const removeTwinGroup = usePedigreeStore((s) => s.removeTwinGroup);
+  const removePartnership = usePedigreeStore((s) => s.removePartnership);
+  const removeParentChildLink = usePedigreeStore((s) => s.removeParentChildLink);
 
   const empty = (
     <div className={styles.panel}>
@@ -81,6 +83,25 @@ export function ConnectionProperties() {
               />
             </div>
           )}
+          {p.childrenIds.length > 0 && (
+            <p className={styles.hint}>
+              Removing this relationship also detaches its{' '}
+              {p.childrenIds.length === 1
+                ? 'child'
+                : `${p.childrenIds.length} children`}{' '}
+              from these parents. The {p.childrenIds.length === 1 ? 'person stays' : 'people stay'} on
+              the canvas.
+            </p>
+          )}
+          <button
+            className={styles.deleteConnectionButton}
+            onClick={() => {
+              removePartnership(p.id);
+              clearConnectionSelection();
+            }}
+          >
+            Remove relationship
+          </button>
         </div>
       );
     }
@@ -107,6 +128,15 @@ export function ConnectionProperties() {
               annotation around the child is set on the person.
             </p>
           </div>
+          <button
+            className={styles.deleteConnectionButton}
+            onClick={() => {
+              removeParentChildLink(link.id);
+              clearConnectionSelection();
+            }}
+          >
+            Remove line of descent
+          </button>
         </div>
       );
     }

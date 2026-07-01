@@ -134,6 +134,24 @@
   text-decoration: underline;
 }
 
+/* Full-width destructive action, e.g. "Remove relationship" in the connection
+   properties editor. Outlined rather than filled so it reads as available but
+   deliberate. */
+.deleteConnectionButton {
+  margin-top: 12px;
+  width: 100%;
+  padding: 8px;
+  font-size: 13px;
+  color: var(--color-danger);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
+  background: transparent;
+}
+
+.deleteConnectionButton:hover {
+  background: color-mix(in srgb, var(--color-danger) 8%, transparent);
+}
+
 /* Twin grouping: a segmented zygosity picker + a single add-to-group button,
    matching the SegmentedControl vocabulary used elsewhere in the panel. */
 .twinChoices {
