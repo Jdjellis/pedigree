@@ -73,6 +73,22 @@ describe('RadialMenu ghost twins (dwell to discover)', () => {
     expect(screen.getByTitle('Add Dizygotic twin (DZ)').className).toMatch(/ghostActive/);
   });
 
+  it('holding ⌥ reveals BOTH groups’ ghosts immediately (no dwell)', () => {
+    render(<RadialMenu />);
+    act(() => {
+      fireEvent.keyDown(window, { key: 'Alt', altKey: true });
+    });
+    // No timer advance — ⌥ is the instant accelerator for the ghost preview.
+    expect(screen.getByTitle('Add Monozygotic twin (MZ)').className).toMatch(/ghostActive/);
+    expect(screen.getByTitle('Add Monozygotic (MZ) twin children').className).toMatch(/ghostActive/);
+
+    // Releasing ⌥ hides them again.
+    act(() => {
+      fireEvent.keyUp(window, { key: 'Alt', altKey: false });
+    });
+    expect(screen.getByTitle('Add Monozygotic twin (MZ)').className).not.toMatch(/ghostActive/);
+  });
+
   it('hides the ghosts shortly after the pointer leaves', () => {
     render(<RadialMenu />);
     const child = screen.getByRole('button', { name: 'Child' });

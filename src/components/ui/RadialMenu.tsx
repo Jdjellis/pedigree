@@ -6,6 +6,7 @@ import { getPresentPartners, findPartnerships } from '../../utils/graphTraversal
 import { addChildToUnion } from './addChild';
 import { addTwinChildrenToUnion, buildTwinChildrenViaNewUnion } from './addTwinChildren';
 import { addTwinOf } from './addTwin';
+import { featureFlags } from '../../config/featureFlags';
 import { generateId } from '../../utils/idGenerator';
 import { RelationshipType, GenderIdentity, TwinType } from '../../types/enums';
 import { PARTNER_SPACING, GENERATION_SPACING, SIBLING_SPACING } from '../../utils/constants';
@@ -396,6 +397,12 @@ export function RadialMenu() {
 
   if (!visible || !target || editingLocked || genderPicker.targetId) return null;
 
+  // A group's ghost twins are revealed either by dwelling on its primary or by
+  // holding ⌥ (⌥ reveals both groups at once — the keyboard accelerator for the
+  // same ghost preview, replacing the old solid split).
+  const siblingRevealed = altMod || ghostGroup === 'sibling';
+  const childRevealed = altMod || ghostGroup === 'child';
+
   return (
     <div
       className={styles.overlay}
@@ -421,22 +428,17 @@ export function RadialMenu() {
           Partner
         </button>
         <button
-          className={clsx(styles.option, styles.bottom, altMod && styles.altActive)}
+          className={clsx(styles.option, styles.bottom)}
           onClick={handleAddChild}
           onMouseEnter={() => armGhost('child')}
           onMouseLeave={disarmGhost}
           title="Add Child (hold ⌥ or dwell for MZ / DZ twin children)"
         >
           Child
-          <TwinBadge />
+          {featureFlags.altHint && <TwinBadge />}
         </button>
         <button
-          className={clsx(
-            styles.option,
-            styles.bottomLeft,
-            altMod && styles.altActive,
-            !altMod && ghostGroup === 'child' && styles.ghostActive,
-          )}
+          className={clsx(styles.option, styles.bottomLeft, childRevealed && styles.ghostActive)}
           onClick={() => handleAddChildTwin(TwinType.Monozygotic)}
           onMouseEnter={keepGhost}
           onMouseLeave={disarmGhost}
@@ -445,12 +447,7 @@ export function RadialMenu() {
           MZ
         </button>
         <button
-          className={clsx(
-            styles.option,
-            styles.bottomRight,
-            altMod && styles.altActive,
-            !altMod && ghostGroup === 'child' && styles.ghostActive,
-          )}
+          className={clsx(styles.option, styles.bottomRight, childRevealed && styles.ghostActive)}
           onClick={() => handleAddChildTwin(TwinType.Dizygotic)}
           onMouseEnter={keepGhost}
           onMouseLeave={disarmGhost}
@@ -459,22 +456,17 @@ export function RadialMenu() {
           DZ
         </button>
         <button
-          className={clsx(styles.option, styles.left, altMod && styles.altActive)}
+          className={clsx(styles.option, styles.left)}
           onClick={handleAddSibling}
           onMouseEnter={() => armGhost('sibling')}
           onMouseLeave={disarmGhost}
           title="Add Sibling (hold ⌥ or dwell for MZ / DZ twin)"
         >
           Sibling
-          <TwinBadge />
+          {featureFlags.altHint && <TwinBadge />}
         </button>
         <button
-          className={clsx(
-            styles.option,
-            styles.leftUpper,
-            altMod && styles.altActive,
-            !altMod && ghostGroup === 'sibling' && styles.ghostActive,
-          )}
+          className={clsx(styles.option, styles.leftUpper, siblingRevealed && styles.ghostActive)}
           onClick={() => handleAddTwin(TwinType.Monozygotic)}
           onMouseEnter={keepGhost}
           onMouseLeave={disarmGhost}
@@ -483,12 +475,7 @@ export function RadialMenu() {
           MZ
         </button>
         <button
-          className={clsx(
-            styles.option,
-            styles.leftLower,
-            altMod && styles.altActive,
-            !altMod && ghostGroup === 'sibling' && styles.ghostActive,
-          )}
+          className={clsx(styles.option, styles.leftLower, siblingRevealed && styles.ghostActive)}
           onClick={() => handleAddTwin(TwinType.Dizygotic)}
           onMouseEnter={keepGhost}
           onMouseLeave={disarmGhost}

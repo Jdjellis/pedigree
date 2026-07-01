@@ -1,14 +1,14 @@
 // src/components/ui/RadialMenu.altBadge.test.tsx
 //
-// Coverage for the persistent ⌥ discovery badge on the Sibling and Child
-// buttons. The badge is an aria-hidden decoration, so the buttons must keep
-// their plain accessible names ("Sibling"/"Child") that the rest of the
-// radial-menu tests query by.
-import { describe, it, expect, beforeEach } from 'vitest';
+// The persistent ⌥ discovery badge is gated behind the `altHint` feature flag
+// (off by default). When on, it renders on the Sibling and Child buttons as an
+// aria-hidden decoration that must not leak into their accessible names.
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { RadialMenu } from './RadialMenu';
 import { useUIStore } from '../../stores/uiStore';
 import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
+import { featureFlags } from '../../config/featureFlags';
 
 const ROOT = 'root';
 
@@ -23,8 +23,20 @@ beforeEach(() => {
   ui.showRadialMenu(ROOT, { x: 0, y: 0 });
 });
 
-describe('RadialMenu ⌥ discovery badge', () => {
-  it('shows a ⌥ badge on both the Sibling and Child buttons', () => {
+afterEach(() => {
+  featureFlags.altHint = false; // restore the default
+});
+
+describe('RadialMenu ⌥ discovery badge (altHint flag)', () => {
+  it('is hidden by default (flag off)', () => {
+    featureFlags.altHint = false;
+    render(<RadialMenu />);
+    const sibling = screen.getByRole('button', { name: 'Sibling' });
+    expect(within(sibling).queryByText('⌥')).toBeNull();
+  });
+
+  it('shows a ⌥ badge on both Sibling and Child when the flag is on', () => {
+    featureFlags.altHint = true;
     render(<RadialMenu />);
     const sibling = screen.getByRole('button', { name: 'Sibling' });
     const child = screen.getByRole('button', { name: 'Child' });
@@ -32,15 +44,13 @@ describe('RadialMenu ⌥ discovery badge', () => {
     expect(within(child).getByText('⌥')).toBeTruthy();
   });
 
-  it('keeps the buttons’ accessible names plain, and adds no badge to Parent/Partner', () => {
+  it('keeps the buttons’ accessible names plain when the badge is on', () => {
+    featureFlags.altHint = true;
     render(<RadialMenu />);
     // Would throw if the ⌥ glyph leaked into the accessible name.
     expect(screen.getByRole('button', { name: 'Sibling' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Child' })).toBeTruthy();
-
-    const parent = screen.getByRole('button', { name: 'Parent' });
-    const partner = screen.getByRole('button', { name: 'Partner' });
-    expect(within(parent).queryByText('⌥')).toBeNull();
-    expect(within(partner).queryByText('⌥')).toBeNull();
+    // Parent/Partner never carry the badge.
+    expect(within(screen.getByRole('button', { name: 'Parent' })).queryByText('⌥')).toBeNull();
   });
 });

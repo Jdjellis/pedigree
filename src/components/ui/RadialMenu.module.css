@@ -76,11 +76,10 @@
 }
 
 /*
- * Cardinal south: child goes straight down in the generational direction.
- * Holding ⌥ fades it out and reveals "MZ"/"DZ" twin-children buttons that split
- * from the same origin LEFT and RIGHT along the child axis (the mirror of the
- * Sibling split, which splits vertically because Sibling sits on the horizontal
- * axis).
+ * Cardinal south: child goes straight down in the generational direction. Its
+ * "MZ"/"DZ" twin-children buttons (`.bottomLeft`/`.bottomRight`) start collapsed
+ * here and are revealed as ghost previews on dwell or ⌥ — see `.ghostActive`
+ * below. The primary stays put; the ghosts flank it left and right.
  */
 .bottom {
   left: 50%;
@@ -91,30 +90,13 @@
 .bottom:hover {
   transform: translate(-50%, -50%) translate(0px, 72px) scale(1.1);
 }
-.bottom.altActive {
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, -50%) translate(0px, 72px) scale(0.7);
-}
 
-/*
- * Twin-children buttons: both start collapsed at the Child position and slide
- * apart to ±26px on the horizontal axis while fading in when ⌥ is held.
- */
 .bottomLeft {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%) translate(0px, 72px) scale(0.7);
   opacity: 0;
   pointer-events: none;
-}
-.bottomLeft.altActive {
-  transform: translate(-50%, -50%) translate(-26px, 72px);
-  opacity: 1;
-  pointer-events: auto;
-}
-.bottomLeft.altActive:hover {
-  transform: translate(-50%, -50%) translate(-26px, 72px) scale(1.1);
 }
 
 .bottomRight {
@@ -124,16 +106,11 @@
   opacity: 0;
   pointer-events: none;
 }
-.bottomRight.altActive {
-  transform: translate(-50%, -50%) translate(26px, 72px);
-  opacity: 1;
-  pointer-events: auto;
-}
-.bottomRight.altActive:hover {
-  transform: translate(-50%, -50%) translate(26px, 72px) scale(1.1);
-}
 
-/* Cardinal west: Sibling. Fades out when ⌥ is held. */
+/*
+ * Cardinal west: Sibling. Its twin buttons (`.leftUpper`/`.leftLower`) start
+ * collapsed here and are revealed as ghost previews above/below on dwell or ⌥.
+ */
 .left {
   left: 50%;
   top: 50%;
@@ -143,31 +120,13 @@
 .left:hover {
   transform: translate(-50%, -50%) translate(-66px, 0px) scale(1.1);
 }
-.left.altActive {
-  opacity: 0;
-  pointer-events: none;
-  transform: translate(-50%, -50%) translate(-66px, 0px) scale(0.7);
-}
 
-/*
- * Twin buttons: both start collapsed at the Sibling position.
- * When .altActive is applied they slide apart to ±22px on the vertical axis
- * while fading in — creating a split-from-origin animation.
- */
 .leftUpper {
   left: 50%;
   top: 50%;
   transform: translate(-50%, -50%) translate(-66px, 0px) scale(0.7);
   opacity: 0;
   pointer-events: none;
-}
-.leftUpper.altActive {
-  transform: translate(-50%, -50%) translate(-66px, -22px);
-  opacity: 1;
-  pointer-events: auto;
-}
-.leftUpper.altActive:hover {
-  transform: translate(-50%, -50%) translate(-66px, -22px) scale(1.1);
 }
 
 .leftLower {
@@ -177,21 +136,14 @@
   opacity: 0;
   pointer-events: none;
 }
-.leftLower.altActive {
-  transform: translate(-50%, -50%) translate(-66px, 22px);
-  opacity: 1;
-  pointer-events: auto;
-}
-.leftLower.altActive:hover {
-  transform: translate(-50%, -50%) translate(-66px, 22px) scale(1.1);
-}
 
 /*
- * Ghost twin previews (dwell-to-discover). The same MZ/DZ buttons, revealed
- * WITHOUT ⌥ after hovering the primary for ~0.8 s. The primary stays visible, so
+ * Ghost twin previews. The MZ/DZ buttons revealed after dwelling on the primary
+ * for ~0.8 s, OR immediately while ⌥ is held (the keyboard accelerator for the
+ * same preview — ⌥ reveals both groups at once). The primary stays visible, so
  * the ghosts flank it at a wider ±34px offset (clearing the 32px primary) and
  * render faded with a dashed outline to read as a preview. Hovering a ghost
- * solidifies it. Suppressed while ⌥ is held (the solid split takes over).
+ * solidifies it.
  */
 .leftUpper.ghostActive {
   transform: translate(-50%, -50%) translate(-66px, -34px);
@@ -242,7 +194,7 @@
  * Persistent ⌥ discovery badge on the Sibling & Child buttons: a tiny glyph
  * clipped to the top-right corner, a standing reminder that a modifier unlocks
  * more options. Aria-hidden decoration; the button `title` stays the a11y hint.
- * It lives inside the button so it inherits the ⌥-fade when the twins reveal.
+ * Rendered only when the `altHint` feature flag is on (off by default).
  */
 .altBadge {
   position: absolute;
@@ -268,10 +220,6 @@
   background: var(--color-surface);
   color: var(--color-primary);
   border-color: var(--color-surface);
-}
-/* When ⌥ is held the twins are already revealed, so drop the reminder. */
-.option.altActive .altBadge {
-  opacity: 0;
 }
 
 .disabled {

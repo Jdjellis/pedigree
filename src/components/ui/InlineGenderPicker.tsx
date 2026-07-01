@@ -5,8 +5,10 @@ import { useViewportStore } from '../../stores/viewportStore';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { GenderIdentity, TwinType } from '../../types/enums';
 import { GenderIconButtons } from './GenderIconButtons';
+import { TwinIconButtons } from './TwinIconButtons';
 import { commitGenderPick } from './commitGenderPick';
 import { addTwinOf, isTwin } from './addTwin';
+import { featureFlags } from '../../config/featureFlags';
 import styles from './InlineGenderPicker.module.css';
 
 /** Screen-px gap between the node anchor and the picker sitting above it. */
@@ -101,33 +103,18 @@ export function InlineGenderPicker(): React.JSX.Element | null {
         role="dialog"
         aria-label="Choose gender identity"
       >
-        <GenderIconButtons
-          value={target.genderIdentity}
-          onChange={(gender) => commitGenderPick(targetId, gender)}
-        />
-        {!alreadyTwin && (
-          <div className={styles.twinSection}>
-            <span className={styles.twinLabel}>Twin?</span>
-            <div className={styles.twinButtons}>
-              <button
-                type="button"
-                className={styles.twinButton}
-                onClick={() => makeTwin(TwinType.Monozygotic)}
-                title="Add a monozygotic (identical) twin"
-              >
-                MZ
-              </button>
-              <button
-                type="button"
-                className={styles.twinButton}
-                onClick={() => makeTwin(TwinType.Dizygotic)}
-                title="Add a dizygotic (fraternal) twin"
-              >
-                DZ
-              </button>
-            </div>
-          </div>
-        )}
+        <div className={styles.row}>
+          <GenderIconButtons
+            value={target.genderIdentity}
+            onChange={(gender) => commitGenderPick(targetId, gender)}
+          />
+          {featureFlags.twinsInGenderPopup && !alreadyTwin && (
+            <>
+              <div className={styles.divider} aria-hidden="true" />
+              <TwinIconButtons onPick={makeTwin} />
+            </>
+          )}
+        </div>
       </div>
     </>
   );

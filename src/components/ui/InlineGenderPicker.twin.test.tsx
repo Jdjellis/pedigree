@@ -1,13 +1,15 @@
 // src/components/ui/InlineGenderPicker.twin.test.tsx
 //
-// Coverage for the gender popup's "make twins" section: a post-creation path to
-// turn the just-created person into a twin.
-import { describe, it, expect, beforeEach } from 'vitest';
+// Coverage for the gender popup's twin icons: MZ/DZ buttons sitting beside the
+// gender icons (gated behind the `twinsInGenderPopup` flag) that turn the
+// just-created person into a twin.
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { InlineGenderPicker } from './InlineGenderPicker';
 import { useUIStore } from '../../stores/uiStore';
 import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
 import { GenderIdentity, RelationshipType, TwinType } from '../../types/enums';
+import { featureFlags } from '../../config/featureFlags';
 
 const TARGET = 'target-1';
 
@@ -23,19 +25,22 @@ function seedTarget(): void {
 }
 
 beforeEach(seedTarget);
+afterEach(() => {
+  featureFlags.twinsInGenderPopup = true; // restore the default
+});
 
-describe('InlineGenderPicker make-twins section', () => {
-  it('offers MZ / DZ twin buttons for a non-twin target', () => {
+describe('InlineGenderPicker twin icons', () => {
+  it('offers MZ / DZ twin buttons for a non-twin target (flag on by default)', () => {
     useUIStore.getState().showGenderPicker(TARGET);
     render(<InlineGenderPicker />);
-    expect(screen.getByRole('button', { name: 'MZ' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'DZ' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Monozygotic twin' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Dizygotic twin' })).toBeInTheDocument();
   });
 
   it('clicking MZ creates a co-twin, groups the pair, and re-anchors the picker onto the twin', () => {
     useUIStore.getState().showGenderPicker(TARGET);
     render(<InlineGenderPicker />);
-    fireEvent.click(screen.getByRole('button', { name: 'MZ' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Monozygotic twin' }));
 
     const doc = usePedigreeStore.getState().document;
     const created = Object.values(doc.individuals).filter((i) => i.id !== TARGET);
@@ -51,7 +56,7 @@ describe('InlineGenderPicker make-twins section', () => {
     expect(useUIStore.getState().genderPicker.targetId).toBe(twin.id);
   });
 
-  it('hides the section once the target is already a twin', () => {
+  it('hides the twin icons once the target is already a twin', () => {
     const store = usePedigreeStore.getState();
     const sib = createDefaultIndividual({ id: 'sib', position: { x: 80, y: 0 } });
     store.addIndividual(sib);
@@ -65,6 +70,15 @@ describe('InlineGenderPicker make-twins section', () => {
 
     useUIStore.getState().showGenderPicker(TARGET);
     render(<InlineGenderPicker />);
-    expect(screen.queryByRole('button', { name: 'MZ' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Monozygotic twin' })).toBeNull();
+  });
+
+  it('hides the twin icons when the twinsInGenderPopup flag is off', () => {
+    featureFlags.twinsInGenderPopup = false;
+    useUIStore.getState().showGenderPicker(TARGET);
+    render(<InlineGenderPicker />);
+    expect(screen.queryByRole('button', { name: 'Monozygotic twin' })).toBeNull();
+    // Gender buttons are unaffected.
+    expect(screen.getByRole('button', { name: 'Woman' })).toBeInTheDocument();
   });
 });
