@@ -1,11 +1,27 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import clsx from 'clsx';
+import {
+  FilePlus,
+  FolderOpen,
+  FileInput,
+  FileOutput,
+  List,
+  Info,
+  Command,
+  HelpCircle,
+} from 'lucide-react';
 import { usePedigreeStore } from '../../../stores/pedigreeStore';
 import { useUIStore } from '../../../stores/uiStore';
 import { useEditorActions } from '../../../commands/useEditorActions';
 import { DocumentDetails } from '../DocumentDetails';
+import { SegmentedControl } from '../SegmentedControl';
+import { THEME_ORDER, THEME_LABELS, type ThemeId } from '../../../theme/themes';
 import { Island } from './Island';
 import styles from './MenuIsland.module.css';
+
+const THEME_OPTIONS: { value: ThemeId; label: string }[] = THEME_ORDER.map(
+  (id) => ({ value: id, label: THEME_LABELS[id] }),
+);
 
 const PLACEHOLDER_TITLE = 'Untitled Pedigree';
 
@@ -32,12 +48,63 @@ function formatRelativeSave(timestamp: number | null, now: number): string {
   return `Saved locally · ${hours}h ago`;
 }
 
+interface MenuItemButtonProps {
+  /** Leading lucide icon (rendered decorative — excluded from the a11y name). */
+  icon: React.ReactNode;
+  label: string;
+  /**
+   * Display string for the keyboard shortcut hint (e.g. `⌘O`). Rendered as a
+   * decorative badge and mirrored onto `aria-keyshortcuts`, so the item's
+   * accessible name stays the bare label.
+   */
+  shortcut?: string;
+  onClick: () => void;
+}
+
+/**
+ * A single row in the ☰ document dropdown: `[icon] label … [shortcut]`.
+ *
+ * The icon and the visible shortcut badge are `aria-hidden`; the shortcut is
+ * re-exposed via `aria-keyshortcuts` so assistive tech announces it without it
+ * leaking into the accessible name (which stays the plain label — keyboard
+ * roving-focus and name-based queries depend on that).
+ */
+function MenuItemButton({
+  icon,
+  label,
+  shortcut,
+  onClick,
+}: MenuItemButtonProps): React.JSX.Element {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      className={styles.menuItem}
+      onClick={onClick}
+      tabIndex={-1}
+      aria-keyshortcuts={shortcut}
+    >
+      <span className={styles.menuItemIcon} aria-hidden="true">
+        {icon}
+      </span>
+      <span className={styles.menuItemLabel}>{label}</span>
+      {shortcut && (
+        <kbd className={styles.menuItemKbd} aria-hidden="true">
+          {shortcut}
+        </kbd>
+      )}
+    </button>
+  );
+}
+
 /**
  * The top-left "menu island" for the floating-island canvas UI.
  *
  * Renders:
  * - A ☰ hamburger button that opens a dropdown of document actions (New, Open,
- *   Import, Export, Legend, Document details, Command palette).
+ *   Import, Export, Legend, Document details, Command palette, Keyboard
+ *   shortcuts), each with a leading icon and — where one exists — a
+ *   right-aligned keyboard-shortcut hint.
  * - An editable document title (click-to-edit inline input).
  * - A "Saved locally" save-status indicator, updated on a 15-second tick.
  *
@@ -55,6 +122,8 @@ export function MenuIsland(): React.JSX.Element {
 
   const lastSavedAt = useUIStore((s) => s.lastSavedAt);
   const storagePersistent = useUIStore((s) => s.storagePersistent);
+  const theme = useUIStore((s) => s.theme);
+  const setTheme = useUIStore((s) => s.setTheme);
 
   const actions = useEditorActions();
 
@@ -257,6 +326,12 @@ export function MenuIsland(): React.JSX.Element {
     useUIStore.getState().toggleCommandPalette();
   };
 
+  /** Opens the keyboard-shortcuts overlay and closes the dropdown. */
+  const handleMenuHelp = (): void => {
+    closeMenu(false);
+    useUIStore.getState().openModal('shortcuts');
+  };
+
   return (
     <Island aria-label="Document menu" className={styles.root}>
       {/* ☰ Menu button */}
@@ -281,72 +356,64 @@ export function MenuIsland(): React.JSX.Element {
             aria-label="Document actions"
             onKeyDown={handleMenuKeyDown}
           >
-            <button
-              type="button"
-              role="menuitem"
-              className={styles.menuItem}
+            <MenuItemButton
+              icon={<FilePlus size={16} />}
+              label="New"
               onClick={handleMenuNew}
-              tabIndex={-1}
-            >
-              New
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className={styles.menuItem}
+            />
+            <MenuItemButton
+              icon={<FolderOpen size={16} />}
+              label="Open"
+              shortcut="⌘O"
               onClick={handleMenuOpen}
-              tabIndex={-1}
-            >
-              Open
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className={styles.menuItem}
+            />
+            <MenuItemButton
+              icon={<FileInput size={16} />}
+              label="Import"
               onClick={handleMenuImport}
-              tabIndex={-1}
-            >
-              Import
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className={styles.menuItem}
+            />
+            <MenuItemButton
+              icon={<FileOutput size={16} />}
+              label="Export"
+              shortcut="⌘E"
               onClick={handleMenuExport}
-              tabIndex={-1}
-            >
-              Export
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              className={styles.menuItem}
+            />
+            <MenuItemButton
+              icon={<List size={16} />}
+              label="Legend"
               onClick={handleMenuLegend}
-              tabIndex={-1}
-            >
-              Legend
-            </button>
+            />
             <div className={styles.menuSeparator} role="separator" />
-            <button
-              type="button"
-              role="menuitem"
-              className={styles.menuItem}
+            <MenuItemButton
+              icon={<Info size={16} />}
+              label="Document details"
               onClick={openDetails}
-              tabIndex={-1}
-            >
-              Document details
-            </button>
+            />
             <div className={styles.menuSeparator} role="separator" />
-            <button
-              type="button"
-              role="menuitem"
-              className={clsx(styles.menuItem, styles.menuItemWithHint)}
+            {/* Theme picker. Not a menuitem (operated by click), and left open
+                after a change so the user can preview Light / Warm / Dim. */}
+            <div className={styles.themeSection}>
+              <span className={styles.themeLabel}>Theme</span>
+              <SegmentedControl
+                options={THEME_OPTIONS}
+                value={theme}
+                onChange={setTheme}
+                ariaLabel="Editor theme"
+              />
+            </div>
+            <div className={styles.menuSeparator} role="separator" />
+            <MenuItemButton
+              icon={<Command size={16} />}
+              label="Command palette…"
+              shortcut="⌘K"
               onClick={handleMenuCommandPalette}
-              tabIndex={-1}
-            >
-              <span>Command palette…</span>
-              <kbd className={styles.menuItemKbd}>⌘K</kbd>
-            </button>
+            />
+            <MenuItemButton
+              icon={<HelpCircle size={16} />}
+              label="Keyboard shortcuts"
+              shortcut="?"
+              onClick={handleMenuHelp}
+            />
           </div>
         )}
 

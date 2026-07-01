@@ -14,6 +14,7 @@ import { LegendOverlay } from './components/ui/LegendOverlay';
 import { AnnotationEditor } from './components/ui/AnnotationEditor';
 import { CommandPalette } from './components/ui/CommandPalette';
 import { ShortcutsOverlay } from './components/ui/ShortcutsOverlay';
+import { HelpOverlay } from './components/ui/HelpOverlay';
 import { MenuIsland } from './components/ui/islands/MenuIsland';
 import { ToolIsland } from './components/ui/islands/ToolIsland';
 import { ToolHint } from './components/ui/islands/ToolHint';
@@ -25,6 +26,7 @@ import { PrivacyBadge } from './components/ui/PrivacyBadge';
 import { useUIStore } from './stores/uiStore';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useAutoSave } from './hooks/useAutoSave';
+import { useApplyTheme } from './hooks/useApplyTheme';
 import styles from './App.module.css';
 
 function App() {
@@ -33,6 +35,7 @@ function App() {
 
   useKeyboardShortcuts();
   useAutoSave();
+  useApplyTheme();
 
   const getStage = useCallback(() => {
     return canvasRef.current?.getStage() ?? null;
@@ -83,6 +86,7 @@ function App() {
       <LinkTypePopup />
       <CommandPalette />
       <ShortcutsOverlay />
+      <HelpOverlay />
     </div>
   );
 }

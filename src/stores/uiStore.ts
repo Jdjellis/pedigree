@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { ONBOARDED_STORAGE_KEY } from '../components/canvas/onboarding';
 import * as safeStorage from '../utils/safeStorage';
+import {
+  DEFAULT_THEME,
+  THEME_STORAGE_KEY,
+  isThemeId,
+  type ThemeId,
+} from '../theme/themes';
 
 /**
  * The currently active canvas tool. `select`/`hand` are modal helpers
@@ -19,7 +25,14 @@ export type ActiveTool = 'select' | 'hand' | 'text' | 'eraser' | 'connect';
  */
 export type DragLinkMode = 'drag' | 'click';
 /** The modal dialog currently open, or `null` when no modal is shown. */
-export type ActiveModal = 'import' | 'export' | 'settings' | 'legendEditor' | 'shortcuts' | null;
+export type ActiveModal =
+  | 'import'
+  | 'export'
+  | 'settings'
+  | 'legendEditor'
+  | 'shortcuts'
+  | 'help'
+  | null;
 
 /** What kind of connection an id in {@link ConnectionSelection} refers to. */
 export type ConnectionKind = 'partnership' | 'parentChild' | 'twin';
@@ -152,6 +165,11 @@ interface UIState {
   onboarded: boolean;
   /** Mark onboarding as complete — updates store and persists to localStorage. */
   setOnboarded: () => void;
+
+  /** The active comfort theme (persisted browser-local). */
+  theme: ThemeId;
+  /** Switch the active theme and persist the choice. */
+  setTheme: (theme: ThemeId) => void;
 }
 
 export const useUIStore = create<UIState>()((set) => ({
@@ -347,5 +365,15 @@ export const useUIStore = create<UIState>()((set) => ({
   setOnboarded: () => {
     safeStorage.setItem(ONBOARDED_STORAGE_KEY, '1');
     set({ onboarded: true });
+  },
+
+  theme: ((): ThemeId => {
+    const stored = safeStorage.getItem(THEME_STORAGE_KEY);
+    return isThemeId(stored) ? stored : DEFAULT_THEME;
+  })(),
+
+  setTheme: (theme) => {
+    safeStorage.setItem(THEME_STORAGE_KEY, theme);
+    set({ theme });
   },
 }));
