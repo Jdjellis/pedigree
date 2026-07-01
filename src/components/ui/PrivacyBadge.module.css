@@ -3,29 +3,6 @@
   pointer-events: auto;
 }
 
-.badge {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 10px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08), 0 1px 3px rgba(0, 0, 0, 0.06);
-  color: var(--color-text-secondary);
-  cursor: pointer;
-  transition: background-color 0.1s;
-}
-
-.badge:hover {
-  background: rgba(0, 0, 0, 0.04);
-}
-
-.badge:active {
-  background: rgba(0, 0, 0, 0.08);
-}
-
 .popover {
   position: absolute;
   bottom: calc(100% + 8px);
