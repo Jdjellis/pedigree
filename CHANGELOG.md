@@ -7,6 +7,9 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Help/shortcuts hint that a relationship line can be clicked to edit it
+  (relationship type, consanguinity, infertility), so those line-level editors
+  are discoverable.
 - Infertility and “no children by choice” markers on a partnership: a stub
   below the relationship line ended by a double cross-bar (infertility, with an
   optional cause) or a single bar (no children), per NSGC/Bennett. Editable in

@@ -314,11 +314,15 @@ function buildLabelLines(individual: Individual): string[] {
       lines.push(`${individual.age}`);
     }
   }
-  // Stillbirth: "SB" + gestational age (mirrors SymbolLabel.tsx).
+  // Stillbirth: "SB" + gestational age (mirrors SymbolLabel.tsx). GA is gated on
+  // a stillbirth or ongoing pregnancy so a stale value never shows otherwise.
   if (individual.vitalStatus === VitalStatus.Stillborn) {
     lines.push('SB');
   }
-  if (individual.gestationalAge?.trim()) {
+  if (
+    (individual.vitalStatus === VitalStatus.Stillborn || individual.isPregnancy) &&
+    individual.gestationalAge?.trim()
+  ) {
     lines.push(`GA: ${individual.gestationalAge.trim()}`);
   }
   if (individual.sexAssignedAtBirth) {

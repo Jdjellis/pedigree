@@ -96,6 +96,7 @@ export function ConnectionProperties() {
             <SegmentedControl
               options={CHILDLESS_OPTIONS}
               value={p.childlessStatus ?? 'none'}
+              disabled={p.childrenIds.length > 0}
               onChange={(v) =>
                 updatePartnership(p.id, {
                   childlessStatus: v === 'none' ? undefined : v,
@@ -105,23 +106,26 @@ export function ConnectionProperties() {
               }
               ariaLabel="Childless status"
             />
-            {p.childlessStatus === 'infertility' && (
-              <input
-                className={styles.input}
-                value={p.childlessReason ?? ''}
-                onChange={(e) =>
-                  updatePartnership(p.id, {
-                    childlessReason: e.target.value || undefined,
-                  })
-                }
-                placeholder="Cause (e.g. azoospermia)"
-              />
-            )}
-            {p.childlessStatus && p.childrenIds.length > 0 && (
+            {p.childrenIds.length > 0 ? (
               <p className={styles.hint}>
-                This union still has {p.childrenIds.length === 1 ? 'a child' : 'children'}
-                {' '}on the canvas — a childless marker will draw alongside the sibship.
+                A childless marker doesn’t apply — this union has{' '}
+                {p.childrenIds.length === 1 ? 'a child' : 'children'}. Detach{' '}
+                {p.childrenIds.length === 1 ? 'them' : 'all of them'} first to mark
+                it infertile or childless.
               </p>
+            ) : (
+              p.childlessStatus === 'infertility' && (
+                <input
+                  className={styles.input}
+                  value={p.childlessReason ?? ''}
+                  onChange={(e) =>
+                    updatePartnership(p.id, {
+                      childlessReason: e.target.value || undefined,
+                    })
+                  }
+                  placeholder="Cause (e.g. azoospermia)"
+                />
+              )
             )}
           </div>
           {p.childrenIds.length > 0 && (

@@ -557,6 +557,14 @@ describe('stillbirth rendering', () => {
     expect(svg).toContain('<circle');
     expect(svg).not.toContain('<polygon');
   });
+
+  it('does not show gestational age for a living individual carrying a stale value', () => {
+    const p = person('c', 100, 100);
+    p.gestationalAge = '20 wk'; // stale value, but vitalStatus is Alive
+    const svg = buildPedigreeSvg(minimalDoc({ c: p }, {}, {}));
+    expect(svg).not.toContain('>GA: 20 wk</text>');
+    expect(svg).not.toContain('>SB</text>');
+  });
 });
 
 describe('childless-union rendering', () => {

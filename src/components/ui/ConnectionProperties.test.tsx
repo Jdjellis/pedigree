@@ -105,6 +105,52 @@ describe('ConnectionProperties via PropertiesPanel', () => {
     expect(screen.queryByPlaceholderText('e.g. 1st cousins')).not.toBeInTheDocument();
   });
 
+  it('shows the childless control with a cause input for an infertile childless union', () => {
+    const doc = createDefaultDocument();
+    doc.partnerships['union1'] = {
+      ...makePartnership('union1', RelationshipType.Partnership),
+      childlessStatus: 'infertility',
+      childlessReason: 'azoospermia',
+    };
+
+    act(() => {
+      usePedigreeStore.getState().setDocument(doc);
+      useUIStore.setState({
+        selectedConnection: { kind: 'partnership', id: 'union1' },
+        propertiesPanelOpen: true,
+      });
+    });
+
+    render(<PropertiesPanel />);
+    expect(screen.getByRole('group', { name: 'Childless status' })).toBeInTheDocument();
+    // Enabled when the union has no children.
+    expect(screen.getByRole('button', { name: 'Infertility' })).toBeEnabled();
+    expect(screen.getByDisplayValue('azoospermia')).toBeInTheDocument();
+  });
+
+  it('disables the childless control when the union has children', () => {
+    const doc = createDefaultDocument();
+    doc.individuals['child'] = createDefaultIndividual({ id: 'child' });
+    doc.partnerships['union1'] = {
+      ...makePartnership('union1', RelationshipType.Partnership),
+      childrenIds: ['child'],
+    };
+
+    act(() => {
+      usePedigreeStore.getState().setDocument(doc);
+      useUIStore.setState({
+        selectedConnection: { kind: 'partnership', id: 'union1' },
+        propertiesPanelOpen: true,
+      });
+    });
+
+    render(<PropertiesPanel />);
+    expect(screen.getByRole('button', { name: 'Infertility' })).toBeDisabled();
+    expect(screen.getByText(/childless marker doesn.t apply/i)).toBeInTheDocument();
+    // No cause input while children exist.
+    expect(screen.queryByPlaceholderText(/azoospermia/i)).not.toBeInTheDocument();
+  });
+
   it('renders the zygosity control for a twin connector', () => {
     const doc = createDefaultDocument();
     doc.twinGroups['tw1'] = makeTwinGroup('tw1', TwinType.Monozygotic);
