@@ -47,32 +47,34 @@
 
 /*
  * All positions are measured from the menu center (= symbol center).
- * The symbol radius is ~20px; 66px clears it on every cardinal axis.
+ * The symbol radius is ~20px; the cardinal buttons orbit at 56px (inner edge
+ * ~40px) so they clear the symbol while sitting close enough that "Sibling"
+ * (west) no longer lands on an adjacent sibling ~80px away.
  *
  * "Child" sits at the cardinal south (6 o'clock) — the natural generational
- * direction — but is pushed to 72px to give the number/name label (which
- * starts ~48px below center) as much breathing room as possible.
+ * direction — and stays at 72px to give the number/name label (which starts
+ * ~48px below center) as much breathing room as possible.
  *
- * "Sibling" sits at the cardinal west (9 o'clock). Holding ⌥ fades it out
- * and reveals "MZ" (monozygotic) and "DZ" (dizygotic) twin buttons that
- * split from the same origin point above and below the Sibling axis.
+ * "Sibling" (west) and "Child" (south) each own a pair of MZ/DZ twin buttons
+ * that start collapsed on the primary and are revealed as ghost previews on
+ * dwell or ⌥ — see `.ghostActive` below.
  */
 .top {
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) translate(0px, -66px);
+  transform: translate(-50%, -50%) translate(0px, -56px);
 }
 .top:hover {
-  transform: translate(-50%, -50%) translate(0px, -66px) scale(1.1);
+  transform: translate(-50%, -50%) translate(0px, -56px) scale(1.1);
 }
 
 .right {
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) translate(66px, 0px);
+  transform: translate(-50%, -50%) translate(56px, 0px);
 }
 .right:hover {
-  transform: translate(-50%, -50%) translate(66px, 0px) scale(1.1);
+  transform: translate(-50%, -50%) translate(56px, 0px) scale(1.1);
 }
 
 /*
@@ -114,17 +116,17 @@
 .left {
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) translate(-66px, 0px);
+  transform: translate(-50%, -50%) translate(-56px, 0px);
   opacity: 1;
 }
 .left:hover {
-  transform: translate(-50%, -50%) translate(-66px, 0px) scale(1.1);
+  transform: translate(-50%, -50%) translate(-56px, 0px) scale(1.1);
 }
 
 .leftUpper {
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) translate(-66px, 0px) scale(0.7);
+  transform: translate(-50%, -50%) translate(-56px, 0px) scale(0.7);
   opacity: 0;
   pointer-events: none;
 }
@@ -132,7 +134,7 @@
 .leftLower {
   left: 50%;
   top: 50%;
-  transform: translate(-50%, -50%) translate(-66px, 0px) scale(0.7);
+  transform: translate(-50%, -50%) translate(-56px, 0px) scale(0.7);
   opacity: 0;
   pointer-events: none;
 }
@@ -146,24 +148,24 @@
  * solidifies it.
  */
 .leftUpper.ghostActive {
-  transform: translate(-50%, -50%) translate(-66px, -34px);
+  transform: translate(-50%, -50%) translate(-56px, -34px);
   opacity: 0.5;
   pointer-events: auto;
   border-style: dashed;
 }
 .leftUpper.ghostActive:hover {
-  transform: translate(-50%, -50%) translate(-66px, -34px) scale(1.1);
+  transform: translate(-50%, -50%) translate(-56px, -34px) scale(1.1);
   opacity: 1;
   border-style: solid;
 }
 .leftLower.ghostActive {
-  transform: translate(-50%, -50%) translate(-66px, 34px);
+  transform: translate(-50%, -50%) translate(-56px, 34px);
   opacity: 0.5;
   pointer-events: auto;
   border-style: dashed;
 }
 .leftLower.ghostActive:hover {
-  transform: translate(-50%, -50%) translate(-66px, 34px) scale(1.1);
+  transform: translate(-50%, -50%) translate(-56px, 34px) scale(1.1);
   opacity: 1;
   border-style: solid;
 }
