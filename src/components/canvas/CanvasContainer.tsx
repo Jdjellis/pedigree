@@ -39,6 +39,7 @@ import {
   idsIntersectingMarquee,
   type NodeBox,
 } from './marqueeSelection';
+import { nextPanningState } from './stageDrag';
 import { useRadialHover } from '../../hooks/useRadialHover';
 import styles from './CanvasContainer.module.css';
 
@@ -323,15 +324,28 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     }, []);
 
     // --------------- Stage Drag (Pan) ---------------
-    const handleDragStart = useCallback(() => {
-      setIsDragging(true);
+    // Konva bubbles a child symbol's drag events up to these stage handlers, so
+    // both guard on the drag target being the stage itself. Without the guard on
+    // dragstart, an alt-drag "connect" gesture (which cancels the symbol drag via
+    // stopDrag() and never emits a stage dragend) latches isDragging on and leaves
+    // the grab cursor stuck as a hand — issue #91. See ./stageDrag.
+    const handleDragStart = useCallback((e: KonvaEventObject<DragEvent>) => {
+      setIsDragging((panning) =>
+        nextPanningState(panning, {
+          phase: 'start',
+          targetIsStage: e.target === stageRef.current,
+        }),
+      );
     }, []);
 
     const handleDragEnd = useCallback(
       (e: KonvaEventObject<DragEvent>) => {
-        setIsDragging(false);
         const stage = e.target;
-        if (stage !== stageRef.current) return;
+        const targetIsStage = stage === stageRef.current;
+        setIsDragging((panning) =>
+          nextPanningState(panning, { phase: 'end', targetIsStage }),
+        );
+        if (!targetIsStage) return;
         setPosition({ x: stage.x(), y: stage.y() });
       },
       [setPosition]
