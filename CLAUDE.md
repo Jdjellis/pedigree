@@ -1,30 +1,24 @@
 # Pedigree Canvas — Claude Instructions
 
-## Architecture gotchas
+## Architecture reference
 
-These are non-obvious and have each cost real debugging time. Read before
-touching canvas rendering, stores, or export.
+Detailed architecture notes live in
+[`docs/architecture-reference.md`](docs/architecture-reference.md). **Read the
+relevant section there before touching canvas rendering, stores, export, or
+feature toggles.** The critical gotchas at a glance (see the reference for the
+full explanation and the fix):
 
-- **react-konva + Zustand subscriptions silently fail.** react-konva uses a
-  custom React reconciler (not react-dom), so a `useStore(selector)` subscription
-  *inside* a Konva component updates the store but never repaints the canvas.
-  Lift **all** Zustand subscriptions up to `CanvasContainer.tsx` (react-dom
-  context) and pass data down as props. Use `useXStore.getState()` for
-  imperative reads/writes inside event handlers only.
-
-- **Never `import ... from 'konva'` directly.** It pulls in a second React copy
-  and crashes with "Invalid hook call". Use the `react-konva` exports; intercept
-  raw events in the capture phase instead of reaching for the Konva global.
-
-- **`svgExport.ts` is a parallel renderer, not a wrapper.** It re-implements the
-  canvas drawing for vector export, so any change to a symbol, label, legend, or
-  layout must be made in **both** the Konva component and `svgExport.ts` or they
-  drift. Because Konva can't render under jsdom, `svgExport` is also the real
-  unit-test surface for rendering logic.
-
-- **react-konva can't render under vitest/jsdom** (no canvas → `Stage` throws).
-  Extract canvas logic into store-operating modules (e.g. `symbolDrag.ts`) and
-  unit-test those, not the components.
+- **react-konva + Zustand subscriptions silently fail** — lift all subscriptions
+  to `CanvasContainer.tsx`; use `getState()` for imperative reads in handlers.
+- **Never `import ... from 'konva'` directly** — second React copy → "Invalid
+  hook call". Use the `react-konva` exports.
+- **`svgExport.ts` is a parallel renderer** — mirror any symbol/label/legend/
+  layout change there too, or the canvas and vector export drift.
+- **react-konva can't render under vitest/jsdom** — extract canvas logic into
+  store-operating modules and unit-test those, not the components.
+- **Feature flags** live in `src/config/featureFlags.ts` (build-time defaults,
+  mutable for per-test overrides) — reset any flag you flip in a test's
+  `afterEach`.
 
 ## Clinical Standards Reference
 

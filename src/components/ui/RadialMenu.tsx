@@ -4,12 +4,30 @@ import { useViewportStore } from '../../stores/viewportStore';
 import { usePedigreeStore, createDefaultIndividual } from '../../stores/pedigreeStore';
 import { getPresentPartners, findPartnerships } from '../../utils/graphTraversal';
 import { addChildToUnion } from './addChild';
+import { addTwinChildrenToUnion, buildTwinChildrenViaNewUnion } from './addTwinChildren';
+import { addTwinOf } from './addTwin';
+import { featureFlags } from '../../config/featureFlags';
 import { generateId } from '../../utils/idGenerator';
 import { RelationshipType, GenderIdentity, TwinType } from '../../types/enums';
 import { PARTNER_SPACING, GENERATION_SPACING, SIBLING_SPACING } from '../../utils/constants';
-import type { PartnershipRelationship, ParentChildRelationship, TwinGroup } from '../../types/pedigree';
+import type { PartnershipRelationship, ParentChildRelationship } from '../../types/pedigree';
 import styles from './RadialMenu.module.css';
 import clsx from 'clsx';
+
+/**
+ * A tiny persistent ⌥ badge shown on the Sibling and Child buttons, advertising
+ * the "hold ⌥ for twins" shortcut at a glance. Aria-hidden so the button keeps
+ * its plain accessible name ("Sibling"/"Child") — the `title` stays the
+ * screen-reader affordance — and it fades out with its button once ⌥ (or a
+ * dwell) reveals the twins.
+ */
+function TwinBadge() {
+  return (
+    <span className={styles.altBadge} aria-hidden="true">
+      ⌥
+    </span>
+  );
+}
 
 export function RadialMenu() {
   const { visible, targetId } = useUIStore((s) => s.radialMenu);
@@ -33,10 +51,49 @@ export function RadialMenu() {
   const addChildViaNewUnion = usePedigreeStore((s) => s.addChildViaNewUnion);
   const fillUnionPartner = usePedigreeStore((s) => s.fillUnionPartner);
   const addParentsToParentlessUnion = usePedigreeStore((s) => s.addParentsToParentlessUnion);
-  const addTwinGroup = usePedigreeStore((s) => s.addTwinGroup);
+  const addTwinChildren = usePedigreeStore((s) => s.addTwinChildren);
 
   const [altMod, setAltMod] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+
+  // Twins-discovery via dwell: hovering the Sibling or Child button for ~0.8 s
+  // reveals faded "ghost" MZ/DZ options flanking it, so users find twins without
+  // knowing about ⌥. `null` = no ghosts shown.
+  const [ghostGroup, setGhostGroup] = useState<'sibling' | 'child' | null>(null);
+  const showTimer = useRef<number | undefined>(undefined);
+  const hideTimer = useRef<number | undefined>(undefined);
+
+  // Arm the dwell timer when the pointer enters a group's primary button. A
+  // short hide timer (started on leave) is cancelled here so moving between the
+  // primary and its ghosts keeps them alive.
+  const armGhost = useCallback((group: 'sibling' | 'child') => {
+    window.clearTimeout(hideTimer.current);
+    setGhostGroup((current) => {
+      if (current === group) return current;
+      window.clearTimeout(showTimer.current);
+      showTimer.current = window.setTimeout(() => setGhostGroup(group), 800);
+      return current;
+    });
+  }, []);
+  // Hovering a revealed ghost keeps the group open (cancels any pending hide).
+  const keepGhost = useCallback(() => {
+    window.clearTimeout(hideTimer.current);
+  }, []);
+  // Leaving the group: cancel a not-yet-fired dwell and fade the ghosts after a
+  // short grace period (so a quick hop primary→ghost doesn't dismiss them).
+  const disarmGhost = useCallback(() => {
+    window.clearTimeout(showTimer.current);
+    window.clearTimeout(hideTimer.current);
+    hideTimer.current = window.setTimeout(() => setGhostGroup(null), 140);
+  }, []);
+
+  // Cancel any pending dwell/hide timers whenever the menu hides, so a reveal
+  // can't fire onto a closed menu.
+  useEffect(() => {
+    if (visible) return;
+    window.clearTimeout(showTimer.current);
+    window.clearTimeout(hideTimer.current);
+  }, [visible]);
 
   const target = targetId ? doc.individuals[targetId] : null;
 
@@ -64,7 +121,10 @@ export function RadialMenu() {
     if (!visible) return;
 
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') hideRadialMenu();
+      if (e.key === 'Escape') {
+        setGhostGroup(null);
+        hideRadialMenu();
+      }
       setAltMod(e.altKey);
     };
     const onKeyUp = (e: KeyboardEvent) => setAltMod(e.altKey);
@@ -79,6 +139,7 @@ export function RadialMenu() {
 
   const handleAddParent = useCallback(() => {
     if (!target || !targetId) return;
+    setGhostGroup(null); // clicking closes the menu; drop any dwell-revealed ghosts
 
     const childGeneration = target.generation ?? 0;
     const parentGeneration = childGeneration - 1;
@@ -151,6 +212,7 @@ export function RadialMenu() {
 
   const handleAddPartner = useCallback(() => {
     if (!target || !targetId) return;
+    setGhostGroup(null); // clicking closes the menu; drop any dwell-revealed ghosts
 
     // If the target is the sole partner of a 1-partner union, the new partner
     // becomes the co-parent of its existing children.
@@ -189,6 +251,7 @@ export function RadialMenu() {
 
   const handleAddChild = useCallback(() => {
     if (!target || !targetId) return;
+    setGhostGroup(null); // clicking closes the menu; drop any dwell-revealed ghosts
 
     const partnershipIds = findPartnerships(doc, targetId);
 
@@ -230,8 +293,48 @@ export function RadialMenu() {
     addChildToUnion(doc, target, partnership);
   }, [target, targetId, doc, showGenderPicker, showUnionPicker, addChildViaNewUnion, hideRadialMenu, select]);
 
+  // Hold ⌥ over Child: add a pair of twin CHILDREN. Because the target is the
+  // parent (not a co-twin), a twin child can only exist as two new siblings born
+  // together — so this mirrors handleAddChild's union resolution but creates a
+  // pair grouped by zygosity rather than a single child.
+  const handleAddChildTwin = useCallback((twinType: TwinType) => {
+    if (!target || !targetId) return;
+    setGhostGroup(null); // clicking closes the menu; drop any dwell-revealed ghosts
+
+    const partnershipIds = findPartnerships(doc, targetId);
+
+    // No union yet: create a 1-partner union with the target as sole parent
+    // holding both twins.
+    if (partnershipIds.length === 0) {
+      const { children, links, partnership, twinGroup } = buildTwinChildrenViaNewUnion(
+        target,
+        twinType,
+      );
+      addTwinChildren(children, links, twinGroup, partnership);
+      hideRadialMenu();
+      select(children[0].id);
+      showGenderPicker(children[0].id);
+      return;
+    }
+
+    // Multiple unions: which one the twins belong to is ambiguous, so defer to
+    // the union picker (carrying the twin intent) — same as single Add Child.
+    if (partnershipIds.length > 1) {
+      hideRadialMenu();
+      showUnionPicker(targetId, twinType);
+      return;
+    }
+
+    const partnership = doc.partnerships[partnershipIds[0]];
+    if (!partnership) return;
+
+    hideRadialMenu();
+    addTwinChildrenToUnion(doc, target, partnership, twinType);
+  }, [target, targetId, doc, showGenderPicker, showUnionPicker, addTwinChildren, hideRadialMenu, select]);
+
   const handleAddSibling = useCallback(() => {
     if (!target || !targetId) return;
+    setGhostGroup(null); // clicking closes the menu; drop any dwell-revealed ghosts
 
     const parentLink = Object.values(doc.parentChildLinks).find((l) => l.childId === targetId);
 
@@ -285,65 +388,20 @@ export function RadialMenu() {
 
   const handleAddTwin = useCallback((twinType: TwinType) => {
     if (!target || !targetId) return;
-
-    const parentLink = Object.values(doc.parentChildLinks).find((l) => l.childId === targetId);
-
-    if (parentLink) {
-      const partnership = doc.partnerships[parentLink.parentPartnershipId];
-      if (!partnership) return;
-      const siblings = partnership.childrenIds.map((id) => doc.individuals[id]).filter(Boolean);
-      const maxX = Math.max(...siblings.map((s) => s.position.x));
-      const twin = createDefaultIndividual({
-        generation: target.generation,
-        position: { x: maxX + SIBLING_SPACING, y: target.position.y },
-      });
-      const link: ParentChildRelationship = {
-        id: generateId(), type: RelationshipType.ParentChild,
-        parentPartnershipId: partnership.id, childId: twin.id,
-      };
-      const twinGroup: TwinGroup = {
-        id: generateId(), twinType,
-        individualIds: [targetId, twin.id], parentPartnershipId: partnership.id,
-      };
-      addChildToFamily(twin, partnership.id, link);
-      addTwinGroup(twinGroup);
-      hideRadialMenu();
-      select(twin.id);
-      showGenderPicker(twin.id);
-      return;
-    }
-
-    // No parents: create a 0-partner sibship then mark the pair as twins.
-    const partnershipId = generateId();
-    const twin = createDefaultIndividual({
-      genderIdentity: GenderIdentity.Unknown,
-      generation: target.generation,
-      position: { x: target.position.x + SIBLING_SPACING, y: target.position.y },
-    });
-    const partnership: PartnershipRelationship = {
-      id: partnershipId, type: RelationshipType.Partnership,
-      childrenIds: [target.id, twin.id],
-    };
-    const targetLink: ParentChildRelationship = {
-      id: generateId(), type: RelationshipType.ParentChild,
-      parentPartnershipId: partnershipId, childId: target.id,
-    };
-    const siblingLink: ParentChildRelationship = {
-      id: generateId(), type: RelationshipType.ParentChild,
-      parentPartnershipId: partnershipId, childId: twin.id,
-    };
-    const twinGroup: TwinGroup = {
-      id: generateId(), twinType,
-      individualIds: [targetId, twin.id], parentPartnershipId: partnershipId,
-    };
-    addSiblingViaNewUnion(target, twin, partnership, targetLink, siblingLink);
-    addTwinGroup(twinGroup);
+    setGhostGroup(null); // clicking closes the menu; drop any dwell-revealed ghosts
     hideRadialMenu();
-    select(twin.id);
-    showGenderPicker(twin.id);
-  }, [target, targetId, doc, showGenderPicker, addChildToFamily, addSiblingViaNewUnion, addTwinGroup, hideRadialMenu, select]);
+    // Shared with the gender popup's "make twins" section (addTwin.ts) so both
+    // routes create an identical twin structure.
+    addTwinOf(doc, target, twinType);
+  }, [target, targetId, doc, hideRadialMenu]);
 
   if (!visible || !target || editingLocked || genderPicker.targetId) return null;
+
+  // A group's ghost twins are revealed either by dwelling on its primary or by
+  // holding ⌥ (⌥ reveals both groups at once — the keyboard accelerator for the
+  // same ghost preview, replacing the old solid split).
+  const siblingRevealed = altMod || ghostGroup === 'sibling';
+  const childRevealed = altMod || ghostGroup === 'child';
 
   return (
     <div
@@ -372,27 +430,55 @@ export function RadialMenu() {
         <button
           className={clsx(styles.option, styles.bottom)}
           onClick={handleAddChild}
-          title="Add Child"
+          onMouseEnter={() => armGhost('child')}
+          onMouseLeave={disarmGhost}
+          title="Add Child (hold ⌥ or dwell for MZ / DZ twin children)"
         >
           Child
+          {featureFlags.altHint && <TwinBadge />}
         </button>
         <button
-          className={clsx(styles.option, styles.left, altMod && styles.altActive)}
+          className={clsx(styles.option, styles.bottomLeft, childRevealed && styles.ghostActive)}
+          onClick={() => handleAddChildTwin(TwinType.Monozygotic)}
+          onMouseEnter={keepGhost}
+          onMouseLeave={disarmGhost}
+          title="Add Monozygotic (MZ) twin children"
+        >
+          MZ
+        </button>
+        <button
+          className={clsx(styles.option, styles.bottomRight, childRevealed && styles.ghostActive)}
+          onClick={() => handleAddChildTwin(TwinType.Dizygotic)}
+          onMouseEnter={keepGhost}
+          onMouseLeave={disarmGhost}
+          title="Add Dizygotic (DZ) twin children"
+        >
+          DZ
+        </button>
+        <button
+          className={clsx(styles.option, styles.left)}
           onClick={handleAddSibling}
-          title="Add Sibling (hold ⌥ for MZ / DZ twin)"
+          onMouseEnter={() => armGhost('sibling')}
+          onMouseLeave={disarmGhost}
+          title="Add Sibling (hold ⌥ or dwell for MZ / DZ twin)"
         >
           Sibling
+          {featureFlags.altHint && <TwinBadge />}
         </button>
         <button
-          className={clsx(styles.option, styles.leftUpper, altMod && styles.altActive)}
+          className={clsx(styles.option, styles.leftUpper, siblingRevealed && styles.ghostActive)}
           onClick={() => handleAddTwin(TwinType.Monozygotic)}
+          onMouseEnter={keepGhost}
+          onMouseLeave={disarmGhost}
           title="Add Monozygotic twin (MZ)"
         >
           MZ
         </button>
         <button
-          className={clsx(styles.option, styles.leftLower, altMod && styles.altActive)}
+          className={clsx(styles.option, styles.leftLower, siblingRevealed && styles.ghostActive)}
           onClick={() => handleAddTwin(TwinType.Dizygotic)}
+          onMouseEnter={keepGhost}
+          onMouseLeave={disarmGhost}
           title="Add Dizygotic twin (DZ)"
         >
           DZ

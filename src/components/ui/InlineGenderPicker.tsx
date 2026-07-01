@@ -3,9 +3,12 @@ import { useEffect, useCallback } from 'react';
 import { useUIStore } from '../../stores/uiStore';
 import { useViewportStore } from '../../stores/viewportStore';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
-import { GenderIdentity } from '../../types/enums';
+import { GenderIdentity, TwinType } from '../../types/enums';
 import { GenderIconButtons } from './GenderIconButtons';
+import { TwinIconButtons } from './TwinIconButtons';
 import { commitGenderPick } from './commitGenderPick';
+import { addTwinOf, isTwin } from './addTwin';
+import { featureFlags } from '../../config/featureFlags';
 import styles from './InlineGenderPicker.module.css';
 
 /** Screen-px gap between the node anchor and the picker sitting above it. */
@@ -37,10 +40,26 @@ export function InlineGenderPicker(): React.JSX.Element | null {
   const target = usePedigreeStore((s) =>
     targetId ? s.document.individuals[targetId] : undefined,
   );
+  // Only offer "make twins" for someone not already twinned, so a person can't
+  // be double-grouped. Reactive so the section disappears once the twin exists.
+  const alreadyTwin = usePedigreeStore((s) =>
+    targetId ? isTwin(s.document, targetId) : false,
+  );
 
   const dismiss = useCallback(() => {
     if (targetId) commitGenderPick(targetId, null);
   }, [targetId]);
+
+  // Turn the just-created person into a twin: create their co-twin, group the
+  // pair, and re-anchor the picker onto the new twin (addTwinOf does this) so
+  // the user can set its sex next. Shared with the radial menu's ⌥ split.
+  const makeTwin = useCallback(
+    (twinType: TwinType) => {
+      if (!target) return;
+      addTwinOf(usePedigreeStore.getState().document, target, twinType);
+    },
+    [target],
+  );
 
   // Self-clear: if the picker's target disappears (undo, delete, import) while
   // the picker is open, dismiss it so the radial menu gate is not left stuck.
@@ -84,10 +103,18 @@ export function InlineGenderPicker(): React.JSX.Element | null {
         role="dialog"
         aria-label="Choose gender identity"
       >
-        <GenderIconButtons
-          value={target.genderIdentity}
-          onChange={(gender) => commitGenderPick(targetId, gender)}
-        />
+        <div className={styles.row}>
+          <GenderIconButtons
+            value={target.genderIdentity}
+            onChange={(gender) => commitGenderPick(targetId, gender)}
+          />
+          {featureFlags.twinsInGenderPopup && !alreadyTwin && (
+            <>
+              <div className={styles.divider} aria-hidden="true" />
+              <TwinIconButtons onPick={makeTwin} />
+            </>
+          )}
+        </div>
       </div>
     </>
   );
