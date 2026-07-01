@@ -429,10 +429,15 @@ export const usePedigreeStore = create<PedigreeState>()(
           // union itself wherever it still depicts something. Clearing a
           // parent's slot (rather than deleting the union) lets the children
           // keep their sibship: with one parent left they drop to that single
-          // parent; with both parents gone they keep the bare sibship bar
-          // joining the siblings. A union is pruned only once it has fewer than
-          // two partners AND no children — i.e. it would draw neither a couple
-          // line nor a sibship.
+          // parent; with both parents gone but two or more siblings they keep the
+          // bare sibship bar joining the siblings. A union is kept only when it
+          // would still draw a meaningful connector:
+          //   - two partners (a couple line), or
+          //   - one partner with at least one child (single-parent descent), or
+          //   - no partners but two or more children (a bare sibship bar).
+          // Everything else is pruned. In particular a no-partner/one-child union
+          // is dropped: it would otherwise render a descent stub hanging above a
+          // lone symbol, attached to nothing above (a stranded connector).
           const remainingPartnerships: Record<
             string,
             PartnershipRelationship
@@ -445,7 +450,11 @@ export const usePedigreeStore = create<PedigreeState>()(
             const childrenIds = p.childrenIds.filter((cId) => cId !== id);
 
             const partnerCount = (partner1Id ? 1 : 0) + (partner2Id ? 1 : 0);
-            if (partnerCount < 2 && childrenIds.length === 0) continue;
+            const keep =
+              partnerCount === 2 ||
+              (partnerCount === 1 && childrenIds.length >= 1) ||
+              (partnerCount === 0 && childrenIds.length >= 2);
+            if (!keep) continue;
 
             remainingPartnerships[pId] = {
               ...p,
