@@ -15,6 +15,7 @@ import {
   RELATIONSHIP_LABEL_OFFSET,
   SELECTION_COLOR,
 } from '../../utils/constants';
+import { consanguinityLines, partnershipMidpoint } from '../../utils/partnershipGeometry';
 
 interface PartnershipLineProps {
   partnership: PartnershipRelationship;
@@ -41,7 +42,7 @@ export function PartnershipLine({ partnership, individuals, selectedConnection }
 
   if (!p1 || !p2) return null;
 
-  const y = (p1.position.y + p2.position.y) / 2;
+  const mid = partnershipMidpoint(p1.position, p2.position);
 
   const isSelected =
     selectedConnection?.kind === 'partnership' && selectedConnection.id === partnership.id;
@@ -58,23 +59,17 @@ export function PartnershipLine({ partnership, individuals, selectedConnection }
 
   if (partnership.type === RelationshipType.Consanguinity) {
     const degree = partnership.consanguinityDegree?.trim();
-    const midX = (p1.position.x + p2.position.x) / 2;
+    const { a, b } = consanguinityLines(p1.position, p2.position, CONSANGUINITY_GAP);
     const labelBoxWidth = 200;
     return (
       <>
-        <Line
-          points={[p1.position.x, y - CONSANGUINITY_GAP / 2, p2.position.x, y - CONSANGUINITY_GAP / 2]}
-          {...lineProps}
-        />
-        <Line
-          points={[p1.position.x, y + CONSANGUINITY_GAP / 2, p2.position.x, y + CONSANGUINITY_GAP / 2]}
-          {...lineProps}
-        />
+        <Line points={a} {...lineProps} />
+        <Line points={b} {...lineProps} />
         {degree && (
           <Text
             text={degree}
-            x={midX - labelBoxWidth / 2}
-            y={y - CONSANGUINITY_GAP / 2 - RELATIONSHIP_LABEL_OFFSET - LABEL_FONT_SIZE}
+            x={mid.x - labelBoxWidth / 2}
+            y={mid.y - CONSANGUINITY_GAP / 2 - RELATIONSHIP_LABEL_OFFSET - LABEL_FONT_SIZE}
             width={labelBoxWidth}
             align="center"
             fontSize={LABEL_FONT_SIZE}
@@ -88,17 +83,19 @@ export function PartnershipLine({ partnership, individuals, selectedConnection }
   }
 
   if (partnership.type === RelationshipType.Separation) {
-    const midX = (p1.position.x + p2.position.x) / 2;
     const hashSize = 6;
     return (
       <>
-        <Line points={[p1.position.x, y, p2.position.x, y]} {...lineProps} />
         <Line
-          points={[midX - 4, y - hashSize, midX + 4, y + hashSize]}
+          points={[p1.position.x, p1.position.y, p2.position.x, p2.position.y]}
           {...lineProps}
         />
         <Line
-          points={[midX + 2, y - hashSize, midX + 10, y + hashSize]}
+          points={[mid.x - 4, mid.y - hashSize, mid.x + 4, mid.y + hashSize]}
+          {...lineProps}
+        />
+        <Line
+          points={[mid.x + 2, mid.y - hashSize, mid.x + 10, mid.y + hashSize]}
           {...lineProps}
         />
       </>
@@ -106,5 +103,10 @@ export function PartnershipLine({ partnership, individuals, selectedConnection }
   }
 
   // Standard partnership - solid line
-  return <Line points={[p1.position.x, y, p2.position.x, y]} {...lineProps} />;
+  return (
+    <Line
+      points={[p1.position.x, p1.position.y, p2.position.x, p2.position.y]}
+      {...lineProps}
+    />
+  );
 }

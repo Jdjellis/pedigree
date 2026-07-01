@@ -38,6 +38,7 @@ import {
   computeParentlessSibshipSegments,
   computeSibshipY,
 } from '../components/connections/parentChildGeometry';
+import { consanguinityLines, partnershipMidpoint } from '../utils/partnershipGeometry';
 import {
   PADDING as LEGEND_PADDING,
   SWATCH_SIZE as LEGEND_SWATCH_SIZE,
@@ -512,19 +513,16 @@ function renderPartnershipLine(
   const p2 = partnership.partner2Id ? individuals[partnership.partner2Id] : undefined;
   if (!p1 || !p2) return '';
 
-  const y = (p1.position.y + p2.position.y) / 2;
+  const mid = partnershipMidpoint(p1.position, p2.position);
 
   if (partnership.type === RelationshipType.Consanguinity) {
-    const parts = [
-      line(p1.position.x, y - CONSANGUINITY_GAP / 2, p2.position.x, y - CONSANGUINITY_GAP / 2),
-      line(p1.position.x, y + CONSANGUINITY_GAP / 2, p2.position.x, y + CONSANGUINITY_GAP / 2),
-    ];
+    const { a, b } = consanguinityLines(p1.position, p2.position, CONSANGUINITY_GAP);
+    const parts = [line(a[0], a[1], a[2], a[3]), line(b[0], b[1], b[2], b[3])];
     const degree = partnership.consanguinityDegree?.trim();
     if (degree) {
-      const midX = (p1.position.x + p2.position.x) / 2;
-      const baselineY = y - CONSANGUINITY_GAP / 2 - RELATIONSHIP_LABEL_OFFSET;
+      const baselineY = mid.y - CONSANGUINITY_GAP / 2 - RELATIONSHIP_LABEL_OFFSET;
       parts.push(
-        `<text x="${num(midX)}" y="${num(
+        `<text x="${num(mid.x)}" y="${num(
           baselineY,
         )}" text-anchor="middle" font-size="${LABEL_FONT_SIZE}" font-family="${escapeXml(
           LABEL_FONT_FAMILY,
@@ -535,16 +533,15 @@ function renderPartnershipLine(
   }
 
   if (partnership.type === RelationshipType.Separation) {
-    const midX = (p1.position.x + p2.position.x) / 2;
     const hashSize = 6;
     return [
-      line(p1.position.x, y, p2.position.x, y),
-      line(midX - 4, y - hashSize, midX + 4, y + hashSize),
-      line(midX + 2, y - hashSize, midX + 10, y + hashSize),
+      line(p1.position.x, p1.position.y, p2.position.x, p2.position.y),
+      line(mid.x - 4, mid.y - hashSize, mid.x + 4, mid.y + hashSize),
+      line(mid.x + 2, mid.y - hashSize, mid.x + 10, mid.y + hashSize),
     ].join('');
   }
 
-  return line(p1.position.x, y, p2.position.x, y);
+  return line(p1.position.x, p1.position.y, p2.position.x, p2.position.y);
 }
 
 /** Render parent-child / sibship lines, matching `ParentChildLine.tsx`. */

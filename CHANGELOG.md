@@ -14,6 +14,12 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   replacing the default Vite icon.
 - Clinical-use disclaimer in the README and in the in-app privacy popover.
 
+### Fixed
+- **Add Child** on an individual who belongs to more than one union no longer
+  silently attaches the child to whichever union happened to be first in
+  iteration order. When 2+ unions exist, a union picker now prompts for which
+  union the child belongs to (issue #97).
+
 ## [0.1.0] — Unreleased
 
 First public release candidate. **Pedigree Canvas** — a local-first clinical

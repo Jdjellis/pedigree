@@ -233,12 +233,43 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
       };
     }, []);
 
+    // Clear any inline cursor the symbols set on the layer canvases (via
+    // mouseenter) so the container's tool cursor — the default arrow in select
+    // mode — takes over. Konva captures the pointer during an alt-drag, so the
+    // source symbol's `pointer` cursor never gets reset by a mouseleave; we do it
+    // explicitly when the drag-link gesture ends.
+    const resetLayerCursors = useCallback(() => {
+      stageRef.current
+        ?.container()
+        .querySelectorAll('canvas')
+        .forEach((c) => {
+          (c as HTMLElement).style.cursor = '';
+        });
+    }, []);
+
     // --------------- Eraser drag: safety-net stop when mouse releases off-canvas ---------------
     useEffect(() => {
       const stop = () => setIsErasing(false);
       window.addEventListener('mouseup', stop);
       return () => window.removeEventListener('mouseup', stop);
     }, []);
+
+    // --------------- Alt-drag connect: safety-net cleanup on off-Stage release ---------------
+    // A drag-link normally ends via the Stage's mouseup (drop on empty canvas) or
+    // a symbol's mouseup (drop on a target). If the release lands OUTSIDE the
+    // Stage entirely, no Konva mouseup fires and the link — plus its dashed
+    // preview line — would stay armed forever. This window-level handler runs in
+    // the bubble phase, after Konva's own mouseup, so it only sees a link that is
+    // *still* active (i.e. was never resolved), and tears it down.
+    useEffect(() => {
+      const onUp = () => {
+        if (!useUIStore.getState().dragLink.active) return;
+        useUIStore.getState().endDragLink();
+        resetLayerCursors();
+      };
+      window.addEventListener('mouseup', onUp);
+      return () => window.removeEventListener('mouseup', onUp);
+    }, [resetLayerCursors]);
 
     // --------------- Cursor feedback for pan modes ---------------
     useEffect(() => {
@@ -362,8 +393,9 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     const handleStageMouseUp = useCallback(() => {
       if (dragLink.active) {
         endDragLink();
+        resetLayerCursors();
       }
-    }, [dragLink.active, endDragLink]);
+    }, [dragLink.active, endDragLink, resetLayerCursors]);
 
     const handleMarqueeDown = useCallback(
       (e: KonvaEventObject<MouseEvent>) => {
