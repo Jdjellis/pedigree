@@ -32,6 +32,16 @@ export const SELECTION_COLOR = '#6965db';
 export const CONSANGUINITY_GAP = 4;
 export const DASH_PATTERN = [8, 4];
 
+// Childless-union marks (infertility / no children by choice). A short vertical
+// stub descends from the relationship-line midpoint, terminated by one bar
+// ("no children") or two parallel bars (infertility), per NSGC/Bennett.
+/** Length of the vertical stub dropping from the relationship line to the bars. */
+export const CHILDLESS_STUB = 18;
+/** Half-width of each horizontal cross-bar. */
+export const CHILDLESS_BAR_HALF = 8;
+/** Vertical gap between the two bars of the infertility (double-bar) marker. */
+export const CHILDLESS_BAR_GAP = 5;
+
 // Adoption brackets (square brackets enclosing an adopted individual's symbol).
 // Geometry is centred on the symbol origin (0,0).
 /** Horizontal distance from the symbol centre to each bracket's vertical stroke. */

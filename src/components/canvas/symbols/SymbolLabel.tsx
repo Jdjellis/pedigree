@@ -45,6 +45,16 @@ export const SymbolLabel: React.FC<SymbolLabelProps> = React.memo(
         }
       }
 
+      // Stillbirth: "SB" abbreviation plus gestational age, per NSGC/Bennett
+      // (the symbol stays the sex-specific shape with a deceased slash — a
+      // stillbirth is never a triangle).
+      if (individual.vitalStatus === VitalStatus.Stillborn) {
+        result.push('SB');
+      }
+      if (individual.gestationalAge?.trim()) {
+        result.push(`GA: ${individual.gestationalAge.trim()}`);
+      }
+
       // Sex assigned at birth annotation (AMAB / AFAB)
       if (individual.sexAssignedAtBirth) {
         result.push(individual.sexAssignedAtBirth);

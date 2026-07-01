@@ -7,12 +7,25 @@ to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Added
+- Infertility and “no children by choice” markers on a partnership: a stub
+  below the relationship line ended by a double cross-bar (infertility, with an
+  optional cause) or a single bar (no children), per NSGC/Bennett. Editable in
+  the connection properties panel (issue #107).
+- Gestational-age field for a stillbirth, shown in the person properties panel
+  when the vital status is Stillborn (issue #106).
 - MIT `LICENSE`.
 - SEO, Open Graph, and Twitter card metadata plus JSON-LD `SoftwareApplication`
   structured data in `index.html`.
 - App favicon (`public/favicon.svg`) and social card (`public/og-image.svg`),
   replacing the default Vite icon.
 - Clinical-use disclaimer in the README and in the in-app privacy popover.
+
+### Changed
+- Stillbirth is now drawn to standard: the sex-specific symbol with a deceased
+  slash plus an “SB” label and gestational age — never a triangle. The unused
+  `PregnancyOutcome.SB` (which would have rendered a triangle) was removed; the
+  triangle is reserved for earlier pregnancy loss (SAB/TOP/ECT), per Bennett/NSGC
+  (issue #106).
 
 ### Fixed
 - The eraser tool no longer deletes the last remaining individual, which left an

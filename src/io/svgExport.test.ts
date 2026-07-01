@@ -541,3 +541,72 @@ describe('single-parent union rendering', () => {
     expect(svg).toContain(`<line x1="100" y1="${midY}" x2="100" y2="250"`);
   });
 });
+
+describe('stillbirth rendering', () => {
+  it('labels a stillborn individual with SB and gestational age, keeping its sex shape', () => {
+    const child = person('c', 100, 100);
+    child.genderIdentity = GenderIdentity.Woman;
+    child.vitalStatus = VitalStatus.Stillborn;
+    child.gestationalAge = '20 wk';
+    const svg = buildPedigreeSvg(minimalDoc({ c: child }, {}, {}));
+
+    expect(svg).toContain('>SB</text>');
+    expect(svg).toContain('>GA: 20 wk</text>');
+    // A stillbirth keeps its sex-specific symbol (circle here) and is NOT a
+    // triangle — no polygon (triangle/diamond) is drawn for it.
+    expect(svg).toContain('<circle');
+    expect(svg).not.toContain('<polygon');
+  });
+});
+
+describe('childless-union rendering', () => {
+  it('draws two parallel bars and the cause for an infertile union', () => {
+    const a = person('a', 100, 100);
+    const b = person('b', 220, 100);
+    const doc = minimalDoc(
+      { a, b },
+      {
+        u1: {
+          id: 'u1',
+          type: RelationshipType.Partnership,
+          partner1Id: 'a',
+          partner2Id: 'b',
+          childrenIds: [],
+          childlessStatus: 'infertility',
+          childlessReason: 'azoospermia',
+        },
+      },
+      {},
+    );
+    const svg = buildPedigreeSvg(doc);
+    // Midpoint (160,100); stub down to y=118; two bars at y=113 and y=118.
+    expect(svg).toContain('<line x1="160" y1="100" x2="160" y2="118"');
+    expect(svg).toContain('<line x1="152" y1="113" x2="168" y2="113"');
+    expect(svg).toContain('<line x1="152" y1="118" x2="168" y2="118"');
+    expect(svg).toContain('>azoospermia</text>');
+  });
+
+  it('draws a single bar and no cause for no children by choice', () => {
+    const a = person('a', 100, 100);
+    const b = person('b', 220, 100);
+    const doc = minimalDoc(
+      { a, b },
+      {
+        u1: {
+          id: 'u1',
+          type: RelationshipType.Partnership,
+          partner1Id: 'a',
+          partner2Id: 'b',
+          childrenIds: [],
+          childlessStatus: 'noChildren',
+        },
+      },
+      {},
+    );
+    const svg = buildPedigreeSvg(doc);
+    expect(svg).toContain('<line x1="160" y1="100" x2="160" y2="118"');
+    expect(svg).toContain('<line x1="152" y1="118" x2="168" y2="118"');
+    // Only the single lower bar — no upper (y=113) bar for the by-choice marker.
+    expect(svg).not.toContain('<line x1="152" y1="113" x2="168" y2="113"');
+  });
+});

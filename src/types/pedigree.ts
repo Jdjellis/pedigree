@@ -139,6 +139,23 @@ export interface PartnershipRelationship {
    * meaningful when {@link type} is {@link RelationshipType.Consanguinity}.
    */
   consanguinityDegree?: string;
+  /**
+   * Documented childlessness of this union, drawn as marks hanging below the
+   * relationship line per NSGC/Bennett. Orthogonal to {@link type} (an infertile
+   * couple may also be consanguineous or separated):
+   *   - `'infertility'` → a double cross-bar, optionally annotated with
+   *     {@link childlessReason} (e.g. "azoospermia");
+   *   - `'noChildren'` → a single cross-bar ("no children by choice or reason
+   *     unknown").
+   * Absent → an ordinary union that draws no childless marks.
+   */
+  childlessStatus?: 'infertility' | 'noChildren';
+  /**
+   * Free-text cause for an infertile union (e.g. "azoospermia",
+   * "endometriosis"), rendered below the marks. Only meaningful when
+   * {@link childlessStatus} is `'infertility'`.
+   */
+  childlessReason?: string;
 }
 
 export interface ParentChildRelationship {

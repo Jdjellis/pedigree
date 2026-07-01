@@ -21,6 +21,9 @@ import {
   LINE_COLOR,
   LINE_WIDTH,
   CONSANGUINITY_GAP,
+  CHILDLESS_STUB,
+  CHILDLESS_BAR_HALF,
+  CHILDLESS_BAR_GAP,
   DASH_PATTERN,
   LABEL_FONT_SIZE,
   LABEL_FONT_FAMILY,
@@ -38,7 +41,11 @@ import {
   computeParentlessSibshipSegments,
   computeSibshipY,
 } from '../components/connections/parentChildGeometry';
-import { consanguinityLines, partnershipMidpoint } from '../utils/partnershipGeometry';
+import {
+  childlessMarks,
+  consanguinityLines,
+  partnershipMidpoint,
+} from '../utils/partnershipGeometry';
 import {
   PADDING as LEGEND_PADDING,
   SWATCH_SIZE as LEGEND_SWATCH_SIZE,
@@ -307,6 +314,13 @@ function buildLabelLines(individual: Individual): string[] {
       lines.push(`${individual.age}`);
     }
   }
+  // Stillbirth: "SB" + gestational age (mirrors SymbolLabel.tsx).
+  if (individual.vitalStatus === VitalStatus.Stillborn) {
+    lines.push('SB');
+  }
+  if (individual.gestationalAge?.trim()) {
+    lines.push(`GA: ${individual.gestationalAge.trim()}`);
+  }
   if (individual.sexAssignedAtBirth) {
     lines.push(individual.sexAssignedAtBirth);
   }
@@ -515,6 +529,32 @@ function renderPartnershipLine(
 
   const mid = partnershipMidpoint(p1.position, p2.position);
 
+  // Childless-union marks (infertility / no children), appended for any type.
+  const childless = ((): string => {
+    if (!partnership.childlessStatus) return '';
+    const { stub, bars } = childlessMarks(mid, partnership.childlessStatus, {
+      stub: CHILDLESS_STUB,
+      barHalf: CHILDLESS_BAR_HALF,
+      barGap: CHILDLESS_BAR_GAP,
+    });
+    const parts = [
+      line(stub[0], stub[1], stub[2], stub[3]),
+      ...bars.map((b) => line(b[0], b[1], b[2], b[3])),
+    ];
+    const reason = partnership.childlessReason?.trim();
+    if (partnership.childlessStatus === 'infertility' && reason) {
+      const baselineY = mid.y + CHILDLESS_STUB + RELATIONSHIP_LABEL_OFFSET + LABEL_FONT_SIZE;
+      parts.push(
+        `<text x="${num(mid.x)}" y="${num(
+          baselineY,
+        )}" text-anchor="middle" font-size="${LABEL_FONT_SIZE}" font-family="${escapeXml(
+          LABEL_FONT_FAMILY,
+        )}" fill="${LABEL_COLOR}">${escapeXml(reason)}</text>`,
+      );
+    }
+    return parts.join('');
+  })();
+
   if (partnership.type === RelationshipType.Consanguinity) {
     const { a, b } = consanguinityLines(p1.position, p2.position, CONSANGUINITY_GAP);
     const parts = [line(a[0], a[1], a[2], a[3]), line(b[0], b[1], b[2], b[3])];
@@ -529,7 +569,7 @@ function renderPartnershipLine(
         )}" fill="${LABEL_COLOR}">${escapeXml(degree)}</text>`,
       );
     }
-    return parts.join('');
+    return parts.join('') + childless;
   }
 
   if (partnership.type === RelationshipType.Separation) {
@@ -538,10 +578,10 @@ function renderPartnershipLine(
       line(p1.position.x, p1.position.y, p2.position.x, p2.position.y),
       line(mid.x - 4, mid.y - hashSize, mid.x + 4, mid.y + hashSize),
       line(mid.x + 2, mid.y - hashSize, mid.x + 10, mid.y + hashSize),
-    ].join('');
+    ].join('') + childless;
   }
 
-  return line(p1.position.x, p1.position.y, p2.position.x, p2.position.y);
+  return line(p1.position.x, p1.position.y, p2.position.x, p2.position.y) + childless;
 }
 
 /** Render parent-child / sibship lines, matching `ParentChildLine.tsx`. */

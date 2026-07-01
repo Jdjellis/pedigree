@@ -21,6 +21,14 @@ const DESCENT_OPTIONS: { value: 'biological' | 'adoptive'; label: string }[] = [
   { value: 'adoptive', label: 'Adoptive' },
 ];
 
+type ChildlessValue = 'none' | 'noChildren' | 'infertility';
+
+const CHILDLESS_OPTIONS: { value: ChildlessValue; label: string }[] = [
+  { value: 'none', label: 'Has / can have' },
+  { value: 'noChildren', label: 'No children' },
+  { value: 'infertility', label: 'Infertility' },
+];
+
 /**
  * Properties editor for a selected connection (line of descent, partnership, or
  * twin connector). Rendered by {@link PropertiesPanel} when
@@ -83,6 +91,39 @@ export function ConnectionProperties() {
               />
             </div>
           )}
+          <div className={styles.field}>
+            <label className={styles.label}>Children</label>
+            <SegmentedControl
+              options={CHILDLESS_OPTIONS}
+              value={p.childlessStatus ?? 'none'}
+              onChange={(v) =>
+                updatePartnership(p.id, {
+                  childlessStatus: v === 'none' ? undefined : v,
+                  // Drop any stale cause when leaving the infertility state.
+                  childlessReason: v === 'infertility' ? p.childlessReason : undefined,
+                })
+              }
+              ariaLabel="Childless status"
+            />
+            {p.childlessStatus === 'infertility' && (
+              <input
+                className={styles.input}
+                value={p.childlessReason ?? ''}
+                onChange={(e) =>
+                  updatePartnership(p.id, {
+                    childlessReason: e.target.value || undefined,
+                  })
+                }
+                placeholder="Cause (e.g. azoospermia)"
+              />
+            )}
+            {p.childlessStatus && p.childrenIds.length > 0 && (
+              <p className={styles.hint}>
+                This union still has {p.childrenIds.length === 1 ? 'a child' : 'children'}
+                {' '}on the canvas — a childless marker will draw alongside the sibship.
+              </p>
+            )}
+          </div>
           {p.childrenIds.length > 0 && (
             <p className={styles.hint}>
               Removing this relationship also detaches its{' '}

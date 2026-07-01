@@ -672,6 +672,26 @@ export function PropertiesPanel() {
             />
           </div>
         )}
+
+        {individual.vitalStatus === VitalStatus.Stillborn && (
+          <div className={styles.field}>
+            <label className={styles.label}>Gestational age</label>
+            <input
+              className={styles.input}
+              value={individual.gestationalAge ?? ''}
+              onChange={(e) =>
+                update({
+                  gestationalAge: e.target.value || undefined,
+                })
+              }
+              placeholder="e.g. 20 wk"
+            />
+            <p className={styles.hint}>
+              Drawn as the sex symbol with a slash and “SB” label, per standard —
+              a stillbirth is not a triangle (that’s for earlier pregnancy loss).
+            </p>
+          </div>
+        )}
       </div>
 
       <div className={styles.divider} />
