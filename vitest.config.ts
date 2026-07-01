@@ -32,6 +32,53 @@ export default defineConfig({
         'src/vite-env.d.ts',
         'src/types/**',
       ],
+      // Modest per-area floors that ratchet coverage on the pure-logic layers
+      // (utils/stores/commands) and a few key I/O modules. These are set a few
+      // points below current coverage so they catch regressions without being
+      // brittle. Glob thresholds are checked against the aggregate of matching
+      // files, so a single low-coverage file (e.g. the canvas-2d-dependent
+      // fillPatterns.ts, which cannot run under jsdom) does not trip the floor.
+      // Deliberately NOT applied to react-konva canvas components, which cannot
+      // render under vitest/jsdom (see docs/architecture-reference.md).
+      thresholds: {
+        'src/utils/**': {
+          statements: 88,
+          branches: 85,
+          functions: 92,
+          lines: 88,
+        },
+        'src/stores/**': {
+          statements: 84,
+          branches: 88,
+          functions: 78,
+          lines: 84,
+        },
+        'src/commands/**': {
+          statements: 90,
+          branches: 82,
+          functions: 55,
+          lines: 90,
+        },
+        'src/io/jsonIO.ts': {
+          branches: 82,
+        },
+        'src/io/pedIO.ts': {
+          statements: 90,
+          functions: 90,
+          lines: 90,
+        },
+        'src/io/svgExport.ts': {
+          statements: 90,
+          branches: 80,
+          functions: 90,
+          lines: 90,
+        },
+        'src/io/captureClean.ts': {
+          statements: 90,
+          functions: 90,
+          lines: 90,
+        },
+      },
     },
   },
 });
