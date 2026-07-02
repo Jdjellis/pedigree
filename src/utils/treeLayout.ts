@@ -434,10 +434,11 @@ function computeRigidBlocks(
 
   // Rule 1: a movable partner of a child-bearing union belongs to the DEEPEST
   // such union. Process deepest-first so the deeper union claims first.
+  // Id tie-break makes equal-depth ownership deterministic regardless of key order.
   const byDepth = [...childBearing].sort((a, b) => {
     const ga = Math.min(...partnersOf(a).map(genOf), Infinity);
     const gb = Math.min(...partnersOf(b).map(genOf), Infinity);
-    return gb - ga;
+    return gb - ga || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
   });
   for (const u of byDepth) {
     for (const p of partnersOf(u)) if (!owner.has(p)) owner.set(p, u.id);
@@ -544,17 +545,20 @@ function clearExternalObstacles(
 /**
  * Enforce minimum horizontal separation across every generation row by sliding
  * rigid descent blocks rightward. Processes rows top-down; within each row the
- * blocks present are sorted by current x (block-key tie-break), separated via
- * {@link resolveRowSeparation}, and each block's shift is applied to ALL its
- * members across every row — so a descendant sub-block moves with its couple and
- * descent lines stay vertical. Because higher rows settle first, a shift there is
- * reflected in the lower rows before they are separated in turn.
+ * blocks present are sorted by current x (block-key tie-break) and swept with the
+ * same monotone `prevMax + minGap - minX` rule that {@link resolveRowSeparation}
+ * encodes, then each block's shift is applied to ALL its members across every row —
+ * so a descendant sub-block moves with its couple and descent lines stay vertical.
+ * Because higher rows settle first, a shift there is reflected in the lower rows
+ * before they are separated in turn.
  *
  * Pinned in-law nodes (placed in the doc but absent from `finalX`) participate as
  * fixed obstacles: they occupy their row and re-anchor the running edge but never
- * move. The directional frame-vs-outside clearance is handled beforehand by
- * {@link clearExternalObstacles}; here obstacles only prevent a cousin block from
- * being packed on top of an internal pinned in-law.
+ * move. {@link resolveRowSeparation} has no notion of a fixed obstacle (every entry
+ * it receives shifts together), so the monotone rule is applied inline here with
+ * obstacle entries short-circuited via `continue`. The directional frame-vs-outside
+ * clearance is handled beforehand by {@link clearExternalObstacles}; here obstacles
+ * only prevent a cousin block from being packed on top of an internal pinned in-law.
  *
  * @param doc - The pedigree slice being laid out.
  * @param finalX - Absolute x per placed node; mutated in place.
@@ -739,7 +743,8 @@ function centerAndReproject(
       return { u, present, gen };
     })
     // Top-down: a higher couple settles before a lower one re-centres on it.
-    .sort((a, b) => a.gen - b.gen);
+    // Id tie-break makes same-generation unions process in a stable id order.
+    .sort((a, b) => a.gen - b.gen || (a.u.id < b.u.id ? -1 : a.u.id > b.u.id ? 1 : 0));
 
   for (const { u, present } of unions) {
     if (present.length === 0) continue;
