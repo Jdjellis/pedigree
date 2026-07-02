@@ -273,20 +273,47 @@ describe('PropertiesPanel individual childlessness control', () => {
     );
   });
 
-  it('clears the stale cause when switching childless status, and on none', () => {
+  it('parks each status cause so an accidental switch never loses typed text', () => {
     seed({ childlessStatus: 'noChildren', childlessReason: 'vasectomy' });
     render(<PropertiesPanel />);
 
     const group = screen.getByRole('group', { name: 'Individual childless status' });
+
+    // Switching to infertility hides the no-children cause; the field is blank
+    // for the new status until the user types.
     fireEvent.click(within(group).getByRole('button', { name: 'Infertility' }));
     let ind = usePedigreeStore.getState().document.individuals['ind-1'];
     expect(ind.childlessStatus).toBe('infertility');
     expect(ind.childlessReason).toBeUndefined();
+    expect(screen.getByPlaceholderText('e.g. azoospermia')).toHaveValue('');
 
-    fireEvent.click(within(group).getByRole('button', { name: 'None' }));
+    // Type an infertility cause, then switch back to no children.
+    fireEvent.change(screen.getByPlaceholderText('e.g. azoospermia'), {
+      target: { value: 'azoospermia' },
+    });
+    fireEvent.click(within(group).getByRole('button', { name: 'No children' }));
     ind = usePedigreeStore.getState().document.individuals['ind-1'];
+    expect(ind.childlessStatus).toBe('noChildren');
+    // The original no-children cause is restored, not lost.
+    expect(ind.childlessReason).toBe('vasectomy');
+    expect(screen.getByPlaceholderText('e.g. vasectomy')).toHaveValue('vasectomy');
+  });
+
+  it('clears the active cause on none while keeping parked causes for re-selection', () => {
+    seed({ childlessStatus: 'noChildren', childlessReason: 'vasectomy' });
+    render(<PropertiesPanel />);
+
+    const group = screen.getByRole('group', { name: 'Individual childless status' });
+    fireEvent.click(within(group).getByRole('button', { name: 'None' }));
+    let ind = usePedigreeStore.getState().document.individuals['ind-1'];
     expect(ind.childlessStatus).toBeUndefined();
     expect(ind.childlessReason).toBeUndefined();
+
+    // Re-selecting no children restores the cause the user had entered.
+    fireEvent.click(within(group).getByRole('button', { name: 'No children' }));
+    ind = usePedigreeStore.getState().document.individuals['ind-1'];
+    expect(ind.childlessStatus).toBe('noChildren');
+    expect(ind.childlessReason).toBe('vasectomy');
   });
 
   it('disables the control and hides the cause when the individual has children', () => {

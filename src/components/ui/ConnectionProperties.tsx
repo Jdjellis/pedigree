@@ -6,6 +6,7 @@ import type { PartnershipRelationship } from '../../types/pedigree';
 import { SegmentedControl } from './SegmentedControl';
 import { TwinZygosityFields } from './TwinZygosityFields';
 import { parentCoupleLabel } from '../../utils/adoption';
+import { childlessStatusChange } from '../../utils/childlessness';
 import styles from './PropertiesPanel.module.css';
 
 type PartnershipStatus = PartnershipRelationship['type'];
@@ -111,15 +112,7 @@ export function ConnectionProperties() {
               options={CHILDLESS_OPTIONS}
               value={p.childlessStatus ?? 'none'}
               disabled={p.childrenIds.length > 0}
-              onChange={(v) =>
-                updatePartnership(p.id, {
-                  childlessStatus: v === 'none' ? undefined : v,
-                  // The cause is specific to the status it was entered under, so
-                  // any status change (including switching between no-children and
-                  // infertility) drops the now-stale cause.
-                  childlessReason: undefined,
-                })
-              }
+              onChange={(v) => updatePartnership(p.id, childlessStatusChange(p, v))}
               ariaLabel="Childless status"
             />
             {p.childrenIds.length > 0 ? (
