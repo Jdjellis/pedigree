@@ -321,8 +321,10 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
       if (uiState.editingLocked) return;
       uiState.setHovered(individual.id);
       if (uiState.dragLink.active) uiState.setDragLinkTarget(individual.id);
-      const stageEl = document.querySelector('canvas');
-      if (stageEl) stageEl.style.cursor = 'pointer';
+      // The pointer hover cursor is NOT set here. It is derived from `hoveredId`
+      // by CanvasContainer's cursor effect (the single owner of the container
+      // cursor — see resolveCanvasCursor), which writes it to the element the
+      // browser actually reads. Writing it here hit the invisible bottom canvas.
       // Opening the radial add-menu is handled by the proximity controller
       // (useRadialHover), which uses a generous enter radius + hysteresis so the
       // menu does not vanish the moment the cursor leaves this 40px hit area.
@@ -337,8 +339,8 @@ export const PedigreeSymbol: React.FC<PedigreeSymbolProps> = React.memo(
       // Note: the radial menu is NOT dismissed here. Closing is owned by the
       // proximity controller (useRadialHover), which keeps the menu open until
       // the pointer leaves a radius wide enough to reach the option buttons.
-      const stage = document.querySelector('canvas');
-      if (stage) stage.style.cursor = 'default';
+      // Clearing `hoveredId` above drives CanvasContainer's cursor effect back to
+      // the per-tool CSS cursor — no cursor is written here (see handleMouseEnter).
     }, []);
 
     const handleDragStart = useCallback(
