@@ -329,3 +329,17 @@ describe('PropertiesPanel role and notes handlers', () => {
     expect(current().notes).toBeUndefined();
   });
 });
+
+describe('PropertiesPanel onboarding dismissal', () => {
+  it('dismisses first-run onboarding when a property is edited on the lone seed person', () => {
+    seedIndividual();
+    act(() => {
+      useUIStore.setState({ onboarded: false });
+    });
+    render(<PropertiesPanel />);
+
+    fireEvent.change(screen.getByPlaceholderText('Age'), { target: { value: '42' } });
+
+    expect(useUIStore.getState().onboarded).toBe(true);
+  });
+});
