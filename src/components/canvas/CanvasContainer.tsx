@@ -14,6 +14,7 @@ import { useViewportStore } from '../../stores/viewportStore';
 import { useUIStore } from '../../stores/uiStore';
 import { usePedigreeStore } from '../../stores/pedigreeStore';
 import { placeTextAt } from './toolPlacement';
+import { resolveCanvasCursor } from './canvasCursor';
 import { GridLayer } from './GridLayer';
 import { ConnectionsLayer } from '../connections/ConnectionsLayer';
 import { PedigreeSymbol } from './symbols/PedigreeSymbol';
@@ -275,20 +276,33 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
       return () => window.removeEventListener('mouseup', onUp);
     }, [resetLayerCursors]);
 
-    // --------------- Cursor feedback for pan modes ---------------
+    // --------------- Cursor feedback: pan modes and hover ---------------
+    // The stage-container div is the single owner of the canvas cursor. `cursor`
+    // is an inherited CSS property and this element sits above every one of
+    // Konva's stacked layer canvases, so whatever we set here is what the browser
+    // actually shows over the canvas. (Symbol and connection-line hover handlers
+    // used to write to an individual <canvas> via `document.querySelector('canvas')`
+    // — the invisible bottom layer — so the pointer affordance never appeared. They
+    // now only update hover state; the cursor is derived from that state here.)
     useEffect(() => {
       const el = stageRef.current?.container();
       if (!el) return;
       const panning = isDragging || isMiddlePanning;
-      el.style.cursor = panning ? 'grabbing' : isSpaceHeld ? 'grab' : '';
-      // While panning, clear any inline cursor the symbols set on the canvases
-      // so the container's grab/grabbing cursor is what shows.
+      el.style.cursor = resolveCanvasCursor({
+        panning,
+        spaceHeld: isSpaceHeld,
+        // A hovered symbol OR a hovered connection line both warrant a pointer.
+        hovering: hoveredId !== null || hoveredConnection !== null,
+        tool: activeTool,
+      });
+      // While panning, clear any stale inline cursor on the layer canvases so the
+      // container's grab/grabbing cursor is what shows.
       if (panning || isSpaceHeld) {
         el.querySelectorAll('canvas').forEach((c) => {
           (c as HTMLElement).style.cursor = '';
         });
       }
-    }, [isDragging, isMiddlePanning, isSpaceHeld]);
+    }, [isDragging, isMiddlePanning, isSpaceHeld, hoveredId, hoveredConnection, activeTool]);
 
     // --------------- Wheel: pan, or zoom with Ctrl/Cmd (and trackpad pinch) ---------------
     const handleWheel = useCallback((e: KonvaEventObject<WheelEvent>) => {
