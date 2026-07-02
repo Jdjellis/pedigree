@@ -309,6 +309,54 @@ export function consanguinity(): Fixture {
 }
 
 /**
+ * LEFT-RIGHT mirror of {@link crossBranchMarriage}: the load-bearing in-law
+ * is placed far to the LEFT so the wide couple's recentred sibship is pulled
+ * leftward toward a cousin sibship that sits to its left.
+ *
+ * Structure (same as crossBranchMarriage, x-negated):
+ *   gp1 + gp2 → s1, s2 (grandparent root union)
+ *   ilp → inlaw (load-bearing in-law pinned far LEFT)
+ *   couple1 = s1 × inlaw → kidA  (cross-branch; inlaw is pinned)
+ *   couple2 = s2 × s2mate → kidB (ordinary movable couple; kidB centres exactly)
+ *
+ * Regression guard for the clamp's LEFT-side direction: the shift that centres
+ * kidB under couple2 must not push kidA into the inlaw's obstacle on its left.
+ */
+export function wideCoupleOppositeCousin(): Fixture {
+  return {
+    name: 'wideCoupleOppositeCousin',
+    doc: doc({
+      individuals: {
+        // Negate x of every individual from crossBranchMarriage; keep generation.
+        gp1: ind('gp1', 60, 0),    // was -60
+        gp2: ind('gp2', -60, 0),   // was  60
+        ilp: ind('ilp', -240, 0),  // was  240 (pinned far LEFT)
+        s1: ind('s1', 0, 1),       // was    0
+        inlaw: ind('inlaw', -240, 1), // was 240 (load-bearing in-law far LEFT)
+        s2: ind('s2', -100, 1),    // was  100
+        s2mate: ind('s2mate', -220, 1), // was 220
+        kidA: ind('kidA', 0, 2),   // was    0
+        kidB: ind('kidB', -160, 2), // was  160
+      },
+      partnerships: {
+        root: union('root', 'gp1', 'gp2', ['s1', 's2']),
+        ilUnion: union('ilUnion', 'ilp', undefined, ['inlaw']),
+        couple1: union('couple1', 's1', 'inlaw', ['kidA']),
+        couple2: union('couple2', 's2', 's2mate', ['kidB']),
+      },
+      parentChildLinks: {
+        l1: link('l1', 'root', 's1'),
+        l2: link('l2', 'root', 's2'),
+        l3: link('l3', 'ilUnion', 'inlaw'),
+        l4: link('l4', 'couple1', 'kidA'),
+        l5: link('l5', 'couple2', 'kidB'),
+      },
+    }),
+    rootUnionId: 'root',
+  };
+}
+
+/**
  * Same shape as {@link crossBranchMarriage} — documents the identical
  * exact-overlap case from the perspective of a wide-couple adjacent cousin.
  * Both fixtures serve as regression guards for the same #115 bug.
@@ -587,6 +635,7 @@ export const ALL_FIXTURES: Array<() => Fixture> = [
   marriedInWithParents,
   crossBranchMarriage,
   consanguinity,
+  wideCoupleOppositeCousin,
   wideCoupleAdjacentCousin,
   wideCoupleInverted,
   chainedWideCouples,

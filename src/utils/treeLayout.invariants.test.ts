@@ -8,6 +8,7 @@ import {
   loneFounder, coupleWithSibship, threeGenerations, marriedInWithParents,
   consanguinity, chainedWideCouples, wideCousinFan,
   crossBranchMarriage, wideCoupleAdjacentCousin, wideCoupleInverted,
+  wideCoupleOppositeCousin,
 } from './__fixtures__/pedigrees';
 
 // Fixtures that already satisfy their invariants on the current code.
@@ -52,4 +53,26 @@ describe('computeTreeLayout — overlap resolution (#115)', () => {
       expect(subtreeNonCollision(pos, f.doc).violations).toEqual([]);
     });
   }
+});
+
+describe('computeTreeLayout — cross-branch centering', () => {
+  it('crossBranchMarriage: the movable couple centres its child; the pinned-in-law couple yields to no-overlap', () => {
+    const f = crossBranchMarriage();
+    const pos = finalPositions(f.doc, computeTreeLayout(f.doc, f.rootUnionId));
+    const x = (id: string): number => pos[id].x;
+    // couple2 (s2 x s2mate, both movable) centres kidB exactly.
+    expect(x('kidB')).toBeCloseTo((x('s2') + x('s2mate')) / 2, 1);
+    // kidA is clamped off couple1's midpoint (the pinned in-law over-constrains it),
+    // but stays clear of kidB — no-overlap wins over exact centring.
+    expect(Math.abs(x('kidA') - x('kidB'))).toBeGreaterThanOrEqual(80 - 0.5);
+  });
+
+  it('wideCoupleOppositeCousin: no overlap and no crossed descent lines (mirror of #115)', () => {
+    const f = wideCoupleOppositeCousin();
+    const pos = finalPositions(f.doc, computeTreeLayout(f.doc, f.rootUnionId));
+    expect(noSymbolOverlap(pos, f.doc).violations).toEqual([]);
+    expect(minSiblingSpacing(pos, f.doc).violations).toEqual([]);
+    expect(noCrossedDescentLines(pos, f.doc).violations).toEqual([]);
+    expect(subtreeNonCollision(pos, f.doc).violations).toEqual([]);
+  });
 });
