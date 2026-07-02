@@ -213,6 +213,8 @@ export function minPartnerSpacing(
     const p2 = u.partner2Id;
     if (!p1 || !p2) continue;
     if (!(p1 in pos) || !(p2 in pos)) continue;
+    // Self-partnered union (degenerate): skip — it is not a real couple.
+    if (p1 === p2) continue;
     // Wide-couple exemption: skip if either partner is load-bearing.
     if (isLoadBearingInLaw(doc, p1) || isLoadBearingInLaw(doc, p2)) continue;
     const gap = Math.abs(pos[p1].x - pos[p2].x);
@@ -293,9 +295,14 @@ export function generationRowAlignment(
 
 /**
  * Assert that descent lines do not cross. For every ordered pair of unions (U, V)
- * with present children: if the parent-anchor x of U is strictly left of V's
- * (gap > tol), then every child of U must have x strictly less than every child of
- * V. A breach means lines from U and V would cross.
+ * with present children **in the same generation row**: if the parent-anchor x of U
+ * is strictly left of V's (gap > tol), then every child of U must have x strictly
+ * less than every child of V. A breach means lines from U and V would cross.
+ *
+ * "Same generation row" is determined by the y-coordinate of the unions' present
+ * children (all children of a union share a row; we use the minimum child y as the
+ * row key, bucketed with 1 px tolerance). Pairs whose children sit on different
+ * rows are skipped — crossing between different generations is not meaningful.
  *
  * Parent-anchor x is the mean of present partners' x; fallback: mean of children x.
  */
@@ -307,39 +314,58 @@ export function noCrossedDescentLines(
   const tol = 0.5;
   const sibMap = siblingsOf(doc);
 
-  const unionIds = [...sibMap.keys()];
-  for (let i = 0; i < unionIds.length; i++) {
-    for (let j = i + 1; j < unionIds.length; j++) {
-      const uId = unionIds[i];
-      const vId = unionIds[j];
-      const uChildren = sibMap.get(uId)!.filter((id) => id in pos);
-      const vChildren = sibMap.get(vId)!.filter((id) => id in pos);
-      if (uChildren.length === 0 || vChildren.length === 0) continue;
+  const anchorX = (uid: string): number => {
+    const u = doc.partnerships[uid];
+    const partnerXs: number[] = [];
+    if (u.partner1Id && u.partner1Id in pos) partnerXs.push(pos[u.partner1Id].x);
+    if (u.partner2Id && u.partner2Id in pos) partnerXs.push(pos[u.partner2Id].x);
+    if (partnerXs.length > 0) return mean(partnerXs);
+    const cids = sibMap.get(uid)!.filter((id) => id in pos);
+    return mean(cids.map((id) => pos[id].x));
+  };
 
-      const anchorX = (uid: string): number => {
-        const u = doc.partnerships[uid];
-        const partnerXs: number[] = [];
-        if (u.partner1Id && u.partner1Id in pos) partnerXs.push(pos[u.partner1Id].x);
-        if (u.partner2Id && u.partner2Id in pos) partnerXs.push(pos[u.partner2Id].x);
-        if (partnerXs.length > 0) return mean(partnerXs);
-        const cids = sibMap.get(uid)!.filter((id) => id in pos);
-        return mean(cids.map((id) => pos[id].x));
-      };
+  /** Compute the child-row y for a union (min y of its present children). */
+  const childRowY = (uid: string): number => {
+    const children = sibMap.get(uid)!.filter((id) => id in pos);
+    return Math.min(...children.map((id) => pos[id].y));
+  };
 
-      const axU = anchorX(uId);
-      const axV = anchorX(vId);
+  // Bucket union ids by their child-row y (1 px tolerance → use Math.round).
+  const byChildRow = new Map<number, string[]>();
+  for (const uid of sibMap.keys()) {
+    const presentChildren = sibMap.get(uid)!.filter((id) => id in pos);
+    if (presentChildren.length === 0) continue;
+    const rowKey = Math.round(childRowY(uid));
+    const bucket = byChildRow.get(rowKey) ?? [];
+    bucket.push(uid);
+    byChildRow.set(rowKey, bucket);
+  }
 
-      // Only check when U is meaningfully left of V.
-      if (axU >= axV - tol) continue;
+  // Only compare unions within the same child-row bucket.
+  for (const bucket of byChildRow.values()) {
+    for (let i = 0; i < bucket.length; i++) {
+      for (let j = i + 1; j < bucket.length; j++) {
+        const uId = bucket[i];
+        const vId = bucket[j];
+        const uChildren = sibMap.get(uId)!.filter((id) => id in pos);
+        const vChildren = sibMap.get(vId)!.filter((id) => id in pos);
+        if (uChildren.length === 0 || vChildren.length === 0) continue;
 
-      const maxUChildX = Math.max(...uChildren.map((id) => pos[id].x));
-      const minVChildX = Math.min(...vChildren.map((id) => pos[id].x));
-      if (maxUChildX >= minVChildX - tol) {
-        violations.push({
-          rule: 'noCrossedDescentLines',
-          ids: [uId, vId],
-          detail: `anchor(${uId})=${axU.toFixed(1)} < anchor(${vId})=${axV.toFixed(1)} but maxChild(${uId})=${maxUChildX.toFixed(1)} >= minChild(${vId})=${minVChildX.toFixed(1)}`,
-        });
+        const axU = anchorX(uId);
+        const axV = anchorX(vId);
+
+        // Only check when U is meaningfully left of V.
+        if (axU >= axV - tol) continue;
+
+        const maxUChildX = Math.max(...uChildren.map((id) => pos[id].x));
+        const minVChildX = Math.min(...vChildren.map((id) => pos[id].x));
+        if (maxUChildX >= minVChildX - tol) {
+          violations.push({
+            rule: 'noCrossedDescentLines',
+            ids: [uId, vId],
+            detail: `anchor(${uId})=${axU.toFixed(1)} < anchor(${vId})=${axV.toFixed(1)} but maxChild(${uId})=${maxUChildX.toFixed(1)} >= minChild(${vId})=${minVChildX.toFixed(1)}`,
+          });
+        }
       }
     }
   }

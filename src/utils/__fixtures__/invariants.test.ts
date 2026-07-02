@@ -56,6 +56,15 @@ describe('minPartnerSpacing', () => {
     const d = doc({ individuals: { a: ind('a', 0, 0), b: ind('b', 90, 0) }, partnerships: { u: union('u', 'a', 'b', []) } });
     expect(minPartnerSpacing({ a: { x: 0, y: 0 }, b: { x: 90, y: 0 } }, d).ok).toBe(false);
   });
+  it('does not flag a self-partnered union (partner1Id === partner2Id)', () => {
+    // Degenerate union: same individual is both partners. Gap is 0 — must be skipped.
+    const d = doc({
+      individuals: { a: ind('a', 0, 0), k: ind('k', 0, 1) },
+      partnerships: { u: union('u', 'a', 'a', ['k']) },
+      parentChildLinks: { lk: link('lk', 'u', 'k') },
+    });
+    expect(minPartnerSpacing({ a: { x: 0, y: 0 }, k: { x: 0, y: 150 } }, d).ok).toBe(true);
+  });
   it('exempts a couple with a load-bearing in-law (wide couple)', () => {
     const d = doc({
       individuals: { blood: ind('blood', 0, 1), inlaw: ind('inlaw', 300, 1), ilp: ind('ilp', 300, 0) },
@@ -110,6 +119,37 @@ describe('noCrossedDescentLines', () => {
       parentChildLinks: { a: link('a', 'u1', 'c1'), b: link('b', 'u2', 'c2') },
     });
     const pos = { p1: { x: 0, y: 150 }, p2: { x: 200, y: 150 }, c1: { x: 20, y: 300 }, c2: { x: 180, y: 300 } };
+    expect(noCrossedDescentLines(pos, d).ok).toBe(true);
+  });
+  it('does not flag a shallow union and a deep union whose old cross-generation x-extents would have overlapped', () => {
+    // top union: parents at gen 0, children pa/pb at y=150 (gen 1).
+    // cousinUnion: parents at gen 2 (y=300), child gc at y=450 (gen 3).
+    // Positioned so that, if compared cross-generation, the old matcher would flag them
+    // (top anchor x=0 < cousinUnion anchor x=100, but pa.x=150 >= gc.x=100).
+    // They are different generations and must NOT be flagged.
+    const d = doc({
+      individuals: {
+        gp1: ind('gp1', 0, 0), gp2: ind('gp2', 0, 0),
+        pa: ind('pa', 0, 1), pb: ind('pb', 150, 1),
+        cp1: ind('cp1', 80, 2), cp2: ind('cp2', 120, 2),
+        gc: ind('gc', 100, 3),
+      },
+      partnerships: {
+        top: union('top', 'gp1', 'gp2', ['pa', 'pb']),
+        cousinUnion: union('cousinUnion', 'cp1', 'cp2', ['gc']),
+      },
+      parentChildLinks: {
+        la: link('la', 'top', 'pa'),
+        lb: link('lb', 'top', 'pb'),
+        lc: link('lc', 'cousinUnion', 'gc'),
+      },
+    });
+    const pos = {
+      gp1: { x: 0, y: 0 }, gp2: { x: 0, y: 0 },
+      pa: { x: 0, y: 150 }, pb: { x: 150, y: 150 },
+      cp1: { x: 80, y: 300 }, cp2: { x: 120, y: 300 },
+      gc: { x: 100, y: 450 },
+    };
     expect(noCrossedDescentLines(pos, d).ok).toBe(true);
   });
 });
