@@ -11,6 +11,7 @@ import {
   crossBranchMarriage, wideCoupleAdjacentCousin, wideCoupleInverted,
   wideCoupleOppositeCousin, undefinedGenerationChild,
   twins, twinsWithSingletonSibling, remarriageHalfSibs,
+  selfPartneredUnion, disconnectedComponents,
 } from './__fixtures__/pedigrees';
 
 // Fixtures that already satisfy their invariants on the current code.
@@ -109,4 +110,20 @@ describe('computeTreeLayout — twin contiguity', () => {
       expect(twinContiguity(pos, f.doc, f.twinGroups!).violations).toEqual([]);
     });
   }
+});
+
+describe('computeTreeLayout — degenerate inputs', () => {
+  it('selfPartneredUnion: does not crash and produces aligned rows', () => {
+    const f = selfPartneredUnion();
+    let moved: Record<string, {x:number;y:number}> = {};
+    expect(() => { moved = computeTreeLayout(f.doc, f.rootUnionId); }).not.toThrow();
+    const pos = finalPositions(f.doc, moved);
+    expect(generationRowAlignment(pos, f.doc).violations).toEqual([]);
+  });
+  it('disconnectedComponents: does not move the unrelated component', () => {
+    const f = disconnectedComponents();
+    const moved = computeTreeLayout(f.doc, f.rootUnionId);
+    // The other component's ids must be absent from the move-map.
+    expect(Object.keys(moved).every((id) => !id.startsWith('other_'))).toBe(true);
+  });
 });
