@@ -13,6 +13,7 @@ import type { Individual, PartnershipRelationship, ParentChildRelationship } fro
 import { RelationshipType } from '../types/enums';
 import { createDefaultIndividual } from '../stores/pedigreeStore';
 import { finalPositions, checkAllInvariants } from './__fixtures__/invariants';
+import { SYMBOL_SIZE } from './constants';
 
 function ind(id: string, x: number, generation = 0): Individual {
   return createDefaultIndividual({ id, generation, position: { x, y: generation * 150 } });
@@ -448,7 +449,7 @@ describe('computeTreeLayout — remarriage (multi-union)', () => {
 
     // The second sibship's child (kidB) is now placed clear of the first (kidA),
     // no longer left at its overlapping seed position.
-    expect(Math.abs(pos.kidA.x - pos.kidB.x)).toBeGreaterThanOrEqual(40 - 0.5);
+    expect(Math.abs(pos.kidA.x - pos.kidB.x)).toBeGreaterThanOrEqual(SYMBOL_SIZE - 0.5);
   });
 });
 

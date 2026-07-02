@@ -3,7 +3,7 @@ import { computeTreeLayout } from './treeLayout';
 import {
   finalPositions, checkAllInvariants, manualOrderPreserved,
   noSymbolOverlap, minSiblingSpacing, noCrossedDescentLines, subtreeNonCollision,
-  generationRowAlignment, twinContiguity,
+  generationRowAlignment, twinContiguity, anchorStability,
 } from './__fixtures__/invariants';
 import {
   loneFounder, coupleWithSibship, threeGenerations, marriedInWithParents,
@@ -13,6 +13,7 @@ import {
   twins, twinsWithSingletonSibling, remarriageHalfSibs,
   selfPartneredUnion, disconnectedComponents,
 } from './__fixtures__/pedigrees';
+import { SIBLING_SPACING } from './constants';
 
 // Fixtures that already satisfy their invariants on the current code.
 const GREEN_TODAY = [
@@ -76,7 +77,7 @@ describe('computeTreeLayout — cross-branch centering', () => {
     expect(x('kidB')).toBeCloseTo((x('s2') + x('s2mate')) / 2, 1);
     // kidA is clamped off couple1's midpoint (the pinned in-law over-constrains it),
     // but stays clear of kidB — no-overlap wins over exact centring.
-    expect(Math.abs(x('kidA') - x('kidB'))).toBeGreaterThanOrEqual(80 - 0.5);
+    expect(Math.abs(x('kidA') - x('kidB'))).toBeGreaterThanOrEqual(SIBLING_SPACING - 0.5);
   });
 
   it('wideCoupleOppositeCousin: no overlap and no crossed descent lines (mirror of #115)', () => {
@@ -125,5 +126,22 @@ describe('computeTreeLayout — degenerate inputs', () => {
     const moved = computeTreeLayout(f.doc, f.rootUnionId);
     // The other component's ids must be absent from the move-map.
     expect(Object.keys(moved).every((id) => !id.startsWith('other_'))).toBe(true);
+  });
+});
+
+describe('computeTreeLayout — anchor stability', () => {
+  it('threeGenerations: root blood partner (gp1) does not move after relayout', () => {
+    // threeGenerations: root union `top` has founders gp1 (x=-60) and gp2 (x=60).
+    // The layout anchors on their midpoint (0) so the canvas does not jump.
+    // gp1 is the first blood partner; after relayout its x should be unchanged.
+    // Children pa (gen 1) and grandchildren c1/c2 (gen 2) re-centre under the
+    // stationary root couple — this is the case where descendants move but the
+    // anchor should stay fixed.
+    const f = threeGenerations();
+    const moved = computeTreeLayout(f.doc, f.rootUnionId);
+    // gp1 is the anchored root partner. Its x must be unchanged (absent from
+    // `moved` or within tolerance of its seeded position).
+    const result = anchorStability(f.doc, moved, 'gp1');
+    expect(result.violations, JSON.stringify(result.violations, null, 2)).toEqual([]);
   });
 });

@@ -123,6 +123,9 @@ This is the crown-jewel test surface for the auto-spacing feature.
   `partnerSpacing` from three different spouses, so the exact partner-spacing
   aesthetic degrades for the 3rd+ union (sibships are still separated; only the
   aesthetic spacing widens).
+- **Disconnected components**: an unrelated family that shares a generation row is
+  treated as a fixed obstacle, so the rooted family may be translated sideways to
+  clear it (no overlap or crossing results; the unrelated family never moves).
 
 ### Canonical test surface
 

@@ -285,6 +285,13 @@ export interface RowBlock {
  * between extents. Monotone — never shifts a block left — so an already-separated
  * row yields all-zero shifts (idempotent). Mirrors {@link packBlocks} applied per
  * generation row rather than per sibling set.
+ *
+ * @remarks
+ * This is a tested reference primitive exported for unit testing. The production
+ * separation pass ({@link separateGenerations}) inlines an obstacle-aware variant
+ * of the same monotone rule — fixed pinned in-law nodes short-circuit the sweep
+ * with `continue` — rather than calling this function directly. A reader should
+ * not expect to find `resolveRowSeparation` called from `separateGenerations`.
  */
 export function resolveRowSeparation(
   blocks: readonly RowBlock[],
@@ -449,7 +456,7 @@ function layoutChildBlock(
   const childUnions = Object.values(doc.partnerships).filter(
     (p) =>
       (p.partner1Id === childId || p.partner2Id === childId) &&
-      p.childrenIds.length > 0,
+      p.childrenIds.some((cid) => doc.individuals[cid]),
   );
   if (childUnions.length === 0) {
     // Leaf — but the child may have a childless partner forming a couple block.
