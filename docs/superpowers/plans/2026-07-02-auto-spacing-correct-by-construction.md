@@ -575,52 +575,61 @@ git commit -m "feat: separation projection + center-then-reproject; fix #115 ove
 
 ---
 
-## Task 6: Couple super-node ownership (Pass 0)
+## Task 6: Cross-branch centering — verify achievable behavior + harden clamp
 
-Give a cross-branch DAG couple one owner for its x, so centering/ownership is principled rather than incidental. Validates the DAG case beyond mere non-overlap.
+**RECONCILED WITH TASK 5 REALITY.** Task 5's rigid-block model (deepest-owner blocks + couple-midpoint centering in `centerAndReproject`) already realizes the "couple super-node ownership" this task originally proposed — so no new ownership code is needed. Empirically, on `crossBranchMarriage` post-Task-5: `kidB=100` sits exactly on couple2's midpoint, but `kidA=20` is deliberately clamped **off** couple1's midpoint (100) because the pinned in-law at 240 drags couple1's ideal descent point onto couple2's; centering there would re-introduce the overlap. **No-overlap correctly wins over exact centering in this over-constrained double-DAG case.** (Single-wide-couple centering stays exact — `marriedInWithParents`: `kid=150=midpoint`.)
+
+This task therefore (a) locks the *achievable* cross-branch behavior as a regression guard, and (b) adds the distinct opposite-side cousin fixture the Task-5 review requested to harden the clamp's side-selection.
 
 **Files:**
-- Modify: `src/utils/treeLayout.ts` — add couple super-node structure used by Pass 1/Pass 3 midpoint logic.
-- Modify: `src/utils/treeLayout.invariants.test.ts` — assert `crossBranchMarriage` centres its child at the couple midpoint and keeps the DAG couple's two lineages from crossing.
+- Modify: `src/utils/__fixtures__/pedigrees.ts` — add `wideCoupleOppositeCousin` fixture (mirror of `crossBranchMarriage`: the wide couple is on the RIGHT so its sibship would slide LEFT onto a cousin). Add it to `ALL_FIXTURES`.
+- Modify: `src/utils/treeLayout.invariants.test.ts` — add honest cross-branch assertions + the new fixture to the overlap block.
 
-**Interfaces:**
-- Produces (module-internal): `function coupleMidpointOf(doc, unionId, finalX): number | null` — the owning x for a union's descent, using placed partners (both-load-bearing → mean of both placed lineages).
+- [ ] **Step 1: Add the `wideCoupleOppositeCousin` fixture**
 
-- [ ] **Step 1: Add the DAG-centering assertion (RED-or-GREEN)**
+In `pedigrees.ts`, add a builder that mirrors `crossBranchMarriage` left-right (the load-bearing in-law is placed far to the LEFT, so the wide couple's recentred sibship is pulled left toward a cousin sibship that sits to its left). Same structure: grandparents → two children; one child marries a load-bearing in-law (placed far left); the other is an ordinary couple; each has one child. Include it in `ALL_FIXTURES`. Run `npx vitest run src/utils/__fixtures__/pedigrees.test.ts` — structural test still green.
 
-Add to the overlap describe in `treeLayout.invariants.test.ts`:
+- [ ] **Step 2: Add honest cross-branch assertions (regression guard)**
+
+Add to `treeLayout.invariants.test.ts`:
 
 ```typescript
-it('crossBranchMarriage: child sits at the couple midpoint', () => {
-  const f = crossBranchMarriage();
-  const moved = computeTreeLayout(f.doc, f.rootUnionId);
-  const pos = finalPositions(f.doc, moved);
-  const x = (id: string) => pos[id].x;
-  // kidA centred under couple1 (s1 x inlaw); kidB under couple2 (s2 x s2mate).
-  expect(x('kidA')).toBeCloseTo((x('s1') + x('inlaw')) / 2, 1);
-  expect(x('kidB')).toBeCloseTo((x('s2') + x('s2mate')) / 2, 1);
+import { wideCoupleOppositeCousin } from './__fixtures__/pedigrees';
+import { noSymbolOverlap, minSiblingSpacing, noCrossedDescentLines, subtreeNonCollision, finalPositions } from './__fixtures__/invariants';
+
+describe('computeTreeLayout — cross-branch centering', () => {
+  it('crossBranchMarriage: the movable couple centres its child; the pinned-in-law couple yields to no-overlap', () => {
+    const f = crossBranchMarriage();
+    const pos = finalPositions(f.doc, computeTreeLayout(f.doc, f.rootUnionId));
+    const x = (id: string) => pos[id].x;
+    // couple2 (s2 x s2mate, both movable) centres kidB exactly.
+    expect(x('kidB')).toBeCloseTo((x('s2') + x('s2mate')) / 2, 1);
+    // kidA is clamped off couple1's midpoint (the pinned in-law over-constrains it),
+    // but stays clear of kidB — no-overlap wins over exact centring.
+    expect(Math.abs(x('kidA') - x('kidB'))).toBeGreaterThanOrEqual(80 - 0.5);
+  });
+
+  it('wideCoupleOppositeCousin: no overlap and no crossed descent lines (mirror of #115)', () => {
+    const f = wideCoupleOppositeCousin();
+    const pos = finalPositions(f.doc, computeTreeLayout(f.doc, f.rootUnionId));
+    expect(noSymbolOverlap(pos, f.doc).violations).toEqual([]);
+    expect(minSiblingSpacing(pos, f.doc).violations).toEqual([]);
+    expect(noCrossedDescentLines(pos, f.doc).violations).toEqual([]);
+    expect(subtreeNonCollision(pos, f.doc).violations).toEqual([]);
+  });
 });
 ```
 
-- [ ] **Step 2: Run to observe status**
+- [ ] **Step 3: Run**
 
-Run: `npx vitest run src/utils/treeLayout.invariants.test.ts -t "couple midpoint"`
-Expected: If Pass 2/3 already centre correctly, PASS (record that the super-node is a clarity refactor, not a fix). If it fails on the midpoint, proceed to implement.
+Run: `npx vitest run src/utils/treeLayout.invariants.test.ts src/utils/__fixtures__/pedigrees.test.ts`
+Expected: PASS. If `wideCoupleOppositeCousin` reports an overlap/crossing violation, that is a genuine clamp side-selection bug surfaced by the mirror case — fix it in `treeLayout.ts` (the clamp/obstacle direction handling) until green; do NOT weaken the assertion. Then `npm test` once — full suite green.
 
-- [ ] **Step 3: Implement `coupleMidpointOf` and use it in Pass 3 centering**
-
-Add `coupleMidpointOf`; in `centerAndReproject`, use it as each union's target x. For a both-load-bearing couple, the target is the mean of both placed partners; the subsequent re-projection clamps it to separation.
-
-- [ ] **Step 4: Run the full layout suite**
-
-Run: `npx vitest run src/utils/treeLayout.invariants.test.ts src/utils/treeLayout.test.ts`
-Expected: PASS.
-
-- [ ] **Step 5: Commit**
+- [ ] **Step 4: Commit**
 
 ```bash
-git add src/utils/treeLayout.ts src/utils/treeLayout.invariants.test.ts
-git commit -m "feat: couple super-node ownership for cross-branch unions (#131)"
+git add src/utils/__fixtures__/pedigrees.ts src/utils/treeLayout.invariants.test.ts src/utils/treeLayout.ts
+git commit -m "test: lock cross-branch centering behavior + opposite-side cousin guard (#131)"
 ```
 
 ---
