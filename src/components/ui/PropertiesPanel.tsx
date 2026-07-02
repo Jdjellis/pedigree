@@ -137,7 +137,13 @@ export function PropertiesPanel() {
 
   const update = useCallback(
     (patch: Partial<Individual>) => {
-      if (selectedId) updateIndividual(selectedId, patch);
+      if (!selectedId) return;
+      // Editing a person's properties is meaningful engagement, so retire
+      // first-run onboarding here too. Otherwise a user who only annotates the
+      // lone seed person (never adding a relative) would keep the overlay,
+      // since the count-based dismissal in OnboardingHints never fires.
+      useUIStore.getState().setOnboarded();
+      updateIndividual(selectedId, patch);
     },
     [selectedId, updateIndividual]
   );
