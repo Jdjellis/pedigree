@@ -249,6 +249,23 @@ interface PedigreeState {
     partnership: PartnershipRelationship,
     link: ParentChildRelationship,
   ) => void;
+  /**
+   * Add a set of children who are twins of EACH OTHER, plus their twin group, in
+   * one undo step. Mirrors {@link addChildToFamily}/{@link addChildViaNewUnion}
+   * but for the "hold ⌥ over Child" flow, where the target is the parent so the
+   * twins are two brand-new children rather than the target itself.
+   *
+   * When `newPartnership` is provided its `childrenIds` must already list the new
+   * children and it is inserted as a fresh union under the target. When it is
+   * `null` the children are appended to the existing union named by
+   * `twinGroup.parentPartnershipId`.
+   */
+  addTwinChildren: (
+    children: Individual[],
+    links: ParentChildRelationship[],
+    twinGroup: TwinGroup,
+    newPartnership: PartnershipRelationship | null,
+  ) => void;
   fillUnionPartner: (partner: Individual, partnershipId: string) => void;
   addParentsToParentlessUnion: (
     parent1: Individual,
@@ -429,10 +446,15 @@ export const usePedigreeStore = create<PedigreeState>()(
           // union itself wherever it still depicts something. Clearing a
           // parent's slot (rather than deleting the union) lets the children
           // keep their sibship: with one parent left they drop to that single
-          // parent; with both parents gone they keep the bare sibship bar
-          // joining the siblings. A union is pruned only once it has fewer than
-          // two partners AND no children — i.e. it would draw neither a couple
-          // line nor a sibship.
+          // parent; with both parents gone but two or more siblings they keep the
+          // bare sibship bar joining the siblings. A union is kept only when it
+          // would still draw a meaningful connector:
+          //   - two partners (a couple line), or
+          //   - one partner with at least one child (single-parent descent), or
+          //   - no partners but two or more children (a bare sibship bar).
+          // Everything else is pruned. In particular a no-partner/one-child union
+          // is dropped: it would otherwise render a descent stub hanging above a
+          // lone symbol, attached to nothing above (a stranded connector).
           const remainingPartnerships: Record<
             string,
             PartnershipRelationship
@@ -445,7 +467,11 @@ export const usePedigreeStore = create<PedigreeState>()(
             const childrenIds = p.childrenIds.filter((cId) => cId !== id);
 
             const partnerCount = (partner1Id ? 1 : 0) + (partner2Id ? 1 : 0);
-            if (partnerCount < 2 && childrenIds.length === 0) continue;
+            const keep =
+              partnerCount === 2 ||
+              (partnerCount === 1 && childrenIds.length >= 1) ||
+              (partnerCount === 0 && childrenIds.length >= 2);
+            if (!keep) continue;
 
             remainingPartnerships[pId] = {
               ...p,
@@ -1014,6 +1040,55 @@ export const usePedigreeStore = create<PedigreeState>()(
               individuals,
               partnerships,
               parentChildLinks,
+            },
+          };
+        }),
+
+      addTwinChildren: (children, links, twinGroup, newPartnership) =>
+        set((state) => {
+          const partnershipId = twinGroup.parentPartnershipId;
+
+          const partnerships = { ...state.document.partnerships };
+          if (newPartnership) {
+            // Fresh 1-partner union under the target; its childrenIds already
+            // list the twins.
+            partnerships[partnershipId] = newPartnership;
+          } else {
+            const existing = partnerships[partnershipId];
+            if (!existing) return state;
+            partnerships[partnershipId] = {
+              ...existing,
+              childrenIds: [...existing.childrenIds, ...children.map((c) => c.id)],
+            };
+          }
+
+          let individuals: Record<string, Individual> = { ...state.document.individuals };
+          for (const child of children) individuals[child.id] = child;
+
+          const parentChildLinks = { ...state.document.parentChildLinks };
+          for (const link of links) parentChildLinks[link.id] = link;
+
+          const twinGroups = {
+            ...state.document.twinGroups,
+            [twinGroup.id]: twinGroup,
+          };
+
+          // Re-tidy the whole blood family so parents re-centre over the full
+          // sibling row, exactly as the single-child path does. Insert + layout +
+          // twin-grouping share this one `set` so a single undo reverts them all.
+          individuals = relayoutFamily(
+            { individuals, partnerships, parentChildLinks },
+            children[0].id,
+          );
+
+          return {
+            document: {
+              ...state.document,
+              metadata: { ...state.document.metadata, updatedAt: new Date().toISOString() },
+              individuals,
+              partnerships,
+              parentChildLinks,
+              twinGroups,
             },
           };
         }),

@@ -9,6 +9,7 @@ import type { ConnectionSelection } from '../../stores/uiStore';
 import { PartnershipLine } from './PartnershipLine';
 import { ParentChildLine } from './ParentChildLine';
 import { TwinConnector } from './TwinConnector';
+import { IndividualChildlessLine } from './IndividualChildlessLine';
 
 interface ConnectionsLayerProps {
   partnerships: Record<string, PartnershipRelationship>;
@@ -16,6 +17,7 @@ interface ConnectionsLayerProps {
   twinGroups: Record<string, TwinGroup>;
   individuals: Record<string, Individual>;
   selectedConnection: ConnectionSelection | null;
+  hoveredConnection: ConnectionSelection | null;
 }
 
 /**
@@ -31,6 +33,7 @@ export function ConnectionsLayer({
   twinGroups,
   individuals,
   selectedConnection,
+  hoveredConnection,
 }: ConnectionsLayerProps) {
   return (
     <Layer>
@@ -40,6 +43,7 @@ export function ConnectionsLayer({
           partnership={partnership}
           individuals={individuals}
           selectedConnection={selectedConnection}
+          hoveredConnection={hoveredConnection}
         />
       ))}
       {Object.values(partnerships).map((partnership) => (
@@ -50,6 +54,7 @@ export function ConnectionsLayer({
           parentChildLinks={parentChildLinks}
           twinGroups={twinGroups}
           selectedConnection={selectedConnection}
+          hoveredConnection={hoveredConnection}
         />
       ))}
       {Object.values(twinGroups).map((twinGroup) => (
@@ -59,6 +64,14 @@ export function ConnectionsLayer({
           individuals={individuals}
           partnerships={partnerships}
           selectedConnection={selectedConnection}
+          hoveredConnection={hoveredConnection}
+        />
+      ))}
+      {Object.values(individuals).map((individual) => (
+        <IndividualChildlessLine
+          key={`icl-${individual.id}`}
+          individual={individual}
+          partnerships={partnerships}
         />
       ))}
     </Layer>

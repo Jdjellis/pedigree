@@ -47,6 +47,10 @@ const SHORTCUT_GROUPS: ShortcutGroup[] = [
         description: 'Link two people (then pick the relationship type)',
         keys: ['Alt + Drag'],
       },
+      {
+        description: 'Edit a line (relationship type, consanguinity, infertility)',
+        keys: ['Click line'],
+      },
     ],
   },
   {

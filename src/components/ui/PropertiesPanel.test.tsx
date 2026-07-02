@@ -7,11 +7,11 @@
  *
  * Store state is reset in `beforeEach` so tests are fully independent.
  */
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, fireEvent, within } from '@testing-library/react';
 import { beforeEach, describe, it, expect } from 'vitest';
 import { usePedigreeStore, createDefaultDocument, createDefaultIndividual } from '../../stores/pedigreeStore';
 import { useUIStore } from '../../stores/uiStore';
-import { RelationshipType } from '../../types/enums';
+import { PregnancyOutcome, RelationshipType, VitalStatus } from '../../types/enums';
 import type { ParentChildRelationship, PartnershipRelationship } from '../../types/pedigree';
 import { PropertiesPanel } from './PropertiesPanel';
 
@@ -114,4 +114,210 @@ describe('PropertiesPanel adoption control', () => {
   // individual cannot belong to more than one parent partnership until
   // multi-parentage (#64) is implemented. RTL coverage is intentionally
   // deferred to that issue.
+});
+
+describe('PropertiesPanel stillbirth gestational age', () => {
+  function seedStillborn() {
+    const ind = createDefaultIndividual({ id: 'sb-1', displayName: 'Baby' });
+    ind.vitalStatus = VitalStatus.Stillborn;
+    ind.gestationalAge = '20 wk';
+    const doc = createDefaultDocument();
+    doc.individuals['sb-1'] = ind;
+
+    act(() => {
+      usePedigreeStore.getState().setDocument(doc);
+      useUIStore.setState({
+        selectedIds: new Set(['sb-1']),
+        propertiesPanelOpen: true,
+      });
+    });
+  }
+
+  it('replaces the Age field with Gestational age when the status is Stillborn', () => {
+    seedStillborn();
+    render(<PropertiesPanel />);
+    // Gestational age is shown; the Age input is not (GA takes its place).
+    expect(screen.getByDisplayValue('20 wk')).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText('Age')).not.toBeInTheDocument();
+  });
+
+  it('clears a stale age when the status changes to Stillborn', () => {
+    const ind = createDefaultIndividual({ id: 'p-1', displayName: 'Kid' });
+    ind.vitalStatus = VitalStatus.Alive;
+    ind.age = 30;
+    const doc = createDefaultDocument();
+    doc.individuals['p-1'] = ind;
+
+    act(() => {
+      usePedigreeStore.getState().setDocument(doc);
+      useUIStore.setState({
+        selectedIds: new Set(['p-1']),
+        propertiesPanelOpen: true,
+      });
+    });
+
+    render(<PropertiesPanel />);
+    // Age is shown for a living person…
+    expect(screen.getByPlaceholderText('Age')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stillborn' }));
+
+    // …and dropped on the switch to Stillborn, so no "d. <age>" can render.
+    expect(usePedigreeStore.getState().document.individuals['p-1'].age).toBeUndefined();
+    expect(screen.queryByPlaceholderText('Age')).not.toBeInTheDocument();
+    expect(screen.getByPlaceholderText('e.g. 20 wk')).toBeInTheDocument();
+  });
+});
+
+describe('PropertiesPanel pregnancy section', () => {
+  function seed(overrides = {}) {
+    const ind = createDefaultIndividual({ id: 'preg-1', displayName: 'Fetus', ...overrides });
+    const doc = createDefaultDocument();
+    doc.individuals['preg-1'] = ind;
+
+    act(() => {
+      usePedigreeStore.getState().setDocument(doc);
+      useUIStore.setState({
+        selectedIds: new Set(['preg-1']),
+        propertiesPanelOpen: true,
+      });
+    });
+  }
+
+  it('hides the outcome control until the individual is marked a pregnancy', () => {
+    seed();
+    render(<PropertiesPanel />);
+    expect(
+      screen.queryByRole('group', { name: 'Pregnancy outcome' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('marks the individual a pregnancy and defaults the outcome to SAB', () => {
+    seed();
+    render(<PropertiesPanel />);
+
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: 'Pregnancy not carried to term' }),
+    );
+
+    const ind = usePedigreeStore.getState().document.individuals['preg-1'];
+    expect(ind.isPregnancy).toBe(true);
+    expect(ind.pregnancyOutcome).toBe(PregnancyOutcome.SAB);
+    expect(
+      screen.getByRole('group', { name: 'Pregnancy outcome' }),
+    ).toBeInTheDocument();
+  });
+
+  it('changes the outcome to TOP / ECT via the segmented control', () => {
+    seed({ isPregnancy: true, pregnancyOutcome: PregnancyOutcome.SAB });
+    render(<PropertiesPanel />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'ECT' }));
+
+    expect(
+      usePedigreeStore.getState().document.individuals['preg-1'].pregnancyOutcome,
+    ).toBe(PregnancyOutcome.ECT);
+  });
+
+  it('clears the outcome and gestational age when unmarked', () => {
+    seed({
+      isPregnancy: true,
+      pregnancyOutcome: PregnancyOutcome.TOP,
+      gestationalAge: '12 wk',
+    });
+    render(<PropertiesPanel />);
+
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: 'Pregnancy not carried to term' }),
+    );
+
+    const ind = usePedigreeStore.getState().document.individuals['preg-1'];
+    expect(ind.isPregnancy).toBe(false);
+    expect(ind.pregnancyOutcome).toBeUndefined();
+    expect(ind.gestationalAge).toBeUndefined();
+  });
+});
+
+describe('PropertiesPanel individual childlessness control', () => {
+  function seed(overrides = {}) {
+    const ind = createDefaultIndividual({ id: 'ind-1', displayName: 'Solo', ...overrides });
+    const doc = createDefaultDocument();
+    doc.individuals['ind-1'] = ind;
+
+    act(() => {
+      usePedigreeStore.getState().setDocument(doc);
+      useUIStore.setState({
+        selectedIds: new Set(['ind-1']),
+        propertiesPanelOpen: true,
+      });
+    });
+  }
+
+  it('sets the childless status and shows a cause field', () => {
+    seed();
+    render(<PropertiesPanel />);
+
+    const control = screen.getByRole('group', { name: 'Individual childless status' });
+    expect(control).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'No children' }));
+    expect(usePedigreeStore.getState().document.individuals['ind-1'].childlessStatus).toBe(
+      'noChildren',
+    );
+
+    // Cause field appears for "No children" (free text like infertility).
+    const cause = screen.getByPlaceholderText('e.g. vasectomy');
+    fireEvent.change(cause, { target: { value: 'vasectomy' } });
+    expect(usePedigreeStore.getState().document.individuals['ind-1'].childlessReason).toBe(
+      'vasectomy',
+    );
+  });
+
+  it('keeps the cause when switching between no-children and infertility, drops it on none', () => {
+    seed({ childlessStatus: 'noChildren', childlessReason: 'vasectomy' });
+    render(<PropertiesPanel />);
+
+    const group = screen.getByRole('group', { name: 'Individual childless status' });
+    fireEvent.click(within(group).getByRole('button', { name: 'Infertility' }));
+    let ind = usePedigreeStore.getState().document.individuals['ind-1'];
+    expect(ind.childlessStatus).toBe('infertility');
+    expect(ind.childlessReason).toBe('vasectomy');
+
+    fireEvent.click(within(group).getByRole('button', { name: 'None' }));
+    ind = usePedigreeStore.getState().document.individuals['ind-1'];
+    expect(ind.childlessStatus).toBeUndefined();
+    expect(ind.childlessReason).toBeUndefined();
+  });
+
+  it('disables the control and hides the cause when the individual has children', () => {
+    const ind = createDefaultIndividual({ id: 'parent-1' });
+    ind.childlessStatus = 'infertility';
+    ind.childlessReason = 'azoospermia';
+    const partner = createDefaultIndividual({ id: 'partner-1' });
+    const child = createDefaultIndividual({ id: 'child-1' });
+    const doc = createDefaultDocument();
+    doc.individuals['parent-1'] = ind;
+    doc.individuals['partner-1'] = partner;
+    doc.individuals['child-1'] = child;
+    doc.partnerships['u1'] = {
+      id: 'u1',
+      type: RelationshipType.Partnership,
+      partner1Id: 'parent-1',
+      partner2Id: 'partner-1',
+      childrenIds: ['child-1'],
+    };
+
+    act(() => {
+      usePedigreeStore.getState().setDocument(doc);
+      useUIStore.setState({
+        selectedIds: new Set(['parent-1']),
+        propertiesPanelOpen: true,
+      });
+    });
+
+    render(<PropertiesPanel />);
+    expect(screen.getByRole('button', { name: 'Infertility' })).toBeDisabled();
+    expect(screen.getByText(/childless marker doesn.t apply/i)).toBeInTheDocument();
+    expect(screen.queryByPlaceholderText(/azoospermia/i)).not.toBeInTheDocument();
+  });
 });

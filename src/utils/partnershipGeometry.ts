@@ -49,3 +49,48 @@ export function consanguinityLines(p1: Point, p2: Point, gap: number): Consangui
 export function partnershipMidpoint(p1: Point, p2: Point): Point {
   return { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
 }
+
+/** Spacing knobs for {@link childlessMarks}. */
+export interface ChildlessMarkOptions {
+  /** Length of the vertical stub dropping from the relationship line. */
+  stub: number;
+  /** Half-width of each horizontal cross-bar. */
+  barHalf: number;
+  /** Vertical gap between the two bars of the infertility marker. */
+  barGap: number;
+}
+
+/** The segments of a childless-union marker: the stub plus its cross-bar(s). */
+export interface ChildlessMarks {
+  /** Vertical stub from the relationship line down to the bars. */
+  stub: [number, number, number, number];
+  /** One bar for `'noChildren'`, two for `'infertility'`. */
+  bars: [number, number, number, number][];
+}
+
+/**
+ * Geometry for a childless-union marker hung below the relationship-line
+ * midpoint `mid`, per NSGC/Bennett: a short vertical stub terminated by a single
+ * horizontal bar (`'noChildren'` — no children by choice) or two parallel bars
+ * (`'infertility'`). Shared by the Konva renderer and the SVG exporter so the
+ * two cannot drift.
+ */
+export function childlessMarks(
+  mid: Point,
+  kind: 'infertility' | 'noChildren',
+  opts: ChildlessMarkOptions,
+): ChildlessMarks {
+  const bottomY = mid.y + opts.stub;
+  const stub: [number, number, number, number] = [mid.x, mid.y, mid.x, bottomY];
+  const bar = (y: number): [number, number, number, number] => [
+    mid.x - opts.barHalf,
+    y,
+    mid.x + opts.barHalf,
+    y,
+  ];
+  const bars =
+    kind === 'infertility'
+      ? [bar(bottomY - opts.barGap), bar(bottomY)]
+      : [bar(bottomY)];
+  return { stub, bars };
+}

@@ -66,6 +66,8 @@ describe('eraseElementById selection reconciliation', () => {
   it('prunes an erased individual from selectedIds', () => {
     const store = usePedigreeStore.getState();
     store.addIndividual(createDefaultIndividual({ id: 'a' }));
+    // A second individual so 'a' is not the last one (which is never erased).
+    store.addIndividual(createDefaultIndividual({ id: 'b' }));
     useUIStore.getState().selectMultiple(['a']);
 
     eraseElementById('a');

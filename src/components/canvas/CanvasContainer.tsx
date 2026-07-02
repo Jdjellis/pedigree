@@ -24,6 +24,7 @@ import { BoundsLayer } from './BoundsLayer';
 import { computeBounds } from '../../utils/boundsCalculation';
 import { collectInvestigations } from '../../utils/investigations';
 import { clearCanvasCursor } from '../../utils/canvasCursor';
+import { childlessMarksActive } from '../../utils/childlessness';
 import type { ActiveQuarter } from './symbols/ConditionOverlay';
 import type { Individual } from '../../types/pedigree';
 import { THEME_CANVAS_PALETTES } from '../../theme/themes';
@@ -88,6 +89,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
     const hoveredId = useUIStore((s) => s.hoveredId);
     const editingAnnotationId = useUIStore((s) => s.editingAnnotationId);
     const selectedConnection = useUIStore((s) => s.selectedConnection);
+    const hoveredConnection = useUIStore((s) => s.hoveredConnection);
     const dragLink = useUIStore((s) => s.dragLink);
     const updateDragLinkCursor = useUIStore((s) => s.updateDragLinkCursor);
     const endDragLink = useUIStore((s) => s.endDragLink);
@@ -575,6 +577,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
               twinGroups={twinGroups}
               individuals={individuals}
               selectedConnection={selectedConnection}
+              hoveredConnection={hoveredConnection}
             />
 
             <Layer>
@@ -596,6 +599,7 @@ export const CanvasContainer = forwardRef<CanvasContainerHandle>(
                     dragLink.sourceId !== individual.id
                   }
                   symbolFill={canvasPalette.symbolFill}
+                  childlessActive={childlessMarksActive(individual, partnerships)}
                 />
               ))}
             </Layer>

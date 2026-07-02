@@ -6,17 +6,24 @@ import { useUIStore } from '../../stores/uiStore';
  * by entity type: text annotation, partnership, or individual. Removing an
  * individual cascades to its partnerships, parent-child links, and twin-group
  * membership (handled inside the store). A no-op if `id` matches nothing.
+ *
+ * The final individual is never erased: an empty canvas has no way to add a new
+ * person (the radial add-menu needs an existing symbol to grow from), so erasing
+ * the last one would strand the user. Mirrors the guard in `deleteSelectedAction`.
  */
 export function eraseElementById(id: string): void {
   if (useUIStore.getState().editingLocked) return;
   const store = usePedigreeStore.getState();
-  const { textAnnotations, partnerships } = store.document;
+  const { textAnnotations, partnerships, individuals } = store.document;
   if (textAnnotations[id]) {
     store.removeTextAnnotation(id);
   } else if (partnerships[id]) {
     store.removePartnership(id);
-  } else {
+  } else if (individuals[id]) {
+    if (Object.keys(individuals).length <= 1) return;
     store.removeIndividual(id);
+  } else {
+    return;
   }
   clearDanglingSelection();
 }

@@ -23,8 +23,13 @@
   border-right: none;
 }
 
-.segment:hover:not(.segmentActive) {
+.segment:hover:not(.segmentActive):not(:disabled) {
   background: color-mix(in srgb, var(--color-border) 50%, transparent);
+}
+
+.segment:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .segmentActive {
