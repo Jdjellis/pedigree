@@ -29,6 +29,12 @@ coverage
 .claude/settings.local.json
 .vercel
 
+# Playwright e2e run artifacts
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
 # Superpowers brainstorming scratch (visual companion mockups)
 .superpowers/
 

@@ -45,3 +45,41 @@ jobs:
           path: coverage/
           if-no-files-found: ignore
           retention-days: 7
+
+  e2e:
+    name: E2E · Playwright (build a pedigree)
+    runs-on: ubuntu-latest
+    # Non-blocking while the harness proves out: a failure here reports but does
+    # not fail the overall run. Drop this line to make the check required once
+    # it has been green across a handful of runs.
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # GitHub runners do not ship the Playwright browser; install just Chromium.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run E2E workflows
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7

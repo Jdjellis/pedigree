@@ -18,7 +18,9 @@ export default defineConfig({
     // Never descend into git worktrees (created under .claude/worktrees/ during
     // isolated sessions). They are full repo copies, so without this Vitest
     // would discover and re-run every test a second time from the worktree.
-    exclude: [...configDefaults.exclude, '.claude/**'],
+    // `e2e/**` holds Playwright specs (`*.spec.ts`) that own the real-browser
+    // canvas coverage and must not run under the jsdom unit runner.
+    exclude: [...configDefaults.exclude, '.claude/**', 'e2e/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'lcov'],
