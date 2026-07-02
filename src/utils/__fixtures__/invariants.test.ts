@@ -100,6 +100,18 @@ describe('noCrossedDescentLines', () => {
     const pos = { p1: { x: 0, y: 150 }, p2: { x: 200, y: 150 }, c1: { x: 180, y: 300 }, c2: { x: 20, y: 300 } };
     expect(noCrossedDescentLines(pos, d).ok).toBe(false);
   });
+  it('passes when cousins are in the same left-to-right order as their parents', () => {
+    const d = doc({
+      individuals: {
+        p1: ind('p1', 0, 1), p2: ind('p2', 200, 1),
+        c1: ind('c1', 20, 2), c2: ind('c2', 180, 2),
+      },
+      partnerships: { u1: union('u1', 'p1', undefined, ['c1']), u2: union('u2', 'p2', undefined, ['c2']) },
+      parentChildLinks: { a: link('a', 'u1', 'c1'), b: link('b', 'u2', 'c2') },
+    });
+    const pos = { p1: { x: 0, y: 150 }, p2: { x: 200, y: 150 }, c1: { x: 20, y: 300 }, c2: { x: 180, y: 300 } };
+    expect(noCrossedDescentLines(pos, d).ok).toBe(true);
+  });
 });
 
 describe('subtreeNonCollision', () => {
@@ -127,6 +139,15 @@ describe('manualOrderPreserved', () => {
     });
     // input: a(0) < b(80); output flips them.
     expect(manualOrderPreserved(d, { p: { x: 0, y: 0 }, a: { x: 80, y: 150 }, b: { x: 0, y: 150 } }).ok).toBe(false);
+  });
+  it('passes when output sibling order agrees with input x order', () => {
+    const d = doc({
+      individuals: { p: ind('p', 0, 0), a: ind('a', 0, 1), b: ind('b', 80, 1) },
+      partnerships: { u: union('u', 'p', undefined, ['a', 'b']) },
+      parentChildLinks: { la: link('la', 'u', 'a'), lb: link('lb', 'u', 'b') },
+    });
+    // input: a(0) < b(80); output keeps that order (a left of b).
+    expect(manualOrderPreserved(d, { p: { x: 0, y: 0 }, a: { x: -40, y: 150 }, b: { x: 40, y: 150 } }).ok).toBe(true);
   });
 });
 
