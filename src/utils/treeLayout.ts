@@ -161,6 +161,39 @@ export function packBlocks(blocks: readonly Block[], spacing: number): number[] 
   return offsets;
 }
 
+/** A rigid group of nodes in one generation row that translate together. */
+export interface RowBlock {
+  ids: string[];
+  minX: number;
+  maxX: number;
+}
+
+/**
+ * Resolve minimum separation across one generation row. `blocks` are given
+ * left-to-right by current x (id tie-break already applied). Returns a per-block
+ * right-shift (>= 0) so adjacent blocks clear each other by `minGap`, measured
+ * between extents. Monotone — never shifts a block left — so an already-separated
+ * row yields all-zero shifts (idempotent). Mirrors {@link packBlocks} applied per
+ * generation row rather than per sibling set.
+ */
+export function resolveRowSeparation(
+  blocks: readonly RowBlock[],
+  minGap: number,
+): number[] {
+  const shifts: number[] = [];
+  let prevMax = -Infinity;
+  for (const b of blocks) {
+    let shift = 0;
+    if (prevMax !== -Infinity) {
+      const need = prevMax + minGap - b.minX;
+      if (need > 0) shift = need;
+    }
+    shifts.push(shift);
+    prevMax = b.maxX + shift;
+  }
+  return shifts;
+}
+
 /** A laid-out subtree in local frame coordinates. */
 interface Frame {
   positions: Record<string, number>;

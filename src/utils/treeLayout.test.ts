@@ -5,6 +5,7 @@ import {
   findRootUnion,
   coupleAround,
   packBlocks,
+  resolveRowSeparation,
   computeTreeLayout,
   type LayoutDoc,
 } from './treeLayout';
@@ -97,6 +98,25 @@ describe('packBlocks', () => {
   it('never pulls an already-clear block left', () => {
     const offsets = packBlocks([{ anchorX: 0, minX: 0, maxX: 0 }, { anchorX: 0, minX: 500, maxX: 500 }], 80);
     expect(offsets).toEqual([0, 0]);
+  });
+});
+
+describe('resolveRowSeparation', () => {
+  const B = (minX: number, maxX: number) => ({ ids: [], minX, maxX });
+  it('leaves an already-separated row untouched (idempotent)', () => {
+    expect(resolveRowSeparation([B(0,0), B(80,80), B(160,160)], 80)).toEqual([0, 0, 0]);
+  });
+  it('pushes a coincident block right to clear minGap (the #115 collision)', () => {
+    expect(resolveRowSeparation([B(100,100), B(100,100)], 80)).toEqual([0, 80]);
+  });
+  it('separates by extents plus gap for a wide block', () => {
+    expect(resolveRowSeparation([B(0,0), B(-60,60)], 80)).toEqual([0, 140]);
+  });
+  it('never pulls a clear block left', () => {
+    expect(resolveRowSeparation([B(0,0), B(500,500)], 80)).toEqual([0, 0]);
+  });
+  it('cascades three coincident points', () => {
+    expect(resolveRowSeparation([B(0,0), B(0,0), B(0,0)], 80)).toEqual([0, 80, 160]);
   });
 });
 
