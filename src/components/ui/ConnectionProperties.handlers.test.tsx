@@ -111,16 +111,23 @@ describe('ConnectionProperties partnership edit handlers', () => {
     );
   });
 
-  it('clears the stale cause when leaving the infertility state', () => {
+  it('parks the infertility cause when leaving it, then restores it on return', () => {
     selectPartnership(
       makePartnership({ childlessStatus: 'infertility', childlessReason: 'azoospermia' }),
     );
     render(<PropertiesPanel />);
 
+    // Leaving infertility hides its cause; the no-children field starts blank.
     fireEvent.click(screen.getByRole('button', { name: 'No children' }));
-    const p = usePedigreeStore.getState().document.partnerships['union1'];
+    let p = usePedigreeStore.getState().document.partnerships['union1'];
     expect(p.childlessStatus).toBe('noChildren');
     expect(p.childlessReason).toBeUndefined();
+
+    // Returning to infertility restores the parked cause instead of losing it.
+    fireEvent.click(screen.getByRole('button', { name: 'Infertility' }));
+    p = usePedigreeStore.getState().document.partnerships['union1'];
+    expect(p.childlessStatus).toBe('infertility');
+    expect(p.childlessReason).toBe('azoospermia');
   });
 
   it('removes the relationship and clears the connection selection', () => {
