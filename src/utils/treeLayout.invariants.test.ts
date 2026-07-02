@@ -10,7 +10,7 @@ import {
   consanguinity, chainedWideCouples, wideCousinFan,
   crossBranchMarriage, wideCoupleAdjacentCousin, wideCoupleInverted,
   wideCoupleOppositeCousin, undefinedGenerationChild,
-  twins, twinsWithSingletonSibling,
+  twins, twinsWithSingletonSibling, remarriageHalfSibs,
 } from './__fixtures__/pedigrees';
 
 // Fixtures that already satisfy their invariants on the current code.
@@ -85,6 +85,18 @@ describe('computeTreeLayout — cross-branch centering', () => {
     expect(minSiblingSpacing(pos, f.doc).violations).toEqual([]);
     expect(noCrossedDescentLines(pos, f.doc).violations).toEqual([]);
     expect(subtreeNonCollision(pos, f.doc).violations).toEqual([]);
+  });
+});
+
+describe('computeTreeLayout — remarriage', () => {
+  it('remarriageHalfSibs: both half-sibships satisfy invariants', () => {
+    // Both half-sibs are seeded at the same x; multi-union layout (#131) must
+    // place the second union's sibship clear of the first so no invariant breaks.
+    const f = remarriageHalfSibs();
+    const moved = computeTreeLayout(f.doc, f.rootUnionId);
+    const pos = finalPositions(f.doc, moved);
+    const res = checkAllInvariants(pos, f.doc);
+    expect(res.violations, JSON.stringify(res.violations, null, 2)).toEqual([]);
   });
 });
 

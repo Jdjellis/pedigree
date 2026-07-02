@@ -481,8 +481,13 @@ export function undefinedGenerationChild(): Fixture {
 /**
  * Remarriage with half-siblings: parent `p` appears in two child-bearing
  * unions — u1 (with spouse1 → kidA) and u2 (with spouse2 → kidB).
- * Documents the known limitation that the layout only processes the first
- * child-bearing union (by insertion order); u2/kidB must not crash.
+ *
+ * Both children are seeded at the SAME x (0) in the same generation row, so a
+ * layout that lays out only the first union (`u1`/`kidA`) and leaves the second
+ * union (`u2`/`kidB`) in place produces a genuine `noSymbolOverlap` /
+ * `subtreeNonCollision` violation. Multi-union layout (issue #131) must place
+ * the second sibship clear of the first. `p` is the shared parent whose two
+ * spouses sit on either side.
  */
 export function remarriageHalfSibs(): Fixture {
   return {
@@ -492,8 +497,9 @@ export function remarriageHalfSibs(): Fixture {
         p: ind('p', 0, 0),
         spouse1: ind('spouse1', 120, 0),
         spouse2: ind('spouse2', -120, 0),
-        kidA: ind('kidA', 60, 1),
-        kidB: ind('kidB', -60, 1),
+        // Both half-sibs seeded at the SAME x → overlap unless u2 is laid out.
+        kidA: ind('kidA', 0, 1),
+        kidB: ind('kidB', 0, 1),
       },
       partnerships: {
         u1: union('u1', 'p', 'spouse1', ['kidA']),

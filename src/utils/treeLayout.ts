@@ -313,16 +313,132 @@ interface Frame {
 }
 
 /**
+ * Compose a person's multiple child-bearing unions into one frame, sharing the
+ * person (`hub`) across all of them. Each union is laid out on its own with the
+ * hub as the incoming blood partner, then the frames are fanned out around the
+ * single shared hub so the sibships sit clear of one another.
+ *
+ * @remarks
+ * Multi-union support (issue #131) lifts the earlier limitation where only the
+ * first child-bearing union was laid out. Each union frame is normalised so the
+ * hub sits at 0, then re-anchored so the hub keeps a single x while each union's
+ * spouse-and-sibship group is packed to a distinct side:
+ *
+ * - Unions are ordered by their spouse's current x (id tie-break) so a manual
+ *   left/right arrangement of the two families survives the relayout.
+ * - Each normalised frame already places its spouse at exactly `partnerSpacing`
+ *   from the hub and its sibship centred under that couple, so re-anchoring by a
+ *   whole-frame translation preserves partner spacing and vertical descent.
+ * - Frames are packed left-to-right with {@link packBlocks} on the non-hub
+ *   footprint, so a second sibship is slid clear of the first (no symbol overlap,
+ *   no crossed descent lines) while the shared hub stays put.
+ *
+ * A single-union person is byte-identical to the previous behaviour: the sole
+ * frame is returned unchanged (offset 0), with the hub as the anchor.
+ *
+ * @remarks Limitation
+ * The bound is two child-bearing unions. A hub with three or more spouses in the
+ * same generation cannot keep every couple at exactly `partnerSpacing` (a single
+ * point is 120 from at most two others), so packing a third spouse-group clear of
+ * the first two necessarily widens its couple past `partnerSpacing`. The sibships
+ * are still laid out and separated (no overlap, no crossed descent lines); only
+ * the exact partner-spacing aesthetic degrades for the 3rd+ union.
+ *
+ * @param hub - The person shared by every union in `unions`.
+ * @param unions - The person's child-bearing unions (≥1), each with ≥1 child.
+ */
+function composeHubUnions(
+  hub: string,
+  unions: readonly PartnershipRelationship[],
+  doc: LayoutDoc,
+  spacing: LayoutSpacing,
+  visited: Set<string>,
+): Frame {
+  // Deterministic left-to-right order: by the spouse's current x, id tie-break.
+  // The hub itself is dropped from the sort key; a union with no other placeable
+  // partner sorts by its own id.
+  const spouseOf = (u: PartnershipRelationship): string | null => {
+    const other = u.partner1Id === hub ? u.partner2Id : u.partner1Id;
+    return other && doc.individuals[other] ? other : null;
+  };
+  const ordered = [...unions].sort((a, b) => {
+    const sa = spouseOf(a);
+    const sb = spouseOf(b);
+    const xa = sa ? doc.individuals[sa].position.x : 0;
+    const xb = sb ? doc.individuals[sb].position.x : 0;
+    if (xa !== xb) return xa - xb;
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+
+  // Lay out each union and normalise so the hub sits at local x = 0. Everything
+  // else in the frame (spouse, sibship, descent) rides along, so partner spacing
+  // and vertical descent lines are preserved by the whole-frame translation.
+  interface HubFrame {
+    frame: Frame;
+    /** The frame's footprint EXCLUDING the hub node, used for packing. */
+    minX: number;
+    maxX: number;
+  }
+  const hubFrames: HubFrame[] = [];
+  for (const u of ordered) {
+    const raw = layoutUnionFrame(u.id, hub, doc, spacing, visited);
+    const hubX = raw.positions[hub] ?? raw.anchorX;
+    const positions: Record<string, number> = {};
+    for (const [id, x] of Object.entries(raw.positions)) positions[id] = x - hubX;
+    // Non-hub footprint: the spouse + sibship + descent that must clear siblings.
+    const nonHubXs = Object.entries(positions)
+      .filter(([id]) => id !== hub)
+      .map(([, x]) => x);
+    const minX = nonHubXs.length ? Math.min(...nonHubXs) : 0;
+    const maxX = nonHubXs.length ? Math.max(...nonHubXs) : 0;
+    hubFrames.push({
+      frame: { positions, anchorX: 0, minX: raw.minX - hubX, maxX: raw.maxX - hubX },
+      minX,
+      maxX,
+    });
+  }
+
+  // Single union → identical to the previous behaviour (offset 0, hub at 0).
+  if (hubFrames.length === 1) {
+    const only = hubFrames[0].frame;
+    return { ...only, anchorX: only.positions[hub] ?? 0 };
+  }
+
+  // Pack the non-hub footprints left-to-right so later sibships clear earlier
+  // ones by at least siblingSpacing. The hub stays at 0; each union's spouse and
+  // sibship translate by the packing offset for their frame.
+  const offsets = packBlocks(
+    hubFrames.map((h) => ({ anchorX: 0, minX: h.minX, maxX: h.maxX })),
+    spacing.siblingSpacing,
+  );
+
+  const positions: Record<string, number> = { [hub]: 0 };
+  let minX = 0;
+  let maxX = 0;
+  hubFrames.forEach((h, i) => {
+    const off = offsets[i];
+    for (const [id, x] of Object.entries(h.frame.positions)) {
+      if (id === hub) continue;
+      positions[id] = x + off;
+    }
+    minX = Math.min(minX, h.frame.minX + off);
+    maxX = Math.max(maxX, h.frame.maxX + off);
+  });
+
+  return { positions, anchorX: 0, minX, maxX };
+}
+
+/**
  * Lay out the subtree headed by `childId` (a blood node): the child, its
  * married-in partner(s), and everything below. `anchorX` is the blood child's
  * own x, used by the parent union to centre over its children.
  *
  * @remarks
- * Only the **first** child-bearing union for this individual (by insertion order
- * in `doc.partnerships`) is tidy-laid-out. Children from later unions (e.g. a
- * remarriage) are left at their current canvas positions — a known best-effort
- * limitation. All unions are still traversed for leaf-partner placement when
- * checking for a childless partner block.
+ * All of the individual's child-bearing unions are laid out and composed around
+ * the shared individual via {@link composeHubUnions} (issue #131 lifted the
+ * earlier "first union only" limitation, so a remarriage's second sibship is now
+ * placed clear of the first rather than left at its seed position). A load-bearing
+ * in-law within any union is still left in place rather than relocated.
  */
 function layoutChildBlock(
   childId: string,
@@ -353,8 +469,7 @@ function layoutChildBlock(
     const xs = Object.values(positions);
     return { positions, anchorX: positions[childId], minX: Math.min(...xs), maxX: Math.max(...xs) };
   }
-  // Use the child's first child-bearing union as the primary line.
-  const frame = layoutUnionFrame(childUnions[0].id, childId, doc, spacing, visited);
+  const frame = composeHubUnions(childId, childUnions, doc, spacing, visited);
   return { ...frame, anchorX: frame.positions[childId] ?? frame.anchorX };
 }
 
@@ -902,7 +1017,29 @@ export function computeTreeLayout(
   const rootUnion = doc.partnerships[rootUnionId];
   if (!rootUnion) return {};
 
-  const frame = layoutUnionFrame(rootUnionId, null, doc, spacing, new Set());
+  // All child-bearing unions a placed person heads (deterministic by id).
+  const childBearingUnionsOf = (personId: string): PartnershipRelationship[] =>
+    Object.values(doc.partnerships)
+      .filter(
+        (u) =>
+          (u.partner1Id === personId || u.partner2Id === personId) &&
+          u.childrenIds.some((cid) => doc.individuals[cid]),
+      )
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+
+  // A root partner that heads ≥2 child-bearing unions is a remarriage hub whose
+  // second (and later) sibships must be laid out too (issue #131). Lay out the
+  // hub's unions together via composeHubUnions rather than only `rootUnionId`, so
+  // every union descending from the root founder is placed and separated. When no
+  // root partner is such a hub, fall back to the ordinary single-union frame.
+  const rootFounders = [rootUnion.partner1Id, rootUnion.partner2Id].filter(
+    (id): id is string => !!id && !!doc.individuals[id],
+  );
+  const hubId = rootFounders.find((id) => childBearingUnionsOf(id).length >= 2);
+  const visited = new Set<string>();
+  const frame = hubId
+    ? composeHubUnions(hubId, childBearingUnionsOf(hubId), doc, spacing, visited)
+    : layoutUnionFrame(rootUnionId, null, doc, spacing, visited);
 
   // Horizontal anchor: keep the root's current centre fixed. Anchor only on
   // partners actually placed in the frame (a pinned load-bearing partner is
